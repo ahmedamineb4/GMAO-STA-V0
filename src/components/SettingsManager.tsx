@@ -299,110 +299,112 @@ export default function SettingsManager({
           </div>
 
           {/* Profile Passwords Management Card */}
-          <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 text-neutral-700 flex items-center gap-1.5">
-              <Lock className="h-4.5 w-4.5 text-neutral-500" />
-              Mots de Passe des Profils
-            </h3>
+          {isAdmin && (
+            <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+              <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 text-neutral-700 flex items-center gap-1.5">
+                <Lock className="h-4.5 w-4.5 text-neutral-500" />
+                Mots de Passe des Profils
+              </h3>
 
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Définissez les codes PIN d'accès pour chaque profil utilisateur afin de limiter les privilèges sur la GMAO.
-            </p>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Définissez les codes PIN d'accès pour chaque profil utilisateur afin de limiter les privilèges sur la GMAO.
+              </p>
 
-            <form onSubmit={handleSavePasswords} className="space-y-3">
-              <div className="space-y-2.5 text-xs">
-                <div>
-                  <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
-                    <span>M. Ahmed Amine (Admin) :</span>
-                    <span className="text-[9px] bg-red-50 text-chery-red px-1.5 py-0.2 rounded font-mono font-semibold">Privilèges Totaux</span>
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!isWritable}
-                    value={localPasswords.admin || ""}
-                    onChange={(e) => setLocalPasswords({ ...localPasswords, admin: e.target.value })}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                    placeholder="PIN Code"
-                  />
+              <form onSubmit={handleSavePasswords} className="space-y-3">
+                <div className="space-y-2.5 text-xs">
+                  <div>
+                    <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
+                      <span>M. Ahmed Amine (Admin) :</span>
+                      <span className="text-[9px] bg-red-50 text-chery-red px-1.5 py-0.2 rounded font-mono font-semibold">Privilèges Totaux</span>
+                    </label>
+                    <input
+                      type="text"
+                      disabled={!isWritable}
+                      value={localPasswords.admin || ""}
+                      onChange={(e) => setLocalPasswords({ ...localPasswords, admin: e.target.value })}
+                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                      placeholder="PIN Code"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
+                      <span>Superviseur (Lecture Seule) :</span>
+                      <span className="text-[9px] bg-neutral-100 text-neutral-500 px-1.5 py-0.2 rounded font-mono font-semibold">Lecture Totale</span>
+                    </label>
+                    <input
+                      type="text"
+                      disabled={!isWritable}
+                      value={localPasswords.supervisor || ""}
+                      onChange={(e) => setLocalPasswords({ ...localPasswords, supervisor: e.target.value })}
+                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                      placeholder="PIN Code"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
+                      <span>Magasinier (Pièces & Stocks) :</span>
+                      <span className="text-[9px] bg-neutral-100 text-neutral-500 px-1.5 py-0.2 rounded font-mono font-semibold">Gestion Pièces</span>
+                    </label>
+                    <input
+                      type="text"
+                      disabled={!isWritable}
+                      value={localPasswords.magasin || ""}
+                      onChange={(e) => setLocalPasswords({ ...localPasswords, magasin: e.target.value })}
+                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                      placeholder="PIN Code"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
+                      <span>Chefs d'Atelier (Opérateurs) :</span>
+                      <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.2 rounded font-mono font-semibold">Ateliers Individuels</span>
+                    </label>
+                    <input
+                      type="text"
+                      disabled={!isWritable}
+                      value={localPasswords.service_rapide || ""}
+                      onChange={(e) => {
+                        const newPin = e.target.value;
+                        setLocalPasswords({
+                          ...localPasswords,
+                          service_rapide: newPin,
+                          atelier_mecanique: newPin,
+                          atelier_diagnostic: newPin,
+                          carrosserie: newPin,
+                          lavage: newPin,
+                          batiment: newPin
+                        });
+                      }}
+                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                      placeholder="PIN Code"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
-                    <span>Superviseur (Lecture Seule) :</span>
-                    <span className="text-[9px] bg-neutral-100 text-neutral-500 px-1.5 py-0.2 rounded font-mono font-semibold">Lecture Totale</span>
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!isWritable}
-                    value={localPasswords.supervisor || ""}
-                    onChange={(e) => setLocalPasswords({ ...localPasswords, supervisor: e.target.value })}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                    placeholder="PIN Code"
-                  />
-                </div>
+                {passwordSaveFeedback && (
+                  <div className="p-2 bg-green-50 border border-green-100 text-green-700 rounded-lg text-[11px] font-semibold text-center leading-tight">
+                    {passwordSaveFeedback}
+                  </div>
+                )}
 
-                <div>
-                  <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
-                    <span>Magasinier (Pièces & Stocks) :</span>
-                    <span className="text-[9px] bg-neutral-100 text-neutral-500 px-1.5 py-0.2 rounded font-mono font-semibold">Gestion Pièces</span>
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!isWritable}
-                    value={localPasswords.magasin || ""}
-                    onChange={(e) => setLocalPasswords({ ...localPasswords, magasin: e.target.value })}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                    placeholder="PIN Code"
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
-                    <span>Chefs d'Atelier (Opérateurs) :</span>
-                    <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.2 rounded font-mono font-semibold">Ateliers Individuels</span>
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!isWritable}
-                    value={localPasswords.service_rapide || ""}
-                    onChange={(e) => {
-                      const newPin = e.target.value;
-                      setLocalPasswords({
-                        ...localPasswords,
-                        service_rapide: newPin,
-                        atelier_mecanique: newPin,
-                        atelier_diagnostic: newPin,
-                        carrosserie: newPin,
-                        lavage: newPin,
-                        batiment: newPin
-                      });
-                    }}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                    placeholder="PIN Code"
-                  />
-                </div>
-              </div>
-
-              {passwordSaveFeedback && (
-                <div className="p-2 bg-green-50 border border-green-100 text-green-700 rounded-lg text-[11px] font-semibold text-center leading-tight">
-                  {passwordSaveFeedback}
-                </div>
-              )}
-
-              {isWritable ? (
-                <button
-                  type="submit"
-                  className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer text-center"
-                >
-                  Sauvegarder les codes d'accès
-                </button>
-              ) : (
-                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] text-neutral-400 font-medium text-center">
-                  🔒 Modification des PINs réservée à l'Administrateur
-                </div>
-              )}
-            </form>
-          </div>
+                {isWritable ? (
+                  <button
+                    type="submit"
+                    className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer text-center"
+                  >
+                    Sauvegarder les codes d'accès
+                  </button>
+                ) : (
+                  <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] text-neutral-400 font-medium text-center">
+                    🔒 Modification des PINs réservée à l'Administrateur
+                  </div>
+                )}
+              </form>
+            </div>
+          )}
         </div>
 
         {/* Right column: Budget allocation */}

@@ -24,7 +24,8 @@ import {
   ShieldCheck,
   HelpCircle,
   Menu,
-  X
+  X,
+  Presentation
 } from "lucide-react";
 
 // Types & Initial Data
@@ -61,6 +62,7 @@ import ContractsManager from "./components/ContractsManager";
 import ExcelBlueprint from "./components/ExcelBlueprint";
 import PurchasesManager from "./components/PurchasesManager";
 import SettingsManager from "./components/SettingsManager";
+import UserGuide from "./components/UserGuide";
 
 export default function App() {
   // Navigation State
@@ -760,6 +762,24 @@ export default function App() {
               <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "excel" ? "opacity-100" : ""}`} />
             </button>
 
+            {/* 📖 Manuel & Formation */}
+            <button
+              onClick={() => {
+                setActiveTab("guide");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "guide"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Presentation className="h-4 w-4" />
+                <span>📖 Guide & Formation</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "guide" ? "opacity-100" : ""}`} />
+            </button>
+
             {/* ⚙️ Paramètres */}
             <button
               onClick={() => {
@@ -828,6 +848,7 @@ export default function App() {
                     { id: "achats", label: "🛒 Achats", icon: ShoppingCart },
                     { id: "contracts", label: "📑 Contrats & Conformité", icon: ShieldCheck },
                     { id: "excel", label: "📊 Rapports & Export", icon: FileSpreadsheet },
+                    { id: "guide", label: "📖 Guide & Formation", icon: Presentation },
                     { id: "settings", label: "⚙️ Paramètres", icon: Settings }
                   ].map((tab) => {
                     return (
@@ -992,6 +1013,10 @@ export default function App() {
               onUpdatePasswords={setPasswords}
             />
           )}
+
+          {activeTab === "guide" && (
+            <UserGuide onNavigate={setActiveTab} />
+          )}
         </main>
       </div>
 
@@ -1034,26 +1059,30 @@ export default function App() {
               )}
             </div>
 
-            <div className="text-center pt-1">
-              <button
-                type="button"
-                onClick={() => setShowHelperCodes(!showHelperCodes)}
-                className="text-[10px] text-neutral-400 hover:text-neutral-600 font-semibold underline transition-colors"
-              >
-                {showHelperCodes ? "Masquer l'aide d'accès" : "Afficher l'aide d'accès (Démo)"}
-              </button>
-            </div>
-
-            {showHelperCodes && (
-              <div className="text-center py-2 text-[10px] text-neutral-500 font-medium space-y-1 bg-amber-50 rounded-xl border border-amber-100 p-2.5 animate-fade-in">
-                <span className="font-semibold text-amber-800">💡 Code Démo de Secours :</span>
-                <div className="grid grid-cols-2 gap-1 text-[9px] text-neutral-600">
-                  <div>Admin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.admin}</code></div>
-                  <div>Superviseur: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.supervisor}</code></div>
-                  <div>Magasin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.magasin}</code></div>
-                  <div>Ateliers: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.service_rapide}</code></div>
+            {pendingRole === "admin" && (
+              <>
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowHelperCodes(!showHelperCodes)}
+                    className="text-[10px] text-neutral-400 hover:text-neutral-600 font-semibold underline transition-colors"
+                  >
+                    {showHelperCodes ? "Masquer l'aide d'accès" : "Afficher l'aide d'accès (Démo)"}
+                  </button>
                 </div>
-              </div>
+
+                {showHelperCodes && (
+                  <div className="text-center py-2 text-[10px] text-neutral-500 font-medium space-y-1 bg-amber-50 rounded-xl border border-amber-100 p-2.5 animate-fade-in">
+                    <span className="font-semibold text-amber-800">💡 Code Démo de Secours :</span>
+                    <div className="grid grid-cols-2 gap-1 text-[9px] text-neutral-600">
+                      <div>Admin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.admin}</code></div>
+                      <div>Superviseur: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.supervisor}</code></div>
+                      <div>Magasin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.magasin}</code></div>
+                      <div>Ateliers: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.service_rapide}</code></div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex gap-3 pt-1">
