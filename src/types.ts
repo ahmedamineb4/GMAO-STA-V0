@@ -117,3 +117,15 @@ export interface AlertNotification {
   resolved: boolean;
   linkedRef?: string; // code or id
 }
+
+export interface PurchaseRequest {
+  id: string;
+  partCode: string;
+  quantity: number;
+  vendorId: string;
+  requestedBy: string;
+  dateRequested: string;
+  status: "En attente" | "Approuvé" | "Commandé" | "Reçu" | "Refusé";
+  estimatedCost: number;
+}
+

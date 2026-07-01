@@ -16,6 +16,12 @@ import {
   User,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
+  ShoppingCart,
+  Building,
+  Calendar,
+  Sliders,
+  ShieldCheck,
   HelpCircle,
   Menu,
   X
@@ -32,7 +38,8 @@ import {
   ComplianceCheck,
   EquipmentStatus,
   InterventionStatus,
-  Workshop
+  Workshop,
+  PurchaseRequest
 } from "./types";
 
 import {
@@ -52,11 +59,23 @@ import InterventionsManager from "./components/InterventionsManager";
 import InventoryManager from "./components/InventoryManager";
 import ContractsManager from "./components/ContractsManager";
 import ExcelBlueprint from "./components/ExcelBlueprint";
+import PurchasesManager from "./components/PurchasesManager";
+import SettingsManager from "./components/SettingsManager";
 
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+
+  // Collapsible Sidebar Menus State
+  const [parcOpen, setParcOpen] = useState<boolean>(true);
+  const [maintenanceOpen, setMaintenanceOpen] = useState<boolean>(true);
+
+  // Nested filter states
+  const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>("All");
+  const [selectedMaintenanceType, setSelectedMaintenanceType] = useState<string>("All");
+  const [selectedMaintenanceStatus, setSelectedMaintenanceStatus] = useState<string>("All");
+  const [showMaintenanceCalendar, setShowMaintenanceCalendar] = useState<boolean>(false);
 
   // Core Reactive States (With LocalStorage persistence fallback)
   const [equipments, setEquipments] = useState<Equipment[]>(() => {
@@ -74,7 +93,38 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_SPARE_PARTS;
   });
 
-  const [vendors] = useState<Vendor[]>(INITIAL_VENDORS);
+  const [vendors, setVendors] = useState<Vendor[]>(() => {
+    const saved = localStorage.getItem("chery_gmao_vendors");
+    return saved ? JSON.parse(saved) : INITIAL_VENDORS;
+  });
+
+  const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>(() => {
+    const saved = localStorage.getItem("chery_gmao_purchase_requests");
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: "DA-2026-001",
+        partCode: "PR-CR-FILT",
+        quantity: 5,
+        vendorId: "VND-SOCO",
+        requestedBy: "M. Ahmed Amine Ben Salah",
+        dateRequested: "2026-06-25",
+        status: "Approuvé",
+        estimatedCost: 1600,
+      },
+      {
+        id: "DA-2026-002",
+        partCode: "PR-SR-FL1",
+        quantity: 10,
+        vendorId: "VND-SOCO",
+        requestedBy: "M. Ahmed Amine Ben Salah",
+        dateRequested: "2026-06-30",
+        status: "En attente",
+        estimatedCost: 850,
+      }
+    ];
+  });
+
   const [contracts] = useState<MaintenanceContract[]>(INITIAL_CONTRACTS);
 
   const [compliance, setCompliance] = useState<ComplianceCheck[]>(() => {
@@ -99,6 +149,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("chery_gmao_spare_parts", JSON.stringify(spareParts));
   }, [spareParts]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_vendors", JSON.stringify(vendors));
+  }, [vendors]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_purchase_requests", JSON.stringify(purchaseRequests));
+  }, [purchaseRequests]);
 
   useEffect(() => {
     localStorage.setItem("chery_gmao_compliance", JSON.stringify(compliance));
@@ -212,6 +270,45 @@ export default function App() {
     setCompliance((prev) => [newCheck, ...prev]);
   };
 
+  // H. Purchase Order (DA) Operations
+  const handleAddPurchaseRequest = (newReq: PurchaseRequest) => {
+    setPurchaseRequests((prev) => [newReq, ...prev]);
+  };
+
+  const handleUpdatePurchaseRequestStatus = (id: string, nextStatus: PurchaseRequest["status"]) => {
+    setPurchaseRequests((prev) =>
+      prev.map((req) => {
+        if (req.id === id) {
+          // If the request transitions to "Reçu" for the first time, automatically replenish the inventory!
+          if (nextStatus === "Reçu" && req.status !== "Reçu") {
+            handleRestockPart(req.partCode, req.quantity);
+          }
+          return { ...req, status: nextStatus };
+        }
+        return req;
+      })
+    );
+  };
+
+  const handleAddVendor = (newVendor: Vendor) => {
+    setVendors((prev) => [newVendor, ...prev]);
+  };
+
+  const handleUpdateBudgetAllocation = (workshop: Workshop, amount: number) => {
+    setBudget((prev) => {
+      const nextAllocated: Record<Workshop, number> = {
+        ...prev.allocatedByWorkshop,
+        [workshop]: amount
+      };
+      const nextTotal = Object.values(nextAllocated).reduce((sum: number, val: any) => sum + Number(val || 0), 0);
+      return {
+        ...prev,
+        allocatedByWorkshop: nextAllocated,
+        totalBudget: nextTotal
+      };
+    });
+  };
+
   // Reset demo data to initial values
   const handleResetDemoData = () => {
     if (window.confirm("Voulez-vous réinitialiser l'ensemble des données aux valeurs par défaut de STA Tunisie ?")) {
@@ -220,11 +317,41 @@ export default function App() {
       localStorage.removeItem("chery_gmao_spare_parts");
       localStorage.removeItem("chery_gmao_compliance");
       localStorage.removeItem("chery_gmao_budget");
+      localStorage.removeItem("chery_gmao_vendors");
+      localStorage.removeItem("chery_gmao_purchase_requests");
+      
       setEquipments(INITIAL_EQUIPMENTS);
       setInterventions(INITIAL_INTERVENTIONS);
       setSpareParts(INITIAL_SPARE_PARTS);
       setCompliance(INITIAL_COMPLIANCE_CHECKS);
       setBudget(BUDGET_2026);
+      setVendors(INITIAL_VENDORS);
+      setPurchaseRequests([
+        {
+          id: "DA-2026-001",
+          partCode: "PR-CR-FILT",
+          quantity: 5,
+          vendorId: "VND-SOCO",
+          requestedBy: "M. Ahmed Amine Ben Salah",
+          dateRequested: "2026-06-25",
+          status: "Approuvé",
+          estimatedCost: 1600,
+        },
+        {
+          id: "DA-2026-002",
+          partCode: "PR-SR-FL1",
+          quantity: 10,
+          vendorId: "VND-SOCO",
+          requestedBy: "M. Ahmed Amine Ben Salah",
+          dateRequested: "2026-06-30",
+          status: "En attente",
+          estimatedCost: 850,
+        }
+      ]);
+      setSelectedWorkshopFilter("All");
+      setSelectedMaintenanceType("All");
+      setSelectedMaintenanceStatus("All");
+      setShowMaintenanceCalendar(false);
       setActiveTab("dashboard");
     }
   };
@@ -288,38 +415,240 @@ export default function App() {
         
         {/* Navigation Sidebar (Desktop version) */}
         <aside className="hidden md:block w-64 shrink-0 space-y-6">
-          <div className="bg-white rounded-2xl border border-neutral-100 p-4 shadow-xs space-y-1">
+          <div className="bg-white rounded-2xl border border-neutral-100 p-4 shadow-xs space-y-2">
             <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-3 pb-2 block border-b border-neutral-100 mb-2">
-              Pilotage & GMAO
+              Menu Principal GMAO
             </span>
 
-            {[
-              { id: "dashboard", label: "Tableau de Bord", icon: LayoutDashboard },
-              { id: "equipements", label: "Registre Équipements", icon: Wrench },
-              { id: "interventions", label: "Bons d'Intervention", icon: FileText },
-              { id: "inventaire", label: "Magasin & Pièces", icon: Package },
-              { id: "contracts", label: "Contrats & Conformité", icon: ShieldAlert },
-              { id: "excel", label: "Générateur Excel", icon: FileSpreadsheet }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === tab.id
-                      ? "bg-chery-red text-white shadow-md shadow-red-500/10"
-                      : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className="h-4 w-4" />
-                    <span>{tab.label}</span>
-                  </div>
-                  <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === tab.id ? "opacity-100" : ""}`} />
-                </button>
-              );
-            })}
+            {/* 🏠 Tableau de Bord */}
+            <button
+              onClick={() => {
+                setActiveTab("dashboard");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "dashboard"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <LayoutDashboard className="h-4 w-4" />
+                <span>🏠 Tableau de Bord</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "dashboard" ? "opacity-100" : ""}`} />
+            </button>
+
+            {/* 🏭 Parc Équipements Accordion */}
+            <div className="space-y-1">
+              <button
+                onClick={() => setParcOpen(!parcOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === "equipements"
+                    ? "bg-neutral-100 text-neutral-800"
+                    : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Wrench className="h-4 w-4 text-neutral-500" />
+                  <span>🏭 Parc Équipements</span>
+                </div>
+                {parcOpen ? <ChevronDown className="h-3.5 w-3.5 text-neutral-500" /> : <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />}
+              </button>
+              
+              {parcOpen && (
+                <div className="pl-4 pr-1 py-1 space-y-1 border-l border-neutral-100 ml-4">
+                  {[
+                    { id: "All", label: "Tous les Équipements" },
+                    { id: "Service Rapide", label: "Service Rapide" },
+                    { id: "Atelier Mécanique", label: "Atelier Mécanique / élec" },
+                    { id: "Atelier Diagnostic", label: "Atelier Diagnostic" },
+                    { id: "Carrosserie", label: "Carrosserie" },
+                    { id: "Lavage", label: "Lavage" },
+                    { id: "Maintenance Bâtiment", label: "Bâtiment & Showroom" }
+                  ].map((sub) => {
+                    const isSelected = activeTab === "equipements" && selectedWorkshopFilter === sub.id;
+                    return (
+                      <button
+                        key={sub.id}
+                        onClick={() => {
+                          setActiveTab("equipements");
+                          setSelectedWorkshopFilter(sub.id);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer block ${
+                          isSelected
+                            ? "bg-neutral-800 text-white font-bold shadow-xs"
+                            : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+                        }`}
+                      >
+                        • {sub.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 🔧 Maintenance Accordion */}
+            <div className="space-y-1">
+              <button
+                onClick={() => setMaintenanceOpen(!maintenanceOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === "maintenance"
+                    ? "bg-neutral-100 text-neutral-800"
+                    : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Sliders className="h-4 w-4 text-neutral-500" />
+                  <span>🔧 Maintenance</span>
+                </div>
+                {maintenanceOpen ? <ChevronDown className="h-3.5 w-3.5 text-neutral-500" /> : <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />}
+              </button>
+              
+              {maintenanceOpen && (
+                <div className="pl-4 pr-1 py-1 space-y-1 border-l border-neutral-100 ml-4">
+                  {[
+                    { id: "preventive", label: "Préventive", type: "Préventif", status: "All", calendar: false },
+                    { id: "corrective", label: "Corrective", type: "Correctif", status: "All", calendar: false },
+                    { id: "planning", label: "Planning", type: "All", status: "Planifié", calendar: false },
+                    { id: "calendrier", label: "Calendrier View", type: "All", status: "All", calendar: true }
+                  ].map((sub) => {
+                    const isSelected =
+                      activeTab === "maintenance" &&
+                      (sub.calendar
+                        ? showMaintenanceCalendar
+                        : selectedMaintenanceType === sub.type && selectedMaintenanceStatus === sub.status && !showMaintenanceCalendar);
+                    
+                    return (
+                      <button
+                        key={sub.id}
+                        onClick={() => {
+                          setActiveTab("maintenance");
+                          setSelectedMaintenanceType(sub.type);
+                          setSelectedMaintenanceStatus(sub.status);
+                          setShowMaintenanceCalendar(sub.calendar);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer block ${
+                          isSelected
+                            ? "bg-neutral-800 text-white font-bold shadow-xs"
+                            : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+                        }`}
+                      >
+                        • {sub.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 📋 Interventions */}
+            <button
+              onClick={() => {
+                setActiveTab("interventions");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "interventions"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <FileText className="h-4 w-4" />
+                <span>📋 Interventions</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "interventions" ? "opacity-100" : ""}`} />
+            </button>
+
+            {/* 📦 Stock & Pièces */}
+            <button
+              onClick={() => {
+                setActiveTab("inventaire");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "inventaire"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Package className="h-4 w-4" />
+                <span>📦 Stock & Pièces</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "inventaire" ? "opacity-100" : ""}`} />
+            </button>
+
+            {/* 🛒 Achats */}
+            <button
+              onClick={() => {
+                setActiveTab("achats");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "achats"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <ShoppingCart className="h-4 w-4" />
+                <span>🛒 Achats</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "achats" ? "opacity-100" : ""}`} />
+            </button>
+
+            {/* 📑 Contrats & Conformité */}
+            <button
+              onClick={() => {
+                setActiveTab("contracts");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "contracts"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className="h-4 w-4" />
+                <span>📑 Contrats & Conformité</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "contracts" ? "opacity-100" : ""}`} />
+            </button>
+
+            {/* 📊 Rapports & Export */}
+            <button
+              onClick={() => {
+                setActiveTab("excel");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "excel"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="h-4 w-4" />
+                <span>📊 Rapports & Export</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "excel" ? "opacity-100" : ""}`} />
+            </button>
+
+            {/* ⚙️ Paramètres */}
+            <button
+              onClick={() => {
+                setActiveTab("settings");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "settings"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Settings className="h-4 w-4" />
+                <span>⚙️ Paramètres</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "settings" ? "opacity-100" : ""}`} />
+            </button>
           </div>
 
           {/* Quick action checklist / system status card */}
@@ -345,7 +674,7 @@ export default function App() {
         {/* Mobile Navigation Sidebar Drawer */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 flex md:hidden bg-neutral-900/40 backdrop-blur-xs">
-            <div className="bg-white w-64 max-w-sm h-full p-5 flex flex-col justify-between shadow-2xl relative animate-fade-in-left">
+            <div className="bg-white w-64 max-w-sm h-full p-5 flex flex-col justify-between shadow-2xl relative animate-fade-in-left overflow-y-auto">
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
                   <div className="flex items-center gap-2">
@@ -364,14 +693,15 @@ export default function App() {
 
                 <div className="space-y-1">
                   {[
-                    { id: "dashboard", label: "Tableau de Bord", icon: LayoutDashboard },
-                    { id: "equipements", label: "Registre Équipements", icon: Wrench },
-                    { id: "interventions", label: "Bons d'Intervention", icon: FileText },
-                    { id: "inventaire", label: "Magasin & Pièces", icon: Package },
-                    { id: "contracts", label: "Contrats & Conformité", icon: ShieldAlert },
-                    { id: "excel", label: "Générateur Excel", icon: FileSpreadsheet }
+                    { id: "dashboard", label: "🏠 Tableau de Bord", icon: LayoutDashboard },
+                    { id: "equipements", label: "🏭 Parc Équipements", icon: Wrench },
+                    { id: "interventions", label: "📋 Interventions", icon: FileText },
+                    { id: "inventaire", label: "📦 Stock & Pièces", icon: Package },
+                    { id: "achats", label: "🛒 Achats", icon: ShoppingCart },
+                    { id: "contracts", label: "📑 Contrats & Conformité", icon: ShieldCheck },
+                    { id: "excel", label: "📊 Rapports & Export", icon: FileSpreadsheet },
+                    { id: "settings", label: "⚙️ Paramètres", icon: Settings }
                   ].map((tab) => {
-                    const Icon = tab.icon;
                     return (
                       <button
                         key={tab.id}
@@ -385,7 +715,6 @@ export default function App() {
                             : "text-neutral-500 hover:bg-neutral-50"
                         }`}
                       >
-                        <Icon className="h-4.5 w-4.5" />
                         <span>{tab.label}</span>
                       </button>
                     );
@@ -420,7 +749,12 @@ export default function App() {
               spareParts={spareParts}
               compliance={compliance}
               budget={budget}
-              onNavigate={(tab) => setActiveTab(tab)}
+              onNavigate={(tab) => {
+                if (tab === "equipements") {
+                  setSelectedWorkshopFilter("All");
+                }
+                setActiveTab(tab);
+              }}
             />
           )}
 
@@ -430,6 +764,20 @@ export default function App() {
               interventions={interventions}
               onAddEquipment={handleAddEquipment}
               onUpdateStatus={handleUpdateEquipmentStatus}
+              initialWorkshop={selectedWorkshopFilter}
+            />
+          )}
+
+          {activeTab === "maintenance" && (
+            <InterventionsManager
+              interventions={interventions}
+              equipments={equipments}
+              spareParts={spareParts}
+              onAddIntervention={handleAddIntervention}
+              onUpdateInterventionStatus={handleUpdateInterventionStatus}
+              initialType={selectedMaintenanceType}
+              initialStatus={selectedMaintenanceStatus}
+              showCalendarByDefault={showMaintenanceCalendar}
             />
           )}
 
@@ -440,6 +788,9 @@ export default function App() {
               spareParts={spareParts}
               onAddIntervention={handleAddIntervention}
               onUpdateInterventionStatus={handleUpdateInterventionStatus}
+              initialType="All"
+              initialStatus="All"
+              showCalendarByDefault={false}
             />
           )}
 
@@ -449,6 +800,17 @@ export default function App() {
               equipments={equipments}
               onRestockPart={handleRestockPart}
               onAddPart={handleAddPart}
+            />
+          )}
+
+          {activeTab === "achats" && (
+            <PurchasesManager
+              purchaseRequests={purchaseRequests}
+              spareParts={spareParts}
+              vendors={vendors}
+              onAddPurchaseRequest={handleAddPurchaseRequest}
+              onUpdatePurchaseRequestStatus={handleUpdatePurchaseRequestStatus}
+              onAddVendor={handleAddVendor}
             />
           )}
 
@@ -471,6 +833,14 @@ export default function App() {
               vendors={vendors}
               compliance={compliance}
               budget={budget}
+            />
+          )}
+
+          {activeTab === "settings" && (
+            <SettingsManager
+              budget={budget}
+              onUpdateBudgetAllocation={handleUpdateBudgetAllocation}
+              onResetDemoData={handleResetDemoData}
             />
           )}
         </main>

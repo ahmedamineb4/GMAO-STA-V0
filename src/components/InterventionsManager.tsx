@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   FileText,
   Search,
@@ -18,7 +18,11 @@ import {
   Sparkles,
   Layers,
   X,
-  Package
+  Package,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  CalendarRange
 } from "lucide-react";
 import { Equipment, Intervention, InterventionStatus, InterventionType, SparePart, PartUsed } from "../types";
 
@@ -28,6 +32,9 @@ interface InterventionsManagerProps {
   spareParts: SparePart[];
   onAddIntervention: (newInt: Intervention) => void;
   onUpdateInterventionStatus: (id: string, status: InterventionStatus) => void;
+  initialType?: string;
+  initialStatus?: string;
+  showCalendarByDefault?: boolean;
 }
 
 export default function InterventionsManager({
@@ -35,12 +42,53 @@ export default function InterventionsManager({
   equipments,
   spareParts,
   onAddIntervention,
-  onUpdateInterventionStatus
+  onUpdateInterventionStatus,
+  initialType = "All",
+  initialStatus = "All",
+  showCalendarByDefault = false
 }: InterventionsManagerProps) {
+  // Navigation tabs inside Interventions Manager
+  const [viewMode, setViewMode] = useState<"list" | "calendar">(showCalendarByDefault ? "calendar" : "list");
+
+  // Sync viewMode from props
+  useEffect(() => {
+    setViewMode(showCalendarByDefault ? "calendar" : "list");
+  }, [showCalendarByDefault]);
+
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedType, setSelectedType] = useState<string>("All");
-  const [selectedStatus, setSelectedStatus] = useState<string>("All");
+  const [selectedType, setSelectedType] = useState<string>(initialType);
+  const [selectedStatus, setSelectedStatus] = useState<string>(initialStatus);
+
+  // Sync initial filters
+  useEffect(() => {
+    if (initialType) {
+      setSelectedType(initialType);
+    }
+  }, [initialType]);
+
+  useEffect(() => {
+    if (initialStatus) {
+      setSelectedStatus(initialStatus);
+    }
+  }, [initialStatus]);
+
+  // Calendar Year/Month (Defaults to July 2026 - Simulated current date)
+  const [calYear, setCalYear] = useState<number>(2026);
+  const [calMonth, setCalMonth] = useState<number>(6); // 6 is July (0-indexed)
+  const [selectedCalDate, setSelectedCalDate] = useState<string>("2026-07-01");
+
+  const MONTHS_FR = useMemo(() => ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"], []);
+  const DAYS_OF_WEEK = useMemo(() => ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"], []);
+
+  const getDaysInMonth = (y: number, m: number) => {
+    return new Date(y, m + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (y: number, m: number) => {
+    let day = new Date(y, m, 1).getDay();
+    return day === 0 ? 6 : day - 1; // Align Monday as first day of week
+  };
 
   // Form states
   const [showForm, setShowForm] = useState(false);
@@ -236,6 +284,30 @@ export default function InterventionsManager({
             <option value="Annulé">Annulé</option>
           </select>
 
+          {/* View Toggle */}
+          <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg border border-neutral-200/50">
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={`px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                viewMode === "list" ? "bg-white text-neutral-800 shadow-sm" : "text-neutral-500 hover:text-neutral-800"
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>Liste</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("calendar")}
+              className={`px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                viewMode === "calendar" ? "bg-white text-neutral-800 shadow-sm" : "text-neutral-500 hover:text-neutral-800"
+              }`}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              <span>Calendrier</span>
+            </button>
+          </div>
+
           <button
             onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
@@ -246,119 +318,350 @@ export default function InterventionsManager({
         </div>
       </div>
 
-      {/* Interventions History Table */}
-      <div className="bg-white rounded-xl border border-neutral-100 shadow-xs overflow-hidden">
-        <div className="p-4 bg-neutral-50 border-b border-neutral-100">
-          <h3 className="text-sm font-bold text-neutral-700">Registre Historique des Interventions</h3>
-        </div>
+      {/* Interventions Content Toggle */}
+      {viewMode === "list" ? (
+        <div className="bg-white rounded-xl border border-neutral-100 shadow-xs overflow-hidden">
+          <div className="p-4 bg-neutral-50 border-b border-neutral-100">
+            <h3 className="text-sm font-bold text-neutral-700">Registre Historique des Interventions</h3>
+          </div>
 
-        <div className="overflow-x-auto">
-          {filteredInterventions.length === 0 ? (
-            <div className="p-12 text-center text-neutral-400 flex flex-col items-center">
-              <FileText className="h-10 w-10 text-neutral-300 mb-2" />
-              <p className="text-sm font-bold">Aucune intervention</p>
-              <p className="text-xs">Aucune fiche de maintenance ne correspond aux critères de filtres.</p>
+          <div className="overflow-x-auto">
+            {filteredInterventions.length === 0 ? (
+              <div className="p-12 text-center text-neutral-400 flex flex-col items-center">
+                <FileText className="h-10 w-10 text-neutral-300 mb-2" />
+                <p className="text-sm font-bold">Aucune intervention</p>
+                <p className="text-xs">Aucune fiche de maintenance ne correspond aux critères de filtres.</p>
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-neutral-100 text-neutral-400 font-semibold uppercase bg-neutral-50/20">
+                    <th className="py-3 px-4">Intervention ID</th>
+                    <th className="py-3 px-4">Équipement</th>
+                    <th className="py-3 px-4">Désignation / Titre</th>
+                    <th className="py-3 px-4">Type</th>
+                    <th className="py-3 px-4 text-center">Date</th>
+                    <th className="py-3 px-4 text-center">Durée</th>
+                    <th className="py-3 px-4 text-right">Pièces (TND)</th>
+                    <th className="py-3 px-4 text-right">Labor (TND)</th>
+                    <th className="py-3 px-4 text-right font-bold">Total (TND)</th>
+                    <th className="py-3 px-4">Intervenant</th>
+                    <th className="py-3 px-4 text-center">Statut</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-50 font-medium">
+                  {filteredInterventions.map((int) => {
+                    const eqName = equipments.find((e) => e.code === int.equipmentCode)?.name || "N/A";
+
+                    return (
+                      <tr key={int.id} className="hover:bg-neutral-50/50 transition-all">
+                        <td className="py-3 px-4 font-mono font-bold text-neutral-400">{int.id}</td>
+                        <td className="py-3 px-4">
+                          <span className="font-bold text-neutral-700 block font-mono">{int.equipmentCode}</span>
+                          <span className="text-[10px] text-neutral-400 truncate max-w-[150px] block">
+                            {eqName}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 max-w-xs">
+                          <span className="font-bold text-neutral-800 block text-[13px]">{int.title}</span>
+                          <span className="text-[10px] text-neutral-400 block mt-0.5 line-clamp-1">
+                            {int.description}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${
+                              int.type === "Correctif"
+                                ? "bg-red-50 text-chery-red"
+                                : int.type === "Préventif"
+                                ? "bg-blue-50 text-blue-600"
+                                : "bg-amber-50 text-amber-700"
+                            }`}
+                          >
+                            {int.type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center font-mono text-neutral-500">
+                          {int.dateIntervention}
+                        </td>
+                        <td className="py-3 px-4 text-center font-mono text-neutral-500">
+                          {int.durationHours} h
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-neutral-600">
+                          {int.costParts.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-neutral-600">
+                          {int.costLabor.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-neutral-800">
+                          {(int.costParts + int.costLabor).toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-1.5 text-neutral-700">
+                            <User className="h-3 w-3 text-neutral-400" />
+                            <span>{int.technician}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <select
+                            value={int.status}
+                            onChange={(e) =>
+                              onUpdateInterventionStatus(int.id, e.target.value as InterventionStatus)
+                            }
+                            className={`text-[11px] font-bold py-1 px-1.5 rounded-md border cursor-pointer outline-none ${
+                              int.status === "Terminé"
+                                ? "bg-green-50 border-green-200 text-green-700"
+                                : int.status === "En cours"
+                                ? "bg-blue-50 border-blue-200 text-blue-700"
+                                : int.status === "Planifié"
+                                ? "bg-amber-50 border-amber-200 text-amber-700"
+                                : "bg-neutral-50 border-neutral-200 text-neutral-400"
+                            }`}
+                          >
+                            <option value="Planifié">Planifié</option>
+                            <option value="En cours">En cours</option>
+                            <option value="Terminé">Terminé</option>
+                            <option value="Annulé">Annulé</option>
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Calendar View container with interactive list on click */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left 2 columns: The beautiful Monthly Calendar grid */}
+          <div className="lg:col-span-2 bg-white rounded-xl border border-neutral-100 shadow-xs p-5 space-y-4">
+            <div className="flex justify-between items-center border-b border-neutral-100 pb-3">
+              <div className="flex items-center gap-2">
+                <CalendarRange className="h-4 w-4 text-chery-red" />
+                <h3 className="text-sm font-bold text-neutral-800">
+                  Planification Mensuelle : {MONTHS_FR[calMonth]} {calYear}
+                </h3>
+              </div>
+              {/* Nav Controls */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (calMonth === 0) {
+                      setCalMonth(11);
+                      setCalYear((y) => y - 1);
+                    } else {
+                      setCalMonth((m) => m - 1);
+                    }
+                  }}
+                  className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-500 hover:text-neutral-800 cursor-pointer"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCalYear(2026);
+                    setCalMonth(6); // Return to default July 2026
+                    setSelectedCalDate("2026-07-01");
+                  }}
+                  className="text-[10px] font-bold px-2 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded cursor-pointer"
+                >
+                  Aujourd'hui
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (calMonth === 11) {
+                      setCalMonth(0);
+                      setCalYear((y) => y + 1);
+                    } else {
+                      setCalMonth((m) => m + 1);
+                    }
+                  }}
+                  className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-500 hover:text-neutral-800 cursor-pointer"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-          ) : (
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-neutral-100 text-neutral-400 font-semibold uppercase bg-neutral-50/20">
-                  <th className="py-3 px-4">Intervention ID</th>
-                  <th className="py-3 px-4">Équipement</th>
-                  <th className="py-3 px-4">Désignation / Titre</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4 text-center">Date</th>
-                  <th className="py-3 px-4 text-center">Durée</th>
-                  <th className="py-3 px-4 text-right">Pièces (TND)</th>
-                  <th className="py-3 px-4 text-right">Labor (TND)</th>
-                  <th className="py-3 px-4 text-right font-bold">Total (TND)</th>
-                  <th className="py-3 px-4">Intervenant</th>
-                  <th className="py-3 px-4 text-center">Statut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-50 font-medium">
-                {filteredInterventions.map((int) => {
-                  const eqName = equipments.find((e) => e.code === int.equipmentCode)?.name || "N/A";
+
+            {/* Calendar Day grid */}
+            <div className="grid grid-cols-7 gap-1.5 text-center text-xs">
+              {/* Days headers */}
+              {DAYS_OF_WEEK.map((day) => (
+                <div key={day} className="py-1 font-bold text-neutral-400 uppercase text-[10px]">
+                  {day}
+                </div>
+              ))}
+
+              {/* Grid cells */}
+              {(() => {
+                const totalDays = getDaysInMonth(calYear, calMonth);
+                const firstDayIdx = getFirstDayOfMonth(calYear, calMonth);
+                const blanks = Array(firstDayIdx).fill(null);
+                const days = Array.from({ length: totalDays }, (_, i) => i + 1);
+                const cells = [...blanks, ...days];
+
+                return cells.map((cell, idx) => {
+                  if (cell === null) {
+                    return <div key={`blank-${idx}`} className="bg-neutral-50/20 rounded-lg h-20" />;
+                  }
+
+                  const dayNum = cell;
+                  const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                  const dayInts = filteredInterventions.filter((i) => i.dateIntervention === dateStr);
+                  const isSelected = selectedCalDate === dateStr;
+                  const isToday = dateStr === "2026-07-01"; // simulated current date
 
                   return (
-                    <tr key={int.id} className="hover:bg-neutral-50/50 transition-all">
-                      <td className="py-3 px-4 font-mono font-bold text-neutral-400">{int.id}</td>
-                      <td className="py-3 px-4">
-                        <span className="font-bold text-neutral-700 block font-mono">{int.equipmentCode}</span>
-                        <span className="text-[10px] text-neutral-400 truncate max-w-[150px] block">
-                          {eqName}
+                    <div
+                      key={`day-${dayNum}`}
+                      onClick={() => setSelectedCalDate(dateStr)}
+                      className={`h-20 p-1.5 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden select-none ${
+                        isSelected
+                          ? "border-chery-red bg-red-50/10 shadow-xs"
+                          : isToday
+                          ? "border-neutral-800 bg-neutral-50 font-bold"
+                          : "border-neutral-100 hover:border-neutral-300 bg-white"
+                      }`}
+                    >
+                      {/* Day number */}
+                      <div className="flex justify-between items-center">
+                        <span className={`text-[11px] font-mono ${isToday ? "text-neutral-900 font-extrabold" : "text-neutral-500 font-semibold"}`}>
+                          {dayNum}
                         </span>
-                      </td>
-                      <td className="py-3 px-4 max-w-xs">
-                        <span className="font-bold text-neutral-800 block text-[13px]">{int.title}</span>
-                        <span className="text-[10px] text-neutral-400 block mt-0.5 line-clamp-1">
-                          {int.description}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${
-                            int.type === "Correctif"
-                              ? "bg-red-50 text-chery-red"
-                              : int.type === "Préventif"
-                              ? "bg-blue-50 text-blue-600"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          {int.type}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono text-neutral-500">
-                        {int.dateIntervention}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono text-neutral-500">
-                        {int.durationHours} h
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono text-neutral-600">
-                        {int.costParts.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono text-neutral-600">
-                        {int.costLabor.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-neutral-800">
-                        {(int.costParts + int.costLabor).toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5 text-neutral-700">
-                          <User className="h-3 w-3 text-neutral-400" />
-                          <span>{int.technician}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <select
-                          value={int.status}
-                          onChange={(e) =>
-                            onUpdateInterventionStatus(int.id, e.target.value as InterventionStatus)
-                          }
-                          className={`text-[11px] font-bold py-1 px-1.5 rounded-md border cursor-pointer outline-none ${
-                            int.status === "Terminé"
-                              ? "bg-green-50 border-green-200 text-green-700"
-                              : int.status === "En cours"
-                              ? "bg-blue-50 border-blue-200 text-blue-700"
-                              : int.status === "Planifié"
-                              ? "bg-amber-50 border-amber-200 text-amber-700"
-                              : "bg-neutral-50 border-neutral-200 text-neutral-400"
-                          }`}
-                        >
-                          <option value="Planifié">Planifié</option>
-                          <option value="En cours">En cours</option>
-                          <option value="Terminé">Terminé</option>
-                          <option value="Annulé">Annulé</option>
-                        </select>
-                      </td>
-                    </tr>
+                        {isToday && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-chery-red block" title="Aujourd'hui" />
+                        )}
+                      </div>
+
+                      {/* Miniature tags or indicator dots */}
+                      <div className="space-y-0.5 max-h-[48px] overflow-hidden">
+                        {dayInts.slice(0, 2).map((int) => (
+                          <div
+                            key={int.id}
+                            className={`text-[8px] px-1 py-0.5 rounded-xs font-bold truncate leading-tight ${
+                              int.type === "Préventif"
+                                ? "bg-green-100 text-green-800"
+                                : int.type === "Correctif"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                            title={`${int.id}: ${int.title}`}
+                          >
+                            {int.type === "Préventif" ? "PRV" : int.type === "Correctif" ? "COR" : "REG"}: {int.title}
+                          </div>
+                        ))}
+                        {dayInts.length > 2 && (
+                          <div className="text-[7px] font-extrabold text-neutral-400 text-center uppercase">
+                            + {dayInts.length - 2} travaux
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
-          )}
+                });
+              })()}
+            </div>
+          </div>
+
+          {/* Right 1 column: Selected day's task list & details */}
+          <div className="bg-white rounded-xl border border-neutral-100 p-5 shadow-xs space-y-4">
+            <div className="border-b border-neutral-100 pb-3">
+              <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">
+                Plan du Jour sélectionné
+              </h3>
+              <span className="text-sm font-extrabold text-neutral-800 font-mono mt-0.5 block">
+                {selectedCalDate.split("-").reverse().join("/")}
+              </span>
+            </div>
+
+            {/* List of interventions on selected day */}
+            {(() => {
+              const dayInts = filteredInterventions.filter((i) => i.dateIntervention === selectedCalDate);
+
+              if (dayInts.length === 0) {
+                return (
+                  <div className="py-12 text-center text-neutral-400 flex flex-col items-center">
+                    <CheckCircle className="h-8 w-8 text-neutral-300 mb-1.5" />
+                    <p className="text-xs font-bold">Aucune maintenance</p>
+                    <p className="text-[10px]">Aucun travail planifié pour cette date.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+                  {dayInts.map((int) => {
+                    const eq = equipments.find((e) => e.code === int.equipmentCode);
+                    return (
+                      <div
+                        key={int.id}
+                        className="p-3.5 rounded-xl border border-neutral-100 bg-neutral-50/50 space-y-2.5 relative hover:border-neutral-200 transition-all text-xs"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-mono font-bold text-neutral-400 text-[10px]">{int.id}</span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                              int.type === "Préventif"
+                                ? "bg-green-100 text-green-800"
+                                : int.type === "Correctif"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
+                            {int.type}
+                          </span>
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <h4 className="font-bold text-neutral-800 text-xs leading-tight">
+                            {int.title}
+                          </h4>
+                          <span className="text-[10px] text-neutral-500 block font-semibold">
+                            Équipement : {eq ? eq.name : int.equipmentCode} ({eq?.workshop})
+                          </span>
+                        </div>
+
+                        <p className="text-[10px] text-neutral-400 leading-normal line-clamp-2">
+                          {int.description}
+                        </p>
+
+                        <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 pt-2 border-t border-neutral-100">
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3 text-neutral-400" />
+                            {int.technician}
+                          </span>
+                          <select
+                            value={int.status}
+                            onChange={(e) =>
+                              onUpdateInterventionStatus(int.id, e.target.value as InterventionStatus)
+                            }
+                            className={`text-[10px] font-bold py-0.5 px-1 rounded cursor-pointer outline-none border ${
+                              int.status === "Terminé"
+                                ? "bg-green-50 border-green-200 text-green-700"
+                                : int.status === "En cours"
+                                ? "bg-blue-50 border-blue-200 text-blue-700"
+                                : "bg-amber-50 border-amber-200 text-amber-700"
+                            }`}
+                          >
+                            <option value="Planifié">Planifié</option>
+                            <option value="En cours">En cours</option>
+                            <option value="Terminé">Terminé</option>
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Create Work Order Modal */}
       {showForm && (

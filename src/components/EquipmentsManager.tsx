@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Search,
   Plus,
@@ -27,19 +27,28 @@ interface EquipmentsManagerProps {
   interventions: Intervention[];
   onAddEquipment: (newEq: Equipment) => void;
   onUpdateStatus: (code: string, status: EquipmentStatus) => void;
+  initialWorkshop?: string;
 }
 
 export default function EquipmentsManager({
   equipments,
   interventions,
   onAddEquipment,
-  onUpdateStatus
+  onUpdateStatus,
+  initialWorkshop = "All"
 }: EquipmentsManagerProps) {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedWorkshop, setSelectedWorkshop] = useState<string>("All");
+  const [selectedWorkshop, setSelectedWorkshop] = useState<string>(initialWorkshop);
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [onlyCritical, setOnlyCritical] = useState(false);
+
+  // Sync initialWorkshop selection when prop changes
+  useEffect(() => {
+    if (initialWorkshop) {
+      setSelectedWorkshop(initialWorkshop);
+    }
+  }, [initialWorkshop]);
 
   // Detail drawer state
   const [selectedEqCode, setSelectedEqCode] = useState<string | null>(null);
