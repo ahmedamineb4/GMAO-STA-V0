@@ -28,6 +28,8 @@ interface EquipmentsManagerProps {
   onAddEquipment: (newEq: Equipment) => void;
   onUpdateStatus: (code: string, status: EquipmentStatus) => void;
   initialWorkshop?: string;
+  isReadOnly?: boolean;
+  allowedWorkshop?: string;
 }
 
 export default function EquipmentsManager({
@@ -35,7 +37,9 @@ export default function EquipmentsManager({
   interventions,
   onAddEquipment,
   onUpdateStatus,
-  initialWorkshop = "All"
+  initialWorkshop = "All",
+  isReadOnly = false,
+  allowedWorkshop
 }: EquipmentsManagerProps) {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,10 +49,13 @@ export default function EquipmentsManager({
 
   // Sync initialWorkshop selection when prop changes
   useEffect(() => {
-    if (initialWorkshop) {
+    if (allowedWorkshop) {
+      setSelectedWorkshop(allowedWorkshop);
+      setNewWorkshop(allowedWorkshop as Workshop);
+    } else if (initialWorkshop) {
       setSelectedWorkshop(initialWorkshop);
     }
-  }, [initialWorkshop]);
+  }, [initialWorkshop, allowedWorkshop]);
 
   // Detail drawer state
   const [selectedEqCode, setSelectedEqCode] = useState<string | null>(null);
@@ -157,15 +164,22 @@ export default function EquipmentsManager({
           {/* Workshop selector */}
           <select
             value={selectedWorkshop}
+            disabled={!!allowedWorkshop}
             onChange={(e) => setSelectedWorkshop(e.target.value)}
-            className="border border-neutral-200 rounded-lg text-xs py-2 px-3 bg-white hover:bg-neutral-50 outline-none font-medium cursor-pointer"
+            className="border border-neutral-200 rounded-lg text-xs py-2 px-3 bg-white hover:bg-neutral-50 outline-none font-medium cursor-pointer disabled:bg-neutral-100 disabled:cursor-not-allowed"
           >
-            <option value="All">Tous les Services</option>
-            {WORKSHOPS.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
+            {allowedWorkshop ? (
+              <option value={allowedWorkshop}>{allowedWorkshop}</option>
+            ) : (
+              <>
+                <option value="All">Tous les Services</option>
+                {WORKSHOPS.map((w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ))}
+              </>
+            )}
           </select>
 
           {/* Status selector */}
@@ -194,13 +208,15 @@ export default function EquipmentsManager({
             Critique
           </button>
 
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors ml-auto md:ml-0 cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Enregistrer Équipement
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors ml-auto md:ml-0 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Enregistrer Équipement
+            </button>
+          )}
         </div>
       </div>
 
@@ -244,6 +260,8 @@ export default function EquipmentsManager({
                               ? "bg-amber-500"
                               : eq.status === "En Maintenance"
                               ? "bg-blue-500"
+                              : eq.status === "Hors Service"
+                              ? "bg-neutral-400"
                               : "bg-red-500 animate-pulse-subtle"
                           }`}
                         />
@@ -326,15 +344,18 @@ export default function EquipmentsManager({
               {/* Status Manager Control */}
               <div className="space-y-2">
                 <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider block">
-                  Changer l'État Actuel
+                  {isReadOnly ? "État Actuel (Lecture Seule)" : "Changer l'État Actuel"}
                 </span>
                 <div className="grid grid-cols-2 gap-2">
-                  {(["Opérationnel", "Dégradé", "En Maintenance", "En Panne"] as EquipmentStatus[]).map(
+                  {(["Opérationnel", "Dégradé", "En Maintenance", "En Panne", "Hors Service"] as EquipmentStatus[]).map(
                     (st) => (
                       <button
                         key={st}
+                        disabled={isReadOnly}
                         onClick={() => onUpdateStatus(selectedEquipment.code, st)}
-                        className={`text-xs font-semibold py-1.5 px-2 rounded border transition-all cursor-pointer ${
+                        className={`text-xs font-semibold py-1.5 px-2 rounded border transition-all ${
+                          isReadOnly ? "cursor-not-allowed opacity-75" : "cursor-pointer"
+                        } ${
                           selectedEquipment.status === st
                             ? st === "Opérationnel"
                               ? "bg-green-500 border-green-500 text-white shadow-sm"
@@ -342,7 +363,9 @@ export default function EquipmentsManager({
                               ? "bg-amber-500 border-amber-500 text-white shadow-sm"
                               : st === "En Maintenance"
                               ? "bg-blue-500 border-blue-500 text-white shadow-sm"
-                              : "bg-red-500 border-red-500 text-white shadow-sm animate-pulse-subtle"
+                              : st === "Hors Service"
+                              ? "bg-neutral-500 border-neutral-500 text-white shadow-sm"
+                              : "bg-red-500 border-red-500 text-white shadow-sm"
                             : "border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-600"
                         }`}
                       >
@@ -546,6 +569,7 @@ export default function EquipmentsManager({
                     <option value="Dégradé">Dégradé</option>
                     <option value="En Maintenance">En Maintenance</option>
                     <option value="En Panne">En Panne</option>
+                    <option value="Hors Service">Hors Service</option>
                   </select>
                 </div>
               </div>

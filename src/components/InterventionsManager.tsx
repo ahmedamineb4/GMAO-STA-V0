@@ -35,6 +35,8 @@ interface InterventionsManagerProps {
   initialType?: string;
   initialStatus?: string;
   showCalendarByDefault?: boolean;
+  isReadOnly?: boolean;
+  allowedWorkshop?: string;
 }
 
 export default function InterventionsManager({
@@ -45,7 +47,9 @@ export default function InterventionsManager({
   onUpdateInterventionStatus,
   initialType = "All",
   initialStatus = "All",
-  showCalendarByDefault = false
+  showCalendarByDefault = false,
+  isReadOnly = false,
+  allowedWorkshop
 }: InterventionsManagerProps) {
   // Navigation tabs inside Interventions Manager
   const [viewMode, setViewMode] = useState<"list" | "calendar">(showCalendarByDefault ? "calendar" : "list");
@@ -308,13 +312,15 @@ export default function InterventionsManager({
             </button>
           </div>
 
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Nouveau Bon
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nouveau Bon
+            </button>
+          )}
         </div>
       </div>
 
@@ -404,11 +410,12 @@ export default function InterventionsManager({
                         </td>
                         <td className="py-3 px-4 text-center">
                           <select
+                            disabled={isReadOnly}
                             value={int.status}
                             onChange={(e) =>
                               onUpdateInterventionStatus(int.id, e.target.value as InterventionStatus)
                             }
-                            className={`text-[11px] font-bold py-1 px-1.5 rounded-md border cursor-pointer outline-none ${
+                            className={`text-[11px] font-bold py-1 px-1.5 rounded-md border cursor-pointer outline-none disabled:cursor-not-allowed disabled:opacity-80 ${
                               int.status === "Terminé"
                                 ? "bg-green-50 border-green-200 text-green-700"
                                 : int.status === "En cours"
@@ -636,11 +643,12 @@ export default function InterventionsManager({
                             {int.technician}
                           </span>
                           <select
+                            disabled={isReadOnly}
                             value={int.status}
                             onChange={(e) =>
                               onUpdateInterventionStatus(int.id, e.target.value as InterventionStatus)
                             }
-                            className={`text-[10px] font-bold py-0.5 px-1 rounded cursor-pointer outline-none border ${
+                            className={`text-[10px] font-bold py-0.5 px-1 rounded cursor-pointer outline-none border disabled:cursor-not-allowed disabled:opacity-80 ${
                               int.status === "Terminé"
                                 ? "bg-green-50 border-green-200 text-green-700"
                                 : int.status === "En cours"

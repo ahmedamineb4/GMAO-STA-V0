@@ -31,6 +31,8 @@ interface PurchasesManagerProps {
   onAddPurchaseRequest: (req: PurchaseRequest) => void;
   onUpdatePurchaseRequestStatus: (id: string, status: PurchaseRequest["status"]) => void;
   onAddVendor: (vendor: Vendor) => void;
+  isReadOnly?: boolean;
+  currentRole?: string;
 }
 
 export default function PurchasesManager({
@@ -39,10 +41,17 @@ export default function PurchasesManager({
   purchaseRequests,
   onAddPurchaseRequest,
   onUpdatePurchaseRequestStatus,
-  onAddVendor
+  onAddVendor,
+  isReadOnly = false,
+  currentRole = "admin"
 }: PurchasesManagerProps) {
   // Navigation tabs inside Purchases Manager
   const [activeSubTab, setActiveSubTab] = useState<"requests" | "vendors">("requests");
+
+  // Auth/Role rules
+  const canManageWorkflow = !isReadOnly && (currentRole === "admin" || currentRole === "magasin");
+  const canManageVendors = !isReadOnly && (currentRole === "admin" || currentRole === "magasin");
+  const canCreateRequests = !isReadOnly && currentRole !== "supervisor";
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,6 +72,27 @@ export default function PurchasesManager({
   const [vendorEmail, setVendorEmail] = useState("");
   const [vendorContact, setVendorContact] = useState("");
   const [vendorRating, setVendorRating] = useState<number>(4);
+
+  // Sync requester name with active role
+  React.useEffect(() => {
+    if (currentRole === "admin") {
+      setRequesterName("M. Ahmed Amine Ben Salah");
+    } else if (currentRole === "supervisor") {
+      setRequesterName("Superviseur Maintenance");
+    } else {
+      const labels: Record<string, string> = {
+        service_rapide: "Service Rapide",
+        atelier_mecanique: "Atelier Mécanique / Elec",
+        atelier_diagnostic: "Atelier Diagnostic",
+        carrosserie: "Atelier Carrosserie",
+        lavage: "Atelier Lavage",
+        reception: "Réception Après-Vente",
+        magasin: "Magasin Pièces",
+        batiment: "Maintenance Bâtiment"
+      };
+      setRequesterName(`Atelier ${labels[currentRole] || currentRole}`);
+    }
+  }, [currentRole]);
 
   // Filtered requests
   const filteredRequests = useMemo(() => {
@@ -168,6 +198,24 @@ export default function PurchasesManager({
 
   return (
     <div className="space-y-6">
+      {/* Role Notice Banner */}
+      {!canManageWorkflow && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3.5 text-xs flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-base">ℹ️</span>
+            <div>
+              <span className="font-bold">Accès Flux d'Achats Restreint</span>
+              <p className="text-[11px] text-blue-700/95 mt-0.5">
+                {currentRole === "supervisor" 
+                  ? "Vous êtes en mode lecture seule (Superviseur). Vous ne pouvez pas créer de demandes ni modifier le workflow."
+                  : "En tant qu'opérateur d'Atelier, vous pouvez créer de nouvelles demandes de pièces (DA), mais seuls l'Administrateur et le Magasin peuvent approuver, commander et réceptionner les articles."}
+              </p>
+            </div>
+          </div>
+          <span className="bg-blue-100 text-blue-800 text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider">Info Accès</span>
+        </div>
+      )}
+
       {/* KPI stats at the top */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-xl border border-neutral-100 shadow-xs">
         <div className="p-3 bg-neutral-50 rounded-lg text-xs">
@@ -272,21 +320,25 @@ export default function PurchasesManager({
           )}
 
           {activeSubTab === "requests" ? (
-            <button
-              onClick={() => setShowRequestForm(true)}
-              className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Nouvelle Demande (DA)
-            </button>
+            canCreateRequests && (
+              <button
+                onClick={() => setShowRequestForm(true)}
+                className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Nouvelle Demande (DA)
+              </button>
+            )
           ) : (
-            <button
-              onClick={() => setShowVendorForm(true)}
-              className="flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Référencer Fournisseur
-            </button>
+            canManageVendors && (
+              <button
+                onClick={() => setShowVendorForm(true)}
+                className="flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Référencer Fournisseur
+              </button>
+            )
           )}
         </div>
       </div>
@@ -372,53 +424,61 @@ export default function PurchasesManager({
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {req.status === "En attente" && (
-                              <>
-                                <button
-                                  onClick={() => onUpdatePurchaseRequestStatus(req.id, "Approuvé")}
-                                  className="bg-green-50 hover:bg-green-100 text-green-700 font-bold px-2 py-1 rounded text-[10px] border border-green-200 cursor-pointer transition-colors"
-                                  title="Approuver la demande"
-                                >
-                                  Approuver
-                                </button>
-                                <button
-                                  onClick={() => onUpdatePurchaseRequestStatus(req.id, "Refusé")}
-                                  className="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2 py-1 rounded text-[10px] border border-red-100 cursor-pointer transition-colors"
-                                  title="Refuser la demande"
-                                >
-                                  Refuser
-                                </button>
-                              </>
-                            )}
-
-                            {req.status === "Approuvé" && (
-                              <button
-                                onClick={() => onUpdatePurchaseRequestStatus(req.id, "Commandé")}
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded text-[10px] cursor-pointer transition-colors flex items-center gap-1"
-                                title="Passer commande officielle"
-                              >
-                                Commandé <ArrowRight className="h-3 w-3" />
-                              </button>
-                            )}
-
-                            {req.status === "Commandé" && (
-                              <button
-                                onClick={() => onUpdatePurchaseRequestStatus(req.id, "Reçu")}
-                                className="bg-green-600 hover:bg-green-700 text-white font-bold px-2 py-1 rounded text-[10px] cursor-pointer transition-colors flex items-center gap-1"
-                                title="Enregistrer la réception et restocker automatiquement"
-                              >
-                                Réceptionner <Package className="h-3 w-3" />
-                              </button>
-                            )}
-
-                            {req.status === "Reçu" && (
-                              <span className="text-[10px] text-neutral-400 font-bold flex items-center gap-1">
-                                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> Stocké
+                            {!canManageWorkflow ? (
+                              <span className="text-[10px] text-neutral-400 font-bold italic">
+                                Lecture Seule
                               </span>
-                            )}
+                            ) : (
+                              <>
+                                {req.status === "En attente" && (
+                                  <>
+                                    <button
+                                      onClick={() => onUpdatePurchaseRequestStatus(req.id, "Approuvé")}
+                                      className="bg-green-50 hover:bg-green-100 text-green-700 font-bold px-2 py-1 rounded text-[10px] border border-green-200 cursor-pointer transition-colors"
+                                      title="Approuver la demande"
+                                    >
+                                      Approuver
+                                    </button>
+                                    <button
+                                      onClick={() => onUpdatePurchaseRequestStatus(req.id, "Refusé")}
+                                      className="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2 py-1 rounded text-[10px] border border-red-100 cursor-pointer transition-colors"
+                                      title="Refuser la demande"
+                                    >
+                                      Refuser
+                                    </button>
+                                  </>
+                                )}
 
-                            {req.status === "Refusé" && (
-                              <span className="text-[10px] text-neutral-400 font-medium">Rejeté</span>
+                                {req.status === "Approuvé" && (
+                                  <button
+                                    onClick={() => onUpdatePurchaseRequestStatus(req.id, "Commandé")}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded text-[10px] cursor-pointer transition-colors flex items-center gap-1"
+                                    title="Passer commande officielle"
+                                  >
+                                    Commandé <ArrowRight className="h-3 w-3" />
+                                  </button>
+                                )}
+
+                                {req.status === "Commandé" && (
+                                  <button
+                                    onClick={() => onUpdatePurchaseRequestStatus(req.id, "Reçu")}
+                                    className="bg-green-600 hover:bg-green-700 text-white font-bold px-2 py-1 rounded text-[10px] cursor-pointer transition-colors flex items-center gap-1"
+                                    title="Enregistrer la réception et restocker automatiquement"
+                                  >
+                                    Réceptionner <Package className="h-3 w-3" />
+                                  </button>
+                                )}
+
+                                {req.status === "Reçu" && (
+                                  <span className="text-[10px] text-neutral-400 font-bold flex items-center gap-1">
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> Stocké
+                                  </span>
+                                )}
+
+                                {req.status === "Refusé" && (
+                                  <span className="text-[10px] text-neutral-400 font-medium">Rejeté</span>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>

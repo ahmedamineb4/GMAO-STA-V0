@@ -24,14 +24,20 @@ interface InventoryManagerProps {
   equipments: Equipment[];
   onRestockPart: (code: string, quantity: number) => void;
   onAddPart: (newPart: SparePart) => void;
+  isReadOnly?: boolean;
+  currentRole?: string;
 }
 
 export default function InventoryManager({
   spareParts,
   equipments,
   onRestockPart,
-  onAddPart
+  onAddPart,
+  isReadOnly = false,
+  currentRole = "admin"
 }: InventoryManagerProps) {
+  // Check if current user has modification rights for inventory (only admin & magasin)
+  const canModifyInventory = !isReadOnly && (currentRole === "admin" || currentRole === "magasin");
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -114,6 +120,20 @@ export default function InventoryManager({
 
   return (
     <div className="space-y-6">
+      {/* Access alert if restricted */}
+      {!canModifyInventory && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3.5 text-xs flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🔒</span>
+            <div>
+              <span className="font-bold">Mode Consultation Restreint (Atelier)</span>
+              <p className="text-[11px] text-amber-700/95 mt-0.5">Seuls le Magasinier et l'Administrateur ont les droits requis pour ajouter des pièces ou enregistrer des réceptions de stocks.</p>
+            </div>
+          </div>
+          <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider">Lecture Seule</span>
+        </div>
+      )}
+
       {/* Inventory Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Stat 1 */}
@@ -230,13 +250,15 @@ export default function InventoryManager({
             Stock Critique
           </button>
 
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Enregistrer Pièce
-          </button>
+          {canModifyInventory && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Enregistrer Pièce
+            </button>
+          )}
         </div>
       </div>
 
@@ -305,13 +327,17 @@ export default function InventoryManager({
                       )}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => onRestockPart(part.code, 10)}
-                        className="flex items-center gap-1 bg-neutral-800 hover:bg-neutral-900 text-white text-[10px] font-bold py-1 px-2.5 rounded-md transition-colors cursor-pointer mx-auto shadow-xs"
-                      >
-                        <Truck className="h-3 w-3" />
-                        +10 Reçu
-                      </button>
+                      {canModifyInventory ? (
+                        <button
+                          onClick={() => onRestockPart(part.code, 10)}
+                          className="flex items-center gap-1 bg-neutral-800 hover:bg-neutral-900 text-white text-[10px] font-bold py-1 px-2.5 rounded-md transition-colors cursor-pointer mx-auto shadow-xs"
+                        >
+                          <Truck className="h-3 w-3" />
+                          +10 Reçu
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-neutral-400 font-bold">Lecture</span>
+                      )}
                     </td>
                   </tr>
                 );

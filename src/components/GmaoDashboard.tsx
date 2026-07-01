@@ -56,10 +56,13 @@ export default function GmaoDashboard({
 
   // 1. Calculations & Metrics
   const metrics = useMemo(() => {
+    // Exclude "Hors Service" (Out of Service) equipments from availability and reliability KPIs
+    const activeEquipments = equipments.filter((eq) => eq.status !== "Hors Service");
+    const totalEquipments = activeEquipments.length;
+
     // Availability calculation
     // Opérationnel = 100%, Dégradé = 90%, En Maintenance = 30%, En Panne = 0%
-    const totalEquipments = equipments.length;
-    const availSum = equipments.reduce((acc, eq) => {
+    const availSum = activeEquipments.reduce((acc, eq) => {
       if (eq.status === "Opérationnel") return acc + 100;
       if (eq.status === "Dégradé") return acc + 90;
       if (eq.status === "En Maintenance") return acc + 30;
@@ -74,9 +77,9 @@ export default function GmaoDashboard({
     const totalCorrectiveHours = correctives.reduce((acc, c) => acc + c.durationHours, 0);
     const mttr = correctives.length ? (totalCorrectiveHours / correctives.length).toFixed(1) : "3.5";
 
-    // MTBF: Average of target MTBFs for operational equipments as an approximation
-    const mtbf = equipments.length
-      ? Math.round(equipments.reduce((acc, eq) => acc + eq.mtbfTargetHours, 0) / equipments.length)
+    // MTBF: Average of target MTBFs for operational/active equipments as an approximation
+    const mtbf = activeEquipments.length
+      ? Math.round(activeEquipments.reduce((acc, eq) => acc + eq.mtbfTargetHours, 0) / activeEquipments.length)
       : 1200;
 
     // Preventive completion rate: completed preventives / (completed + planned preventives)
@@ -580,13 +583,14 @@ export default function GmaoDashboard({
               {Object.keys(budget.allocatedByWorkshop).map((workshopName) => {
                 const wName = workshopName as Workshop;
                 const eqInWorkshop = equipments.filter((e) => e.workshop === wName);
+                const activeEqInWorkshop = eqInWorkshop.filter((e) => e.status !== "Hors Service");
                 const countEq = eqInWorkshop.length;
 
-                // Avg availability of workshop
-                const totalEq = eqInWorkshop.length;
-                const activeEqCount = eqInWorkshop.filter((e) => e.status === "Opérationnel").length;
-                const degradedEqCount = eqInWorkshop.filter((e) => e.status === "Dégradé").length;
-                const mtCount = eqInWorkshop.filter((e) => e.status === "En Maintenance").length;
+                // Avg availability of workshop (excluding "Hors Service" from calculation)
+                const totalEq = activeEqInWorkshop.length;
+                const activeEqCount = activeEqInWorkshop.filter((e) => e.status === "Opérationnel").length;
+                const degradedEqCount = activeEqInWorkshop.filter((e) => e.status === "Dégradé").length;
+                const mtCount = activeEqInWorkshop.filter((e) => e.status === "En Maintenance").length;
                 const sumAvail = (activeEqCount * 100) + (degradedEqCount * 90) + (mtCount * 30);
                 const avgAvail = totalEq ? Math.round(sumAvail / totalEq) : 100;
 

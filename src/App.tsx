@@ -137,6 +137,77 @@ export default function App() {
     return saved ? JSON.parse(saved) : BUDGET_2026;
   });
 
+  // User Authentication & Access Control States
+  const DEFAULT_PASSWORDS: Record<string, string> = {
+    admin: "1924",
+    supervisor: "1234",
+    magasin: "2026",
+    service_rapide: "0000",
+    atelier_mecanique: "0000",
+    atelier_diagnostic: "0000",
+    carrosserie: "0000",
+    lavage: "0000",
+    batiment: "0000"
+  };
+
+  const [passwords, setPasswords] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem("chery_gmao_passwords");
+    return saved ? JSON.parse(saved) : DEFAULT_PASSWORDS;
+  });
+
+  const [currentUserRole, setCurrentUserRole] = useState<string>(() => {
+    return localStorage.getItem("chery_gmao_user_role") || "admin";
+  });
+
+  const [pendingRole, setPendingRole] = useState<string | null>(null);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
+
+  const ROLE_LABELS: Record<string, string> = {
+    admin: "M. Ahmed Amine (Admin)",
+    supervisor: "Superviseur (Lecture seule)",
+    magasin: "Magasinier (Pièces)",
+    service_rapide: "Chef d'Atelier: Service Rapide",
+    atelier_mecanique: "Chef d'Atelier: Mécanique / élec",
+    atelier_diagnostic: "Chef d'Atelier: Diagnostic",
+    carrosserie: "Chef d'Atelier: Carrosserie",
+    lavage: "Chef d'Atelier: Lavage",
+    batiment: "Chef d'Atelier: Maintenance Bâtiment"
+  };
+
+  const handleVerifyPassword = () => {
+    if (!pendingRole) return;
+    const correctPassword = passwords[pendingRole] || "0000";
+    if (passwordInput === correctPassword) {
+      setCurrentUserRole(pendingRole);
+      localStorage.setItem("chery_gmao_user_role", pendingRole);
+      setPendingRole(null);
+      setPasswordInput("");
+      setPasswordError(false);
+    } else {
+      setPasswordError(true);
+    }
+  };
+
+  const getAllowedWorkshop = (role: string): Workshop | undefined => {
+    if (role === "service_rapide") return "Service Rapide";
+    if (role === "atelier_mecanique") return "Atelier Mécanique";
+    if (role === "atelier_diagnostic") return "Atelier Diagnostic";
+    if (role === "carrosserie") return "Carrosserie";
+    if (role === "lavage") return "Lavage";
+    if (role === "batiment") return "Maintenance Bâtiment";
+    return undefined;
+  };
+
+  const isEquipmentsReadOnly = currentUserRole === "supervisor" || currentUserRole === "magasin";
+  const isPurchasesReadOnly = currentUserRole === "supervisor";
+  const isSettingsReadOnly = currentUserRole !== "admin";
+  const allowedWorkshop = getAllowedWorkshop(currentUserRole);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_passwords", JSON.stringify(passwords));
+  }, [passwords]);
+
   // Save states to LocalStorage on changes
   useEffect(() => {
     localStorage.setItem("chery_gmao_equipments", JSON.stringify(equipments));
@@ -356,6 +427,17 @@ export default function App() {
     }
   };
 
+  const handleImportAllData = (importedData: any) => {
+    if (!importedData) return;
+    if (importedData.equipments) setEquipments(importedData.equipments);
+    if (importedData.interventions) setInterventions(importedData.interventions);
+    if (importedData.spareParts) setSpareParts(importedData.spareParts);
+    if (importedData.vendors) setVendors(importedData.vendors);
+    if (importedData.purchaseRequests) setPurchaseRequests(importedData.purchaseRequests);
+    if (importedData.compliance) setCompliance(importedData.compliance);
+    if (importedData.budget) setBudget(importedData.budget);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
       {/* Top corporate header branding */}
@@ -393,18 +475,63 @@ export default function App() {
             </span>
           </div>
 
-          {/* User Profile avatar for Ahmed Amine Ben Salah */}
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <span className="font-bold text-xs text-neutral-800 block leading-tight">
-                M. Ahmed Amine Ben Salah
-              </span>
-              <span className="text-[10px] text-neutral-400 font-semibold uppercase block tracking-wider">
-                Responsable Maintenance & Parc
-              </span>
+          {/* Dynamic Role Switcher dropdown */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <select
+                value={currentUserRole}
+                onChange={(e) => {
+                  const role = e.target.value;
+                  setPendingRole(role);
+                  setPasswordInput("");
+                  setPasswordError(false);
+                }}
+                className="bg-neutral-50 hover:bg-neutral-100 text-neutral-800 text-[11px] font-bold py-1.5 px-3 rounded-xl border border-neutral-200 outline-none cursor-pointer shadow-xs transition-all"
+              >
+                <option value="admin">🔑 Admin: M. Ahmed Amine</option>
+                <option value="supervisor">👁️ Superviseur (Lecture seule)</option>
+                <option value="magasin">📦 Magasinier (Pièces)</option>
+                <option value="service_rapide">⚡ Atelier Service Rapide</option>
+                <option value="atelier_mecanique">⚙️ Atelier Mécanique / élec</option>
+                <option value="atelier_diagnostic">🔬 Atelier Diagnostic</option>
+                <option value="carrosserie">🎨 Atelier Carrosserie</option>
+                <option value="lavage">🧼 Atelier Lavage</option>
+                <option value="batiment">🏢 Maintenance Bâtiment</option>
+              </select>
             </div>
-            <div className="h-9 w-9 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-white font-bold text-xs shadow-inner">
-              AB
+
+            <div className="flex items-center gap-2.5 ml-1 pl-2 border-l border-neutral-200">
+              <div className="text-right hidden sm:block">
+                <span className="font-bold text-xs text-neutral-800 block leading-tight">
+                  {currentUserRole === "admin" 
+                    ? "M. Ahmed Amine" 
+                    : currentUserRole === "supervisor" 
+                    ? "Superviseur STA" 
+                    : currentUserRole === "magasin" 
+                    ? "Magasinier Chery" 
+                    : "Chef d'Atelier"}
+                </span>
+                <span className="text-[9px] text-neutral-400 font-bold uppercase block tracking-wider">
+                  {currentUserRole === "admin" 
+                    ? "Admin Maintenance" 
+                    : currentUserRole === "supervisor" 
+                    ? "Lecture Totale" 
+                    : currentUserRole === "magasin" 
+                    ? "Stocks & Achats" 
+                    : "Accès Atelier"}
+                </span>
+              </div>
+              <div className={`h-8 w-8 rounded-full border flex items-center justify-center text-white font-bold text-xs shadow-inner ${
+                currentUserRole === "admin" 
+                  ? "bg-chery-red border-red-500" 
+                  : currentUserRole === "supervisor" 
+                  ? "bg-amber-600 border-amber-500" 
+                  : currentUserRole === "magasin" 
+                  ? "bg-neutral-800 border-neutral-700" 
+                  : "bg-blue-600 border-blue-500"
+              }`}>
+                {currentUserRole === "admin" ? "AA" : currentUserRole === "supervisor" ? "SV" : currentUserRole === "magasin" ? "MG" : "OP"}
+              </div>
             </div>
           </div>
         </div>
@@ -765,6 +892,8 @@ export default function App() {
               onAddEquipment={handleAddEquipment}
               onUpdateStatus={handleUpdateEquipmentStatus}
               initialWorkshop={selectedWorkshopFilter}
+              isReadOnly={isEquipmentsReadOnly}
+              allowedWorkshop={allowedWorkshop}
             />
           )}
 
@@ -778,6 +907,8 @@ export default function App() {
               initialType={selectedMaintenanceType}
               initialStatus={selectedMaintenanceStatus}
               showCalendarByDefault={showMaintenanceCalendar}
+              isReadOnly={isEquipmentsReadOnly}
+              allowedWorkshop={allowedWorkshop}
             />
           )}
 
@@ -791,6 +922,8 @@ export default function App() {
               initialType="All"
               initialStatus="All"
               showCalendarByDefault={false}
+              isReadOnly={isEquipmentsReadOnly}
+              allowedWorkshop={allowedWorkshop}
             />
           )}
 
@@ -800,6 +933,8 @@ export default function App() {
               equipments={equipments}
               onRestockPart={handleRestockPart}
               onAddPart={handleAddPart}
+              isReadOnly={currentUserRole === "supervisor" || (currentUserRole !== "admin" && currentUserRole !== "magasin")}
+              currentRole={currentUserRole}
             />
           )}
 
@@ -811,6 +946,8 @@ export default function App() {
               onAddPurchaseRequest={handleAddPurchaseRequest}
               onUpdatePurchaseRequestStatus={handleUpdatePurchaseRequestStatus}
               onAddVendor={handleAddVendor}
+              isReadOnly={isPurchasesReadOnly}
+              currentRole={currentUserRole}
             />
           )}
 
@@ -841,10 +978,94 @@ export default function App() {
               budget={budget}
               onUpdateBudgetAllocation={handleUpdateBudgetAllocation}
               onResetDemoData={handleResetDemoData}
+              equipments={equipments}
+              interventions={interventions}
+              spareParts={spareParts}
+              vendors={vendors}
+              purchaseRequests={purchaseRequests}
+              compliance={compliance}
+              onImportAllData={handleImportAllData}
+              isReadOnly={isSettingsReadOnly}
+              currentRole={currentUserRole}
+              passwords={passwords}
+              onUpdatePasswords={setPasswords}
             />
           )}
         </main>
       </div>
+
+      {/* Password Authentication Modal */}
+      {pendingRole && (
+        <div className="fixed inset-0 bg-neutral-900/85 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="text-center space-y-1">
+              <span className="text-3xl">🔑</span>
+              <h3 className="text-base font-bold text-neutral-800">
+                Authentification de Sécurité
+              </h3>
+              <p className="text-xs text-neutral-400">
+                Veuillez saisir le mot de passe pour accéder au profil :
+              </p>
+              <p className="text-xs font-bold text-neutral-700 bg-neutral-50 p-2 rounded-lg border border-neutral-100">
+                {ROLE_LABELS[pendingRole] || pendingRole}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <input
+                type="password"
+                autoFocus
+                placeholder="Saisir le code / PIN"
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  setPasswordError(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleVerifyPassword();
+                }}
+                className="w-full text-center tracking-widest text-lg font-bold font-mono border border-neutral-200 rounded-xl p-2.5 bg-neutral-50 outline-none focus:ring-2 focus:ring-chery-red"
+              />
+              {passwordError && (
+                <p className="text-[11px] text-chery-red font-bold text-center">
+                  ❌ Mot de passe incorrect
+                </p>
+              )}
+            </div>
+
+            <div className="text-center py-2 text-[10px] text-neutral-500 font-medium space-y-1 bg-amber-50 rounded-xl border border-amber-100 p-2.5">
+              <span className="font-semibold text-amber-800">💡 Code Démo de Secours :</span>
+              <div className="grid grid-cols-2 gap-1 text-[9px] text-neutral-600">
+                <div>Admin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.admin}</code></div>
+                <div>Superviseur: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.supervisor}</code></div>
+                <div>Magasin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.magasin}</code></div>
+                <div>Ateliers: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.service_rapide}</code></div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingRole(null);
+                  setPasswordInput("");
+                  setPasswordError(false);
+                }}
+                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleVerifyPassword}
+                className="flex-1 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+              >
+                Valider
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Page Footer */}
       <footer className="bg-white border-t border-neutral-200 py-6 text-center text-xs text-neutral-400 shrink-0 mt-auto">

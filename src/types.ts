@@ -13,7 +13,7 @@ export type Workshop =
   | "Magasin Pièces de Rechange"
   | "Maintenance Bâtiment";
 
-export type EquipmentStatus = "Opérationnel" | "Dégradé" | "En Panne" | "En Maintenance";
+export type EquipmentStatus = "Opérationnel" | "Dégradé" | "En Panne" | "En Maintenance" | "Hors Service";
 
 export interface Equipment {
   code: string; // unique code, e.g. EQ-SR-01
