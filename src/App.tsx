@@ -856,7 +856,7 @@ export default function App() {
             Concessionnaire Officiel Chery en Tunisie. Développé pour M. Ahmed Amine Ben Salah, Responsable Maintenance et Parc.
           </p>
           <p className="text-[10px] text-neutral-300 mt-2 font-mono">
-            STA Tunisie • Zone Industrielle Charguia II • Tunis, Tunisie
+            STA Tunisie • Ben Arous, Tunisie
           </p>
         </div>
       </footer>

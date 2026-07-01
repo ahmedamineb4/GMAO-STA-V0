@@ -11,7 +11,7 @@ where node >nul 2>nul
 if %errorlevel% NEQ 0 goto ERROR_NODE
 
 :: 3. Installation automatique des dependances (npm install)
-if exist "node_modules\" goto START_APP
+if exist "node_modules" goto START_APP
 
 echo ======================================================================
 echo [INFO] Premier lancement detecte ! Installation des composants...
@@ -36,6 +36,9 @@ echo.
 echo Pour arreter l'application, fermez simplement cette fenetre.
 echo ----------------------------------------------------------------------
 echo.
+
+:: Ouvrir automatiquement l'application dans le navigateur par defaut
+start "" http://localhost:3000
 
 call npm run dev
 if %errorlevel% NEQ 0 goto ERROR_RUN
