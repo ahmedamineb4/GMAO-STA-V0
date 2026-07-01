@@ -162,6 +162,7 @@ export default function App() {
   const [pendingRole, setPendingRole] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
+  const [showHelperCodes, setShowHelperCodes] = useState(false);
 
   const ROLE_LABELS: Record<string, string> = {
     admin: "M. Ahmed Amine (Admin)",
@@ -1033,15 +1034,27 @@ export default function App() {
               )}
             </div>
 
-            <div className="text-center py-2 text-[10px] text-neutral-500 font-medium space-y-1 bg-amber-50 rounded-xl border border-amber-100 p-2.5">
-              <span className="font-semibold text-amber-800">💡 Code Démo de Secours :</span>
-              <div className="grid grid-cols-2 gap-1 text-[9px] text-neutral-600">
-                <div>Admin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.admin}</code></div>
-                <div>Superviseur: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.supervisor}</code></div>
-                <div>Magasin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.magasin}</code></div>
-                <div>Ateliers: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.service_rapide}</code></div>
-              </div>
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => setShowHelperCodes(!showHelperCodes)}
+                className="text-[10px] text-neutral-400 hover:text-neutral-600 font-semibold underline transition-colors"
+              >
+                {showHelperCodes ? "Masquer l'aide d'accès" : "Afficher l'aide d'accès (Démo)"}
+              </button>
             </div>
+
+            {showHelperCodes && (
+              <div className="text-center py-2 text-[10px] text-neutral-500 font-medium space-y-1 bg-amber-50 rounded-xl border border-amber-100 p-2.5 animate-fade-in">
+                <span className="font-semibold text-amber-800">💡 Code Démo de Secours :</span>
+                <div className="grid grid-cols-2 gap-1 text-[9px] text-neutral-600">
+                  <div>Admin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.admin}</code></div>
+                  <div>Superviseur: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.supervisor}</code></div>
+                  <div>Magasin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.magasin}</code></div>
+                  <div>Ateliers: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.service_rapide}</code></div>
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-3 pt-1">
               <button
@@ -1050,6 +1063,7 @@ export default function App() {
                   setPendingRole(null);
                   setPasswordInput("");
                   setPasswordError(false);
+                  setShowHelperCodes(false);
                 }}
                 className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
               >
@@ -1074,7 +1088,7 @@ export default function App() {
             Portail de GMAO & Support Excel d'Ingénierie pour STA Tunisie
           </p>
           <p className="mt-1">
-            Concessionnaire Officiel Chery en Tunisie. Développé pour M. Ahmed Amine Ben Salah, Responsable Maintenance et Parc.
+            Concessionnaire Officiel Chery en Tunisie. Conçu et développé par <strong>Ahmed Amine Ben Salah</strong>, Responsable Maintenance et Parc.
           </p>
           <p className="text-[10px] text-neutral-300 mt-2 font-mono">
             STA Tunisie • Ben Arous, Tunisie
