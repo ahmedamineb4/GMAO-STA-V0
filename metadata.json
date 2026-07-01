@@ -1,0 +1,6 @@
+{
+  "name": "Chery GMAO & Excel Builder",
+  "description": "Portail de GMAO professionnel et Générateur de Classeur Excel pour STA Chery Tunisie, conçu pour piloter les équipements, interventions, pièces de rechange, et indicateurs (MTBF, MTTR, Disponibilité).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
