@@ -80,64 +80,109 @@ export default function App() {
   const [selectedMaintenanceStatus, setSelectedMaintenanceStatus] = useState<string>("All");
   const [showMaintenanceCalendar, setShowMaintenanceCalendar] = useState<boolean>(false);
 
+  const [dbMode, setDbMode] = useState<"demo" | "vierge">(() => {
+    const saved = localStorage.getItem("chery_gmao_database_mode");
+    return (saved as "demo" | "vierge") || "demo";
+  });
+
   // Core Reactive States (With LocalStorage persistence fallback)
   const [equipments, setEquipments] = useState<Equipment[]>(() => {
     const saved = localStorage.getItem("chery_gmao_equipments");
-    return saved ? JSON.parse(saved) : INITIAL_EQUIPMENTS;
+    if (saved) return JSON.parse(saved);
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_EQUIPMENTS : [];
   });
 
   const [interventions, setInterventions] = useState<Intervention[]>(() => {
     const saved = localStorage.getItem("chery_gmao_interventions");
-    return saved ? JSON.parse(saved) : INITIAL_INTERVENTIONS;
+    if (saved) return JSON.parse(saved);
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_INTERVENTIONS : [];
   });
 
   const [spareParts, setSpareParts] = useState<SparePart[]>(() => {
     const saved = localStorage.getItem("chery_gmao_spare_parts");
-    return saved ? JSON.parse(saved) : INITIAL_SPARE_PARTS;
+    if (saved) return JSON.parse(saved);
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_SPARE_PARTS : [];
   });
 
   const [vendors, setVendors] = useState<Vendor[]>(() => {
     const saved = localStorage.getItem("chery_gmao_vendors");
-    return saved ? JSON.parse(saved) : INITIAL_VENDORS;
+    if (saved) return JSON.parse(saved);
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_VENDORS : [];
   });
 
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>(() => {
     const saved = localStorage.getItem("chery_gmao_purchase_requests");
     if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: "DA-2026-001",
-        partCode: "PR-CR-FILT",
-        quantity: 5,
-        vendorId: "VND-SOCO",
-        requestedBy: "M. Ahmed Amine Ben Salah",
-        dateRequested: "2026-06-25",
-        status: "Approuvé",
-        estimatedCost: 1600,
-      },
-      {
-        id: "DA-2026-002",
-        partCode: "PR-SR-FL1",
-        quantity: 10,
-        vendorId: "VND-SOCO",
-        requestedBy: "M. Ahmed Amine Ben Salah",
-        dateRequested: "2026-06-30",
-        status: "En attente",
-        estimatedCost: 850,
-      }
-    ];
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    if (mode === "demo") {
+      return [
+        {
+          id: "DA-2026-001",
+          partCode: "PR-CR-FILT",
+          quantity: 5,
+          vendorId: "VND-SOCO",
+          requestedBy: "M. Ahmed Amine Ben Salah",
+          dateRequested: "2026-06-25",
+          status: "Approuvé",
+          estimatedCost: 1600,
+        },
+        {
+          id: "DA-2026-002",
+          partCode: "PR-SR-FL1",
+          quantity: 10,
+          vendorId: "VND-SOCO",
+          requestedBy: "M. Ahmed Amine Ben Salah",
+          dateRequested: "2026-06-30",
+          status: "En attente",
+          estimatedCost: 850,
+        }
+      ];
+    }
+    return [];
   });
 
   const [contracts] = useState<MaintenanceContract[]>(INITIAL_CONTRACTS);
 
   const [compliance, setCompliance] = useState<ComplianceCheck[]>(() => {
     const saved = localStorage.getItem("chery_gmao_compliance");
-    return saved ? JSON.parse(saved) : INITIAL_COMPLIANCE_CHECKS;
+    if (saved) return JSON.parse(saved);
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_COMPLIANCE_CHECKS : [];
   });
 
   const [budget, setBudget] = useState<BudgetYear>(() => {
     const saved = localStorage.getItem("chery_gmao_budget");
-    return saved ? JSON.parse(saved) : BUDGET_2026;
+    if (saved) return JSON.parse(saved);
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    if (mode === "demo") return BUDGET_2026;
+    return {
+      year: 2026,
+      totalBudget: 0,
+      allocatedByWorkshop: {
+        "Service Rapide": 0,
+        "Atelier Mécanique": 0,
+        "Atelier Diagnostic": 0,
+        "Carrosserie": 0,
+        "Lavage": 0,
+        "Réception Après-Vente": 0,
+        "Magasin Pièces de Rechange": 0,
+        "Maintenance Bâtiment": 0
+      },
+      spentByWorkshop: {
+        "Service Rapide": 0,
+        "Atelier Mécanique": 0,
+        "Atelier Diagnostic": 0,
+        "Carrosserie": 0,
+        "Lavage": 0,
+        "Réception Après-Vente": 0,
+        "Magasin Pièces de Rechange": 0,
+        "Maintenance Bâtiment": 0
+      }
+    };
   });
 
   // User Authentication & Access Control States
@@ -391,6 +436,8 @@ export default function App() {
 
   // Actually execute the demo data reset
   const executeResetDemoData = () => {
+    localStorage.setItem("chery_gmao_database_mode", "demo");
+    setDbMode("demo");
     localStorage.removeItem("chery_gmao_equipments");
     localStorage.removeItem("chery_gmao_interventions");
     localStorage.removeItem("chery_gmao_spare_parts");
@@ -442,6 +489,8 @@ export default function App() {
 
   // Actually execute the full wipe
   const executeClearAllData = () => {
+    localStorage.setItem("chery_gmao_database_mode", "vierge");
+    setDbMode("vierge");
     localStorage.removeItem("chery_gmao_equipments");
     localStorage.removeItem("chery_gmao_interventions");
     localStorage.removeItem("chery_gmao_spare_parts");
@@ -455,6 +504,7 @@ export default function App() {
     setSpareParts([]);
     setCompliance([]);
     setBudget({
+      year: 2026,
       totalBudget: 0,
       allocatedByWorkshop: {
         "Service Rapide": 0,
@@ -462,6 +512,18 @@ export default function App() {
         "Atelier Diagnostic": 0,
         "Carrosserie": 0,
         "Lavage": 0,
+        "Réception Après-Vente": 0,
+        "Magasin Pièces de Rechange": 0,
+        "Maintenance Bâtiment": 0
+      },
+      spentByWorkshop: {
+        "Service Rapide": 0,
+        "Atelier Mécanique": 0,
+        "Atelier Diagnostic": 0,
+        "Carrosserie": 0,
+        "Lavage": 0,
+        "Réception Après-Vente": 0,
+        "Magasin Pièces de Rechange": 0,
         "Maintenance Bâtiment": 0
       }
     });
@@ -589,7 +651,45 @@ export default function App() {
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-6 flex flex-col md:flex-row gap-6 relative">
         
         {/* Navigation Sidebar (Desktop version) */}
-        <aside className="hidden md:block w-64 shrink-0 space-y-6">
+        <aside className="hidden md:block w-64 shrink-0 space-y-4">
+          {/* Base GMAO Mode Selector Widget */}
+          <div className="bg-gradient-to-br from-neutral-900 to-neutral-800 rounded-2xl p-4 shadow-md text-white space-y-3 border border-neutral-700/50">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">
+                Base GMAO Active
+              </span>
+              <span className={`h-2.5 w-2.5 rounded-full ${dbMode === "demo" ? "bg-amber-400 animate-pulse" : "bg-green-400 animate-pulse"}`}></span>
+            </div>
+            
+            <div className="space-y-1">
+              <div className="font-bold text-xs flex items-center gap-1.5">
+                {dbMode === "demo" ? "⚡ Mode Démo (STA Chery)" : "🌱 Mode Vierge (Prêt)"}
+              </div>
+              <p className="text-[10px] text-neutral-400 leading-normal">
+                {dbMode === "demo" 
+                  ? "Données de démonstration chargées. Idéal pour explorer l'application."
+                  : "Base propre sans aucune donnée fictive. Prête pour l'exploitation."}
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                if (dbMode === "demo") {
+                  handleClearAllData();
+                } else {
+                  handleResetDemoData();
+                }
+              }}
+              className={`w-full py-2 px-3 rounded-xl text-[10px] font-extrabold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${
+                dbMode === "demo"
+                  ? "bg-white hover:bg-neutral-100 text-neutral-900"
+                  : "bg-chery-red hover:bg-red-700 text-white"
+              }`}
+            >
+              {dbMode === "demo" ? "🧹 Passer au Mode Vierge" : "🔄 Charger la Démo STA"}
+            </button>
+          </div>
+
           <div className="bg-white rounded-2xl border border-neutral-100 p-4 shadow-xs space-y-2">
             <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-3 pb-2 block border-b border-neutral-100 mb-2">
               Menu Principal GMAO
@@ -884,6 +984,32 @@ export default function App() {
                   </button>
                 </div>
 
+                {/* Mobile database mode card */}
+                <div className="bg-neutral-900 rounded-xl p-3 text-white space-y-2 border border-neutral-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">
+                      Base GMAO active
+                    </span>
+                    <span className={`h-2 w-2 rounded-full ${dbMode === "demo" ? "bg-amber-400 animate-pulse" : "bg-green-400 animate-pulse"}`}></span>
+                  </div>
+                  <div className="font-bold text-[11px]">
+                    {dbMode === "demo" ? "⚡ Mode Démo (STA)" : "🌱 Mode Vierge (Production)"}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (dbMode === "demo") {
+                        handleClearAllData();
+                      } else {
+                        handleResetDemoData();
+                      }
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full py-1.5 px-2 bg-white hover:bg-neutral-100 text-neutral-900 rounded-lg text-[10px] font-bold text-center cursor-pointer block"
+                  >
+                    {dbMode === "demo" ? "🧹 Passer au Mode Vierge" : "🔄 Charger la Démo STA"}
+                  </button>
+                </div>
+
                 <div className="space-y-1">
                   {[
                     { id: "dashboard", label: "🏠 Tableau de Bord", icon: LayoutDashboard },
@@ -1164,13 +1290,13 @@ export default function App() {
               <span className="text-4xl">⚠️</span>
               <h3 className="text-base font-bold text-neutral-800">
                 {resetConfirmType === "reset" 
-                  ? "Réinitialiser la base STA Tunisie" 
-                  : "🚨 ATTENTION : Vider complètement la base"}
+                  ? "Activer le Mode Démo (STA Chery)" 
+                  : "🚨 Activer le Mode Vierge (Production)"}
               </h3>
               <p className="text-xs text-neutral-500 leading-relaxed">
                 {resetConfirmType === "reset"
-                  ? "Voulez-vous réinitialiser l'ensemble des données aux valeurs par défaut de STA Tunisie (équipements, fiches travaux, budget) ? Vos modifications locales seront remplacées."
-                  : "Voulez-vous supprimer DÉFINITIVEMENT toutes les données pour obtenir une base de données complètement vierge et prête pour la production ? Cette action est irréversible."}
+                  ? "Voulez-vous réinitialiser l'ensemble des données de démonstration de STA Tunisie (équipements fictifs, fiches travaux, budget) ? Vos données locales actuelles seront écrasées."
+                  : "Voulez-vous supprimer DÉFINITIVEMENT toutes les données pour obtenir une base de données complètement vierge et prête pour l'exploitation réelle ? Cette action est irréversible."}
               </p>
             </div>
 
@@ -1186,7 +1312,7 @@ export default function App() {
                 type="button"
                 onClick={resetConfirmType === "reset" ? executeResetDemoData : executeClearAllData}
                 className={`flex-1 ${
-                  resetConfirmType === "reset" ? "bg-red-600 hover:bg-red-700" : "bg-neutral-900 hover:bg-black"
+                  resetConfirmType === "reset" ? "bg-amber-600 hover:bg-amber-700" : "bg-red-600 hover:bg-red-700"
                 } text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors`}
               >
                 Confirmer

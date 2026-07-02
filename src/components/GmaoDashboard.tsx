@@ -68,19 +68,19 @@ export default function GmaoDashboard({
       if (eq.status === "En Maintenance") return acc + 30;
       return acc; // En Panne = 0
     }, 0);
-    const avgAvailability = totalEquipments ? Math.round(availSum / totalEquipments) : 95;
+    const avgAvailability = totalEquipments ? Math.round(availSum / totalEquipments) : 0;
 
     // MTTR: Average duration of completed Corrective interventions
     const correctives = interventions.filter(
       (int) => int.type === "Correctif" && int.status === "Terminé"
     );
     const totalCorrectiveHours = correctives.reduce((acc, c) => acc + c.durationHours, 0);
-    const mttr = correctives.length ? (totalCorrectiveHours / correctives.length).toFixed(1) : "3.5";
+    const mttr = correctives.length ? (totalCorrectiveHours / correctives.length).toFixed(1) : "0";
 
     // MTBF: Average of target MTBFs for operational/active equipments as an approximation
     const mtbf = activeEquipments.length
       ? Math.round(activeEquipments.reduce((acc, eq) => acc + eq.mtbfTargetHours, 0) / activeEquipments.length)
-      : 1200;
+      : 0;
 
     // Preventive completion rate: completed preventives / (completed + planned preventives)
     const preventives = interventions.filter((int) => int.type === "Préventif");
@@ -88,7 +88,7 @@ export default function GmaoDashboard({
     const activePrev = preventives.filter((int) => int.status === "Planifié" || int.status === "En cours").length;
     const prevRate = completedPrev + activePrev > 0
       ? Math.round((completedPrev / (completedPrev + activePrev)) * 100)
-      : 85;
+      : 0;
 
     // Financial calculations
     const totalSpent = interventions
@@ -592,7 +592,7 @@ export default function GmaoDashboard({
                 const degradedEqCount = activeEqInWorkshop.filter((e) => e.status === "Dégradé").length;
                 const mtCount = activeEqInWorkshop.filter((e) => e.status === "En Maintenance").length;
                 const sumAvail = (activeEqCount * 100) + (degradedEqCount * 90) + (mtCount * 30);
-                const avgAvail = totalEq ? Math.round(sumAvail / totalEq) : 100;
+                const avgAvail = totalEq ? Math.round(sumAvail / totalEq) : 0;
 
                 const activeFailures = eqInWorkshop.filter((e) => e.status === "En Panne").length;
 
