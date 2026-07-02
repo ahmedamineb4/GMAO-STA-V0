@@ -17,7 +17,8 @@ import {
   Lock,
   UserCheck,
   Download,
-  Upload
+  Upload,
+  Trash2
 } from "lucide-react";
 import { BudgetYear, Workshop } from "../types";
 import { WORKSHOPS } from "../data";
@@ -26,6 +27,7 @@ interface SettingsManagerProps {
   budget: BudgetYear;
   onUpdateBudgetAllocation: (workshop: Workshop, amount: number) => void;
   onResetDemoData: () => void;
+  onClearAllData?: () => void;
   equipments: any[];
   interventions: any[];
   spareParts: any[];
@@ -43,6 +45,7 @@ export default function SettingsManager({
   budget,
   onUpdateBudgetAllocation,
   onResetDemoData,
+  onClearAllData,
   equipments,
   interventions,
   spareParts,
@@ -227,21 +230,34 @@ export default function SettingsManager({
             </h3>
 
             <p className="text-xs text-neutral-400 leading-relaxed">
-              Pour des raisons de démonstration ou de test, vous pouvez réinitialiser l'ensemble des données (équipements, interventions, stocks) à leurs valeurs initiales configurées pour STA Tunisie.
+              Gérez les données de votre application. Vous pouvez soit réinitialiser aux valeurs de démonstration, soit tout effacer pour démarrer de zéro.
             </p>
 
             {isWritable ? (
-              <button
-                type="button"
-                onClick={onResetDemoData}
-                className="w-full bg-red-50 hover:bg-red-100 text-chery-red border border-red-200 font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Réinitialiser la Base STA Tunisie
-              </button>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={onResetDemoData}
+                  className="w-full bg-red-50 hover:bg-red-100 text-chery-red border border-red-200 font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Réinitialiser la Base STA Tunisie (Démo)
+                </button>
+
+                {onClearAllData && (
+                  <button
+                    type="button"
+                    onClick={onClearAllData}
+                    className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border border-neutral-300 font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Vider complètement la base de données (Mode Vierge)
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] text-neutral-400 font-medium text-center">
-                🔒 Réinitialisation verrouillée pour votre profil
+                🔒 Actions de maintenance réservées à l'Administrateur
               </div>
             )}
           </div>

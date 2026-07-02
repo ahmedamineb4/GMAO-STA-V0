@@ -280,7 +280,7 @@ export default function GmaoDashboard({
               Tableau de Bord de Maintenance
             </h1>
             <p className="text-sm text-neutral-300 mt-1 max-w-2xl">
-              Bienvenue M. <strong>Ahmed Amine Ben Salah</strong>. Suivi complet des indices de fiabilité,
+              Bienvenue. Suivi complet des indices de fiabilité,
               KPIs de disponibilité technique, suivi budgétaire et génération automatique du modèle Excel pour STA Tunisie.
             </p>
           </div>

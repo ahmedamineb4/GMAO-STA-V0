@@ -68,6 +68,7 @@ export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [resetConfirmType, setResetConfirmType] = useState<"reset" | "clear" | null>(null);
 
   // Collapsible Sidebar Menus State
   const [parcOpen, setParcOpen] = useState<boolean>(true);
@@ -383,51 +384,95 @@ export default function App() {
     });
   };
 
-  // Reset demo data to initial values
+  // Reset demo data trigger
   const handleResetDemoData = () => {
-    if (window.confirm("Voulez-vous réinitialiser l'ensemble des données aux valeurs par défaut de STA Tunisie ?")) {
-      localStorage.removeItem("chery_gmao_equipments");
-      localStorage.removeItem("chery_gmao_interventions");
-      localStorage.removeItem("chery_gmao_spare_parts");
-      localStorage.removeItem("chery_gmao_compliance");
-      localStorage.removeItem("chery_gmao_budget");
-      localStorage.removeItem("chery_gmao_vendors");
-      localStorage.removeItem("chery_gmao_purchase_requests");
-      
-      setEquipments(INITIAL_EQUIPMENTS);
-      setInterventions(INITIAL_INTERVENTIONS);
-      setSpareParts(INITIAL_SPARE_PARTS);
-      setCompliance(INITIAL_COMPLIANCE_CHECKS);
-      setBudget(BUDGET_2026);
-      setVendors(INITIAL_VENDORS);
-      setPurchaseRequests([
-        {
-          id: "DA-2026-001",
-          partCode: "PR-CR-FILT",
-          quantity: 5,
-          vendorId: "VND-SOCO",
-          requestedBy: "M. Ahmed Amine Ben Salah",
-          dateRequested: "2026-06-25",
-          status: "Approuvé",
-          estimatedCost: 1600,
-        },
-        {
-          id: "DA-2026-002",
-          partCode: "PR-SR-FL1",
-          quantity: 10,
-          vendorId: "VND-SOCO",
-          requestedBy: "M. Ahmed Amine Ben Salah",
-          dateRequested: "2026-06-30",
-          status: "En attente",
-          estimatedCost: 850,
-        }
-      ]);
-      setSelectedWorkshopFilter("All");
-      setSelectedMaintenanceType("All");
-      setSelectedMaintenanceStatus("All");
-      setShowMaintenanceCalendar(false);
-      setActiveTab("dashboard");
-    }
+    setResetConfirmType("reset");
+  };
+
+  // Actually execute the demo data reset
+  const executeResetDemoData = () => {
+    localStorage.removeItem("chery_gmao_equipments");
+    localStorage.removeItem("chery_gmao_interventions");
+    localStorage.removeItem("chery_gmao_spare_parts");
+    localStorage.removeItem("chery_gmao_compliance");
+    localStorage.removeItem("chery_gmao_budget");
+    localStorage.removeItem("chery_gmao_vendors");
+    localStorage.removeItem("chery_gmao_purchase_requests");
+    
+    setEquipments(INITIAL_EQUIPMENTS);
+    setInterventions(INITIAL_INTERVENTIONS);
+    setSpareParts(INITIAL_SPARE_PARTS);
+    setCompliance(INITIAL_COMPLIANCE_CHECKS);
+    setBudget(BUDGET_2026);
+    setVendors(INITIAL_VENDORS);
+    setPurchaseRequests([
+      {
+        id: "DA-2026-001",
+        partCode: "PR-CR-FILT",
+        quantity: 5,
+        vendorId: "VND-SOCO",
+        requestedBy: "M. Ahmed Amine Ben Salah",
+        dateRequested: "2026-06-25",
+        status: "Approuvé",
+        estimatedCost: 1600,
+      },
+      {
+        id: "DA-2026-002",
+        partCode: "PR-SR-FL1",
+        quantity: 10,
+        vendorId: "VND-SOCO",
+        requestedBy: "M. Ahmed Amine Ben Salah",
+        dateRequested: "2026-06-30",
+        status: "En attente",
+        estimatedCost: 850,
+      }
+    ]);
+    setSelectedWorkshopFilter("All");
+    setSelectedMaintenanceType("All");
+    setSelectedMaintenanceStatus("All");
+    setShowMaintenanceCalendar(false);
+    setActiveTab("dashboard");
+    setResetConfirmType(null);
+  };
+
+  // Completely wipe the database for production trigger
+  const handleClearAllData = () => {
+    setResetConfirmType("clear");
+  };
+
+  // Actually execute the full wipe
+  const executeClearAllData = () => {
+    localStorage.removeItem("chery_gmao_equipments");
+    localStorage.removeItem("chery_gmao_interventions");
+    localStorage.removeItem("chery_gmao_spare_parts");
+    localStorage.removeItem("chery_gmao_compliance");
+    localStorage.removeItem("chery_gmao_budget");
+    localStorage.removeItem("chery_gmao_vendors");
+    localStorage.removeItem("chery_gmao_purchase_requests");
+    
+    setEquipments([]);
+    setInterventions([]);
+    setSpareParts([]);
+    setCompliance([]);
+    setBudget({
+      totalBudget: 0,
+      allocatedByWorkshop: {
+        "Service Rapide": 0,
+        "Atelier Mécanique": 0,
+        "Atelier Diagnostic": 0,
+        "Carrosserie": 0,
+        "Lavage": 0,
+        "Maintenance Bâtiment": 0
+      }
+    });
+    setVendors([]);
+    setPurchaseRequests([]);
+    setSelectedWorkshopFilter("All");
+    setSelectedMaintenanceType("All");
+    setSelectedMaintenanceStatus("All");
+    setShowMaintenanceCalendar(false);
+    setActiveTab("dashboard");
+    setResetConfirmType(null);
   };
 
   const handleImportAllData = (importedData: any) => {
@@ -1000,6 +1045,7 @@ export default function App() {
               budget={budget}
               onUpdateBudgetAllocation={handleUpdateBudgetAllocation}
               onResetDemoData={handleResetDemoData}
+              onClearAllData={handleClearAllData}
               equipments={equipments}
               interventions={interventions}
               spareParts={spareParts}
@@ -1104,6 +1150,46 @@ export default function App() {
                 className="flex-1 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
               >
                 Valider
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Database Reset Confirmation Modal */}
+      {resetConfirmType && (
+        <div className="fixed inset-0 bg-neutral-900/85 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="text-center space-y-2">
+              <span className="text-4xl">⚠️</span>
+              <h3 className="text-base font-bold text-neutral-800">
+                {resetConfirmType === "reset" 
+                  ? "Réinitialiser la base STA Tunisie" 
+                  : "🚨 ATTENTION : Vider complètement la base"}
+              </h3>
+              <p className="text-xs text-neutral-500 leading-relaxed">
+                {resetConfirmType === "reset"
+                  ? "Voulez-vous réinitialiser l'ensemble des données aux valeurs par défaut de STA Tunisie (équipements, fiches travaux, budget) ? Vos modifications locales seront remplacées."
+                  : "Voulez-vous supprimer DÉFINITIVEMENT toutes les données pour obtenir une base de données complètement vierge et prête pour la production ? Cette action est irréversible."}
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setResetConfirmType(null)}
+                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={resetConfirmType === "reset" ? executeResetDemoData : executeClearAllData}
+                className={`flex-1 ${
+                  resetConfirmType === "reset" ? "bg-red-600 hover:bg-red-700" : "bg-neutral-900 hover:bg-black"
+                } text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors`}
+              >
+                Confirmer
               </button>
             </div>
           </div>
