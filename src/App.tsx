@@ -295,6 +295,18 @@ export default function App() {
     setEquipments((prev) => [newEq, ...prev]);
   };
 
+  // A1. Update an existing Equipment Asset
+  const handleUpdateEquipment = (updatedEq: Equipment) => {
+    setEquipments((prev) =>
+      prev.map((eq) => (eq.code === updatedEq.code ? updatedEq : eq))
+    );
+  };
+
+  // A2. Delete an Equipment Asset
+  const handleDeleteEquipment = (code: string) => {
+    setEquipments((prev) => prev.filter((eq) => eq.code !== code));
+  };
+
   // B. Update Equipment Operational Status
   const handleUpdateEquipmentStatus = (code: string, status: EquipmentStatus) => {
     setEquipments((prev) =>
@@ -562,12 +574,15 @@ export default function App() {
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
 
-            {/* Logo placeholder mimicking Chery and STA Tunisie */}
-            <div className="flex items-center gap-2">
-              <div className="h-9 w-9 bg-chery-red rounded-lg flex items-center justify-center text-white font-extrabold text-sm tracking-tighter shadow-md shadow-red-500/20">
-                CHY
+            {/* Simple & Premium STA Chery Logo */}
+            <div className="flex items-center gap-2 select-none">
+              <div className="bg-chery-red text-white text-xs font-black px-2.5 py-1.5 rounded-md tracking-wider flex items-center justify-center shadow-xs">
+                STA
               </div>
-              <div>
+              <span className="font-sans font-black text-lg tracking-wide text-neutral-800">
+                CHERY
+              </span>
+              <div className="hidden sm:block border-l border-neutral-200 pl-3 ml-1">
                 <span className="font-display font-black text-sm tracking-tight text-neutral-800 block leading-tight">
                   STA TUNISIE
                 </span>
@@ -652,44 +667,6 @@ export default function App() {
         
         {/* Navigation Sidebar (Desktop version) */}
         <aside className="hidden md:block w-64 shrink-0 space-y-4">
-          {/* Base GMAO Mode Selector Widget */}
-          <div className="bg-gradient-to-br from-neutral-900 to-neutral-800 rounded-2xl p-4 shadow-md text-white space-y-3 border border-neutral-700/50">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">
-                Base GMAO Active
-              </span>
-              <span className={`h-2.5 w-2.5 rounded-full ${dbMode === "demo" ? "bg-amber-400 animate-pulse" : "bg-green-400 animate-pulse"}`}></span>
-            </div>
-            
-            <div className="space-y-1">
-              <div className="font-bold text-xs flex items-center gap-1.5">
-                {dbMode === "demo" ? "⚡ Mode Démo (STA Chery)" : "🌱 Mode Vierge (Prêt)"}
-              </div>
-              <p className="text-[10px] text-neutral-400 leading-normal">
-                {dbMode === "demo" 
-                  ? "Données de démonstration chargées. Idéal pour explorer l'application."
-                  : "Base propre sans aucune donnée fictive. Prête pour l'exploitation."}
-              </p>
-            </div>
-
-            <button
-              onClick={() => {
-                if (dbMode === "demo") {
-                  handleClearAllData();
-                } else {
-                  handleResetDemoData();
-                }
-              }}
-              className={`w-full py-2 px-3 rounded-xl text-[10px] font-extrabold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${
-                dbMode === "demo"
-                  ? "bg-white hover:bg-neutral-100 text-neutral-900"
-                  : "bg-chery-red hover:bg-red-700 text-white"
-              }`}
-            >
-              {dbMode === "demo" ? "🧹 Passer au Mode Vierge" : "🔄 Charger la Démo STA"}
-            </button>
-          </div>
-
           <div className="bg-white rounded-2xl border border-neutral-100 p-4 shadow-xs space-y-2">
             <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-3 pb-2 block border-b border-neutral-100 mb-2">
               Menu Principal GMAO
@@ -943,25 +920,6 @@ export default function App() {
               <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "settings" ? "opacity-100" : ""}`} />
             </button>
           </div>
-
-          {/* Quick action checklist / system status card */}
-          <div className="bg-white rounded-2xl border border-neutral-100 p-4 shadow-xs space-y-3.5 text-xs">
-            <h4 className="font-bold text-neutral-800 flex items-center gap-1.5 border-b border-neutral-100 pb-2">
-              <Settings className="h-3.5 w-3.5 text-neutral-500" />
-              Actions Système
-            </h4>
-            <div className="space-y-2">
-              <p className="text-neutral-400 leading-relaxed text-[11px]">
-                Pour faire une démonstration à vos ateliers ou réinitialiser les stocks fictifs.
-              </p>
-              <button
-                onClick={handleResetDemoData}
-                className="w-full bg-neutral-100 hover:bg-red-50 hover:text-chery-red border border-transparent hover:border-red-100 text-neutral-600 font-bold py-2 rounded-xl transition-all cursor-pointer text-center text-[11px]"
-              >
-                Réinitialiser STA Données
-              </button>
-            </div>
-          </div>
         </aside>
 
         {/* Mobile Navigation Sidebar Drawer */}
@@ -970,43 +928,19 @@ export default function App() {
             <div className="bg-white w-64 max-w-sm h-full p-5 flex flex-col justify-between shadow-2xl relative animate-fade-in-left overflow-y-auto">
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 bg-chery-red rounded flex items-center justify-center text-white font-extrabold text-xs">
-                      CHY
+                  <div className="flex items-center gap-2 select-none">
+                    <div className="bg-chery-red text-white text-[10px] font-black px-2 py-1 rounded-md tracking-wider flex items-center justify-center shadow-xs">
+                      STA
                     </div>
-                    <span className="font-display font-black text-xs text-neutral-800">STA Chery Tunisie</span>
+                    <span className="font-sans font-black text-base tracking-wide text-neutral-800">
+                      CHERY
+                    </span>
                   </div>
                   <button
                     onClick={() => setMobileMenuOpen(false)}
                     className="p-1 rounded-full hover:bg-neutral-100 text-neutral-400 focus:outline-none"
                   >
                     <X className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {/* Mobile database mode card */}
-                <div className="bg-neutral-900 rounded-xl p-3 text-white space-y-2 border border-neutral-800">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">
-                      Base GMAO active
-                    </span>
-                    <span className={`h-2 w-2 rounded-full ${dbMode === "demo" ? "bg-amber-400 animate-pulse" : "bg-green-400 animate-pulse"}`}></span>
-                  </div>
-                  <div className="font-bold text-[11px]">
-                    {dbMode === "demo" ? "⚡ Mode Démo (STA)" : "🌱 Mode Vierge (Production)"}
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (dbMode === "demo") {
-                        handleClearAllData();
-                      } else {
-                        handleResetDemoData();
-                      }
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full py-1.5 px-2 bg-white hover:bg-neutral-100 text-neutral-900 rounded-lg text-[10px] font-bold text-center cursor-pointer block"
-                  >
-                    {dbMode === "demo" ? "🧹 Passer au Mode Vierge" : "🔄 Charger la Démo STA"}
                   </button>
                 </div>
 
@@ -1042,16 +976,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="border-t border-neutral-100 pt-4 space-y-2">
-                <button
-                  onClick={() => {
-                    handleResetDemoData();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full bg-red-50 text-chery-red font-bold py-2 rounded-lg text-xs text-center cursor-pointer"
-                >
-                  Réinitialiser les données
-                </button>
+              <div className="border-t border-neutral-100 pt-4">
                 <div className="text-[10px] text-neutral-400 text-center">
                   GMAO STA Chery Tunisie © 2026
                 </div>
@@ -1084,6 +1009,8 @@ export default function App() {
               interventions={interventions}
               onAddEquipment={handleAddEquipment}
               onUpdateStatus={handleUpdateEquipmentStatus}
+              onUpdateEquipment={handleUpdateEquipment}
+              onDeleteEquipment={handleDeleteEquipment}
               initialWorkshop={selectedWorkshopFilter}
               isReadOnly={isEquipmentsReadOnly}
               allowedWorkshop={allowedWorkshop}
@@ -1170,8 +1097,6 @@ export default function App() {
             <SettingsManager
               budget={budget}
               onUpdateBudgetAllocation={handleUpdateBudgetAllocation}
-              onResetDemoData={handleResetDemoData}
-              onClearAllData={handleClearAllData}
               equipments={equipments}
               interventions={interventions}
               spareParts={spareParts}
@@ -1276,46 +1201,6 @@ export default function App() {
                 className="flex-1 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
               >
                 Valider
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Custom Database Reset Confirmation Modal */}
-      {resetConfirmType && (
-        <div className="fixed inset-0 bg-neutral-900/85 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div className="text-center space-y-2">
-              <span className="text-4xl">⚠️</span>
-              <h3 className="text-base font-bold text-neutral-800">
-                {resetConfirmType === "reset" 
-                  ? "Activer le Mode Démo (STA Chery)" 
-                  : "🚨 Activer le Mode Vierge (Production)"}
-              </h3>
-              <p className="text-xs text-neutral-500 leading-relaxed">
-                {resetConfirmType === "reset"
-                  ? "Voulez-vous réinitialiser l'ensemble des données de démonstration de STA Tunisie (équipements fictifs, fiches travaux, budget) ? Vos données locales actuelles seront écrasées."
-                  : "Voulez-vous supprimer DÉFINITIVEMENT toutes les données pour obtenir une base de données complètement vierge et prête pour l'exploitation réelle ? Cette action est irréversible."}
-              </p>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setResetConfirmType(null)}
-                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={resetConfirmType === "reset" ? executeResetDemoData : executeClearAllData}
-                className={`flex-1 ${
-                  resetConfirmType === "reset" ? "bg-amber-600 hover:bg-amber-700" : "bg-red-600 hover:bg-red-700"
-                } text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors`}
-              >
-                Confirmer
               </button>
             </div>
           </div>

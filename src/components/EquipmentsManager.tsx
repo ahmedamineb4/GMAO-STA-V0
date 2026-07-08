@@ -17,7 +17,10 @@ import {
   DollarSign,
   ChevronRight,
   X,
-  FileText
+  FileText,
+  Copy,
+  Edit,
+  Trash2
 } from "lucide-react";
 import { Equipment, EquipmentStatus, Workshop, Intervention } from "../types";
 import { WORKSHOPS } from "../data";
@@ -27,6 +30,8 @@ interface EquipmentsManagerProps {
   interventions: Intervention[];
   onAddEquipment: (newEq: Equipment) => void;
   onUpdateStatus: (code: string, status: EquipmentStatus) => void;
+  onUpdateEquipment: (updatedEq: Equipment) => void;
+  onDeleteEquipment: (code: string) => void;
   initialWorkshop?: string;
   isReadOnly?: boolean;
   allowedWorkshop?: string;
@@ -37,6 +42,8 @@ export default function EquipmentsManager({
   interventions,
   onAddEquipment,
   onUpdateStatus,
+  onUpdateEquipment,
+  onDeleteEquipment,
   initialWorkshop = "All",
   isReadOnly = false,
   allowedWorkshop
@@ -60,8 +67,12 @@ export default function EquipmentsManager({
   // Detail drawer state
   const [selectedEqCode, setSelectedEqCode] = useState<string | null>(null);
 
-  // Add Equipment Form modal state
+  // Add/Edit Equipment Form modal state
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+
+  // Deletion confirmation modal state
+  const [equipmentToDelete, setEquipmentToDelete] = useState<string | null>(null);
 
   // New Equipment state form values
   const [newCode, setNewCode] = useState("");
@@ -103,7 +114,7 @@ export default function EquipmentsManager({
     return interventions.filter((int) => int.equipmentCode === selectedEqCode);
   }, [interventions, selectedEqCode]);
 
-  // Handle submitting new equipment form
+  // Handle submitting equipment form
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCode || !newName) {
@@ -111,13 +122,7 @@ export default function EquipmentsManager({
       return;
     }
 
-    // Check if code already exists
-    if (equipments.some((eq) => eq.code.toUpperCase() === newCode.toUpperCase())) {
-      alert(`Erreur : Le code équipement "${newCode}" existe déjà !`);
-      return;
-    }
-
-    const created: Equipment = {
+    const payload: Equipment = {
       code: newCode.toUpperCase(),
       name: newName,
       workshop: newWorkshop,
@@ -128,14 +133,25 @@ export default function EquipmentsManager({
       location: newLocation || "Zone Principale",
       serialNumber: newSerial || "SN-PENDING",
       critical: newCritical,
-      lastInspectionDate: newPurchaseDate,
+      lastInspectionDate: editingEquipment ? editingEquipment.lastInspectionDate : newPurchaseDate,
       inspectionIntervalMonths: Number(newInterval),
       mtbfTargetHours: Number(newMtbf),
       mttrTargetHours: Number(newMttr)
     };
 
-    onAddEquipment(created);
+    if (editingEquipment) {
+      onUpdateEquipment(payload);
+    } else {
+      // Check if code already exists
+      if (equipments.some((eq) => eq.code.toUpperCase() === newCode.toUpperCase())) {
+        alert(`Erreur : Le code équipement "${newCode}" existe déjà !`);
+        return;
+      }
+      onAddEquipment(payload);
+    }
+
     setShowAddForm(false);
+    setEditingEquipment(null);
 
     // Reset Form fields
     setNewCode("");
@@ -143,6 +159,84 @@ export default function EquipmentsManager({
     setNewLocation("");
     setNewSerial("");
     setNewCritical(false);
+  };
+
+  const handleAddNewClick = () => {
+    setEditingEquipment(null);
+    setNewCode("");
+    setNewName("");
+    setNewWorkshop(allowedWorkshop as Workshop || "Service Rapide");
+    setNewStatus("Opérationnel");
+    setNewPurchaseDate("2025-01-01");
+    setNewWarrantyEnd("2027-01-01");
+    setNewPrice(12000);
+    setNewLocation("");
+    setNewSerial("");
+    setNewCritical(false);
+    setNewInterval(6);
+    setNewMtbf(1200);
+    setNewMttr(4);
+    setShowAddForm(true);
+  };
+
+  // Pre-fill the add equipment form with an existing equipment's data for editing
+  const handleEditClick = (eq: Equipment) => {
+    setEditingEquipment(eq);
+    setNewCode(eq.code);
+    setNewName(eq.name);
+    setNewWorkshop(eq.workshop);
+    setNewStatus(eq.status);
+    setNewPurchaseDate(eq.purchaseDate);
+    setNewWarrantyEnd(eq.warrantyEnd);
+    setNewPrice(eq.purchasePrice);
+    setNewLocation(eq.location);
+    setNewSerial(eq.serialNumber);
+    setNewCritical(eq.critical);
+    setNewInterval(eq.inspectionIntervalMonths);
+    setNewMtbf(eq.mtbfTargetHours);
+    setNewMttr(eq.mttrTargetHours);
+    setShowAddForm(true);
+  };
+
+  const handleDeleteClick = (code: string) => {
+    setEquipmentToDelete(code);
+  };
+
+  const executeDelete = () => {
+    if (equipmentToDelete) {
+      onDeleteEquipment(equipmentToDelete);
+      if (selectedEqCode === equipmentToDelete) {
+        setSelectedEqCode(null);
+      }
+      setEquipmentToDelete(null);
+    }
+  };
+
+  // Pre-fill the add equipment form with an existing equipment's data as a copy
+  const handleDuplicate = (eq: Equipment) => {
+    setEditingEquipment(null);
+    let baseCode = eq.code;
+    let suggestedCode = `${baseCode}_COPIE`;
+    let counter = 1;
+    while (equipments.some((item) => item.code.toUpperCase() === suggestedCode.toUpperCase())) {
+      suggestedCode = `${baseCode}_COPIE${counter}`;
+      counter++;
+    }
+
+    setNewCode(suggestedCode);
+    setNewName(`${eq.name} (Copie)`);
+    setNewWorkshop(eq.workshop);
+    setNewStatus(eq.status);
+    setNewPurchaseDate(eq.purchaseDate);
+    setNewWarrantyEnd(eq.warrantyEnd);
+    setNewPrice(eq.purchasePrice);
+    setNewLocation(eq.location);
+    setNewSerial(eq.serialNumber && eq.serialNumber !== "SN-PENDING" ? `${eq.serialNumber}-COPIE` : "");
+    setNewCritical(eq.critical);
+    setNewInterval(eq.inspectionIntervalMonths);
+    setNewMtbf(eq.mtbfTargetHours);
+    setNewMttr(eq.mttrTargetHours);
+    setShowAddForm(true);
   };
 
   return (
@@ -210,7 +304,7 @@ export default function EquipmentsManager({
 
           {!isReadOnly && (
             <button
-              onClick={() => setShowAddForm(true)}
+              onClick={handleAddNewClick}
               className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm transition-colors ml-auto md:ml-0 cursor-pointer"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -308,6 +402,43 @@ export default function EquipmentsManager({
                             {hasWarranty ? "Sous Garantie" : "Hors Garantie"}
                           </span>
                         </div>
+                        {!isReadOnly && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClick(eq);
+                              }}
+                              title="Modifier cet équipement"
+                              className="p-1.5 rounded-lg hover:bg-blue-50 text-neutral-400 hover:text-blue-600 transition-all cursor-pointer"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDuplicate(eq);
+                              }}
+                              title="Dupliquer cet équipement"
+                              className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-chery-red transition-all cursor-pointer"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(eq.code);
+                              }}
+                              title="Supprimer cet équipement"
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-red-600 transition-all cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
                         <ChevronRight className="h-4 w-4 text-neutral-300" />
                       </div>
                     </div>
@@ -323,22 +454,34 @@ export default function EquipmentsManager({
           {selectedEquipment ? (
             <div className="bg-white rounded-xl border border-neutral-100 shadow-sm p-5 space-y-5 sticky top-6">
               <div className="flex justify-between items-start pb-3 border-b border-neutral-100">
-                <div>
+                <div className="flex-1 min-w-0 pr-2">
                   <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-mono">
                     <span>{selectedEquipment.code}</span>
                     <span>•</span>
                     <span>{selectedEquipment.workshop}</span>
                   </div>
-                  <h3 className="text-base font-bold text-neutral-800 mt-1">
+                  <h3 className="text-base font-bold text-neutral-800 mt-1 truncate">
                     {selectedEquipment.name}
                   </h3>
                 </div>
-                <button
-                  onClick={() => setSelectedEqCode(null)}
-                  className="p-1 rounded-full hover:bg-neutral-100 text-neutral-400"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => handleDuplicate(selectedEquipment)}
+                      title="Dupliquer cet équipement"
+                      className="p-1.5 rounded-lg bg-neutral-50 hover:bg-red-50 text-neutral-500 hover:text-chery-red border border-neutral-100 transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      <span className="text-[10px] font-bold">Dupliquer</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedEqCode(null)}
+                    className="p-1.5 rounded-full hover:bg-neutral-100 text-neutral-400 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               {/* Status Manager Control */}
@@ -375,6 +518,26 @@ export default function EquipmentsManager({
                   )}
                 </div>
               </div>
+
+              {/* Administrative actions */}
+              {!isReadOnly && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEditClick(selectedEquipment)}
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-lg text-xs font-semibold border border-blue-200 transition-colors cursor-pointer"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    Modifier
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(selectedEquipment.code)}
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-red-50 hover:bg-red-100 text-chery-red py-2 rounded-lg text-xs font-semibold border border-red-200 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Supprimer
+                  </button>
+                </div>
+              )}
 
               {/* Technical Specifications */}
               <div className="space-y-3 bg-neutral-50 p-4 rounded-xl text-xs">
@@ -507,7 +670,7 @@ export default function EquipmentsManager({
             <div className="flex items-center justify-between p-5 border-b border-neutral-100">
               <h3 className="text-base font-bold text-neutral-800 flex items-center gap-2">
                 <Wrench className="h-5 w-5 text-chery-red" />
-                Enregistrer un Nouvel Équipement
+                {editingEquipment ? `Modifier l'Équipement: ${editingEquipment.code}` : "Enregistrer un Nouvel Équipement"}
               </h3>
               <button
                 onClick={() => setShowAddForm(false)}
@@ -524,10 +687,11 @@ export default function EquipmentsManager({
                   <input
                     type="text"
                     required
+                    disabled={!!editingEquipment}
                     placeholder="ex: EQ-SR-03"
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value)}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-neutral-50/50 uppercase outline-none focus:ring-1 focus:ring-chery-red"
+                    className="w-full border border-neutral-200 rounded-lg p-2 bg-neutral-50/50 uppercase outline-none focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:text-neutral-500 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -685,10 +849,46 @@ export default function EquipmentsManager({
                   type="submit"
                   className="flex-1 bg-chery-red hover:bg-chery-dark text-white py-2.5 rounded-lg font-bold text-center cursor-pointer"
                 >
-                  Enregistrer
+                  {editingEquipment ? "Enregistrer les modifications" : "Enregistrer"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Deletion Confirmation Modal */}
+      {equipmentToDelete && (
+        <div className="fixed inset-0 bg-neutral-900/80 backdrop-blur-xs flex items-center justify-center z-[100] p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="text-center space-y-3">
+              <div className="mx-auto h-12 w-12 bg-red-50 rounded-full flex items-center justify-center text-chery-red border border-red-100">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-bold text-neutral-800">
+                Supprimer définitivement l'équipement ?
+              </h3>
+              <p className="text-xs text-neutral-500 leading-relaxed">
+                Êtes-vous sûr de vouloir supprimer définitivement l'équipement <strong className="text-neutral-800">{equipmentToDelete}</strong> ? Cette action supprimera l'équipement du parc et est strictement irréversible.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setEquipmentToDelete(null)}
+                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={executeDelete}
+                className="flex-1 bg-chery-red hover:bg-red-700 text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+              >
+                Confirmer la suppression
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -297,6 +297,56 @@ export default function UserGuide({ onNavigate }: UserGuideProps) {
           </div>
         </div>
       )
+    },
+    {
+      title: "7. Kit de Présentation de la GMAO (ZIP)",
+      subtitle: "Captures d'écran HD prêtes pour vos diapositives & Guide complet",
+      icon: Download,
+      bg: "from-neutral-950 to-neutral-850 text-white",
+      content: (
+        <div className="space-y-4 text-xs">
+          <p className="text-neutral-200">
+            Nous avons préparé pour vous un kit de communication complet au format <strong>ZIP</strong> contenant les captures d'écran HD générées de l'application ainsi qu'un guide de présentation au format Markdown/Texte pour chaque diapositive :
+          </p>
+
+          <div className="bg-white/10 p-5 rounded-2xl border border-white/15 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="space-y-1 text-left">
+                <h5 className="font-bold text-white text-sm flex items-center gap-1.5">
+                  <Package className="h-4 w-4 text-amber-400" /> presentation_captures.zip
+                </h5>
+                <p className="text-[11px] text-neutral-300">
+                  Comprend 5 captures d'écran HD nommées (Tableau de Bord, Équipements, Interventions, Stocks, Budget) + le Guide de Présentation complet.
+                </p>
+              </div>
+
+              <a
+                href="/presentation_captures.zip"
+                download="GMAO_STA_Chery_Kit_Presentation.zip"
+                className="w-full sm:w-auto px-5 py-3 bg-white hover:bg-neutral-100 text-neutral-900 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer border border-neutral-200"
+              >
+                <Download className="h-4 w-4 text-neutral-900" />
+                Télécharger le Kit (.ZIP)
+              </a>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-1">
+              <h6 className="font-bold text-white text-[11px]">📸 Captures HD Incluses</h6>
+              <p className="text-[10px] text-neutral-300">
+                Images au format 16:9 optimisées pour vos diapositives PowerPoint, Google Slides ou Keynote.
+              </p>
+            </div>
+            <div className="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-1">
+              <h6 className="font-bold text-white text-[11px]">📝 Guide d'Accompagnement</h6>
+              <p className="text-[10px] text-neutral-300">
+                Fichier texte contenant le script de l'orateur (notes de présentation) pour chaque diapositive, mot à mot.
+              </p>
+            </div>
+          </div>
+        </div>
+      )
     }
   ];
 

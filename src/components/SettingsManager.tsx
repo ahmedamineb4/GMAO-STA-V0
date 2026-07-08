@@ -26,8 +26,6 @@ import { WORKSHOPS } from "../data";
 interface SettingsManagerProps {
   budget: BudgetYear;
   onUpdateBudgetAllocation: (workshop: Workshop, amount: number) => void;
-  onResetDemoData: () => void;
-  onClearAllData?: () => void;
   equipments: any[];
   interventions: any[];
   spareParts: any[];
@@ -44,8 +42,6 @@ interface SettingsManagerProps {
 export default function SettingsManager({
   budget,
   onUpdateBudgetAllocation,
-  onResetDemoData,
-  onClearAllData,
   equipments,
   interventions,
   spareParts,
@@ -222,45 +218,6 @@ export default function SettingsManager({
               </button>
             )}
           </form>
-
-          {/* System Maintenance Card */}
-          <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 text-red-600">
-              ⚠️ Maintenance Système
-            </h3>
-
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Gérez les données de votre application. Vous pouvez soit réinitialiser aux valeurs de démonstration, soit tout effacer pour démarrer de zéro.
-            </p>
-
-            {isWritable ? (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={onResetDemoData}
-                  className="w-full bg-red-50 hover:bg-red-100 text-chery-red border border-red-200 font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Réinitialiser la Base STA Tunisie (Démo)
-                </button>
-
-                {onClearAllData && (
-                  <button
-                    type="button"
-                    onClick={onClearAllData}
-                    className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border border-neutral-300 font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Vider complètement la base de données (Mode Vierge)
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] text-neutral-400 font-medium text-center">
-                🔒 Actions de maintenance réservées à l'Administrateur
-              </div>
-            )}
-          </div>
 
           {/* Backup & Restore Card */}
           <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
