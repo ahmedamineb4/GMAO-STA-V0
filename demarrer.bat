@@ -25,20 +25,40 @@ echo [SUCCES] Installation terminee !
 echo.
 
 :START_APP
-:: 4. Lancement du serveur local
+:: 4. Determination de l'adresse IP locale pour le partage reseau
+setlocal enabledelayedexpansion
+set "LOCAL_IP=localhost"
+for /f "tokens=2 delims=:" %%A in ('ipconfig ^| findstr /i "IPv4"') do (
+    set "TEMP_IP=%%A"
+    :: Supprimer les espaces autour de l'IP
+    set "TEMP_IP=!TEMP_IP: =!"
+    if not "!TEMP_IP!"=="" (
+        set "LOCAL_IP=!TEMP_IP!"
+    )
+)
+
 echo ======================================================================
-echo [INFO] Demarrage du serveur de l'application en cours...
+echo [INFO] DEMARRAGE DE LA GMAO STA CHERY TUNISIE
 echo ======================================================================
 echo.
-echo Une fois demarre, l'application sera accessible dans votre navigateur :
-echo --^> http://localhost:3000
+echo L'application est en cours de demarrage...
 echo.
-echo Pour arreter l'application, fermez simplement cette fenetre.
+echo ----------------------------------------------------------------------
+echo 💻 SUR VOTRE ORDINATEUR (Local) :
+echo    Ouvrez ce lien : http://localhost:3000
+echo.
+echo 🔌 PARTAGE SUR VOTRE RESEAU LOCAL (LAN) :
+echo    Vos collegues peuvent s'y connecter DIRECTEMENT depuis leurs PC,
+echo    tablettes ou smartphones connectes au meme reseau Wi-Fi / Ethernet :
+echo    --^> http://!LOCAL_IP!:3000
 echo ----------------------------------------------------------------------
 echo.
+echo Pour arreter le serveur, fermez simplement cette fenetre noire.
+echo ======================================================================
+echo.
 
-:: Ouvrir automatiquement l'application dans le navigateur par defaut
-start "" http://localhost:3000
+:: Ouvrir automatiquement l'application dans le navigateur par defaut de l'hote
+start "" "http://localhost:3000"
 
 call npm run dev
 if %errorlevel% NEQ 0 goto ERROR_RUN
