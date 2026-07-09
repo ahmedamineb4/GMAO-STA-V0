@@ -37,6 +37,9 @@ interface SettingsManagerProps {
   currentRole?: string;
   passwords?: Record<string, string>;
   onUpdatePasswords?: (newPasswords: Record<string, string>) => void;
+  dbMode?: "demo" | "vierge";
+  onResetDemoData?: () => void;
+  onClearAllData?: () => void;
 }
 
 export default function SettingsManager({
@@ -52,7 +55,10 @@ export default function SettingsManager({
   isReadOnly = false,
   currentRole = "admin",
   passwords = {},
-  onUpdatePasswords
+  onUpdatePasswords,
+  dbMode = "demo",
+  onResetDemoData,
+  onClearAllData
 }: SettingsManagerProps) {
   const isAdmin = currentRole === "admin";
   const isWritable = !isReadOnly && isAdmin;

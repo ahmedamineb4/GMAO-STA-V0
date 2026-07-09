@@ -30,7 +30,8 @@ import {
   Package,
   ArrowRight,
   Sparkles,
-  Info
+  Info,
+  RefreshCw
 } from "lucide-react";
 import { Equipment, Intervention, SparePart, ComplianceCheck, BudgetYear, Workshop } from "../types";
 
@@ -41,6 +42,7 @@ interface GmaoDashboardProps {
   compliance: ComplianceCheck[];
   budget: BudgetYear;
   onNavigate: (tab: string) => void;
+  onResetDemoData?: () => void;
 }
 
 export default function GmaoDashboard({
@@ -49,7 +51,8 @@ export default function GmaoDashboard({
   spareParts,
   compliance,
   budget,
-  onNavigate
+  onNavigate,
+  onResetDemoData
 }: GmaoDashboardProps) {
   // Current static date for comparisons (given as July 2026 in environment context)
   const TODAY = "2026-07-01";
@@ -293,6 +296,27 @@ export default function GmaoDashboard({
           </button>
         </div>
       </div>
+
+      {equipments.length === 0 && onResetDemoData && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+              <span className="text-lg">📁</span>
+              Version Vierge Active (Base de Données Vide)
+            </h3>
+            <p className="text-xs text-neutral-600 max-w-3xl leading-relaxed">
+              La base de données est actuellement vide. Vous pouvez commencer à saisir vos fiches d'équipements manuellement ou <strong>charger instantanément les équipements réels et les demandes d'achats</strong> extraits de votre fichier Excel pour peupler la GMAO.
+            </p>
+          </div>
+          <button
+            onClick={onResetDemoData}
+            className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-3 px-5 rounded-xl transition-all shadow-md shadow-amber-600/10 flex items-center gap-2 cursor-pointer"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Mettre en place depuis le fichier
+          </button>
+        </div>
+      )}
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

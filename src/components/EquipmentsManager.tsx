@@ -20,7 +20,8 @@ import {
   FileText,
   Copy,
   Edit,
-  Trash2
+  Trash2,
+  RefreshCw
 } from "lucide-react";
 import { Equipment, EquipmentStatus, Workshop, Intervention } from "../types";
 import { WORKSHOPS } from "../data";
@@ -35,6 +36,7 @@ interface EquipmentsManagerProps {
   initialWorkshop?: string;
   isReadOnly?: boolean;
   allowedWorkshop?: string;
+  onResetDemoData?: () => void;
 }
 
 export default function EquipmentsManager({
@@ -46,7 +48,8 @@ export default function EquipmentsManager({
   onDeleteEquipment,
   initialWorkshop = "All",
   isReadOnly = false,
-  allowedWorkshop
+  allowedWorkshop,
+  onResetDemoData
 }: EquipmentsManagerProps) {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -330,7 +333,21 @@ export default function EquipmentsManager({
               <div className="p-12 text-center text-neutral-400 flex flex-col items-center">
                 <Sliders className="h-10 w-10 text-neutral-300 mb-2" />
                 <p className="text-sm font-bold">Aucun équipement trouvé</p>
-                <p className="text-xs mt-1">Modifiez vos critères de recherche ou de filtre.</p>
+                <p className="text-xs mt-1 mb-4">
+                  {equipments.length === 0 
+                    ? "La base de données d'équipements est actuellement vierge (vide)."
+                    : "Modifiez vos critères de recherche ou de filtre."}
+                </p>
+                {equipments.length === 0 && onResetDemoData && (
+                  <button
+                    type="button"
+                    onClick={onResetDemoData}
+                    className="bg-chery-red hover:bg-chery-dark text-white text-xs font-bold py-2.5 px-5 rounded-xl shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Mettre en place les équipements depuis le fichier STA
+                  </button>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-neutral-100">

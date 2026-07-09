@@ -25,7 +25,8 @@ import {
   HelpCircle,
   Menu,
   X,
-  Presentation
+  Presentation,
+  LogOut
 } from "lucide-react";
 
 // Types & Initial Data
@@ -50,7 +51,8 @@ import {
   INITIAL_VENDORS,
   INITIAL_CONTRACTS,
   INITIAL_COMPLIANCE_CHECKS,
-  BUDGET_2026
+  BUDGET_2026,
+  INITIAL_PURCHASE_REQUESTS
 } from "./data";
 
 // Sub Components
@@ -82,7 +84,7 @@ export default function App() {
 
   const [dbMode, setDbMode] = useState<"demo" | "vierge">(() => {
     const saved = localStorage.getItem("chery_gmao_database_mode");
-    return (saved as "demo" | "vierge") || "demo";
+    return (saved as "demo" | "vierge") || "vierge";
   });
 
   // Core Reactive States (With LocalStorage persistence fallback)
@@ -118,31 +120,7 @@ export default function App() {
     const saved = localStorage.getItem("chery_gmao_purchase_requests");
     if (saved) return JSON.parse(saved);
     const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
-    if (mode === "demo") {
-      return [
-        {
-          id: "DA-2026-001",
-          partCode: "PR-CR-FILT",
-          quantity: 5,
-          vendorId: "VND-SOCO",
-          requestedBy: "M. Ahmed Amine Ben Salah",
-          dateRequested: "2026-06-25",
-          status: "Approuvé",
-          estimatedCost: 1600,
-        },
-        {
-          id: "DA-2026-002",
-          partCode: "PR-SR-FL1",
-          quantity: 10,
-          vendorId: "VND-SOCO",
-          requestedBy: "M. Ahmed Amine Ben Salah",
-          dateRequested: "2026-06-30",
-          status: "En attente",
-          estimatedCost: 850,
-        }
-      ];
-    }
-    return [];
+    return mode === "demo" ? INITIAL_PURCHASE_REQUESTS : [];
   });
 
   const [contracts] = useState<MaintenanceContract[]>(INITIAL_CONTRACTS);
@@ -207,6 +185,11 @@ export default function App() {
     return localStorage.getItem("chery_gmao_user_role") || "admin";
   });
 
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [loginPendingRole, setLoginPendingRole] = useState<string | null>(null);
+  const [loginPasswordInput, setLoginPasswordInput] = useState<string>("");
+  const [loginPasswordError, setLoginPasswordError] = useState<boolean>(false);
+
   const [pendingRole, setPendingRole] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
@@ -235,6 +218,21 @@ export default function App() {
       setPasswordError(false);
     } else {
       setPasswordError(true);
+    }
+  };
+
+  const handleLoginVerifyPassword = () => {
+    if (!loginPendingRole) return;
+    const correctPassword = passwords[loginPendingRole] || "0000";
+    if (loginPasswordInput === correctPassword) {
+      setCurrentUserRole(loginPendingRole);
+      localStorage.setItem("chery_gmao_user_role", loginPendingRole);
+      setIsAuthenticated(true);
+      setLoginPendingRole(null);
+      setLoginPasswordInput("");
+      setLoginPasswordError(false);
+    } else {
+      setLoginPasswordError(true);
     }
   };
 
@@ -285,6 +283,23 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("chery_gmao_budget", JSON.stringify(budget));
   }, [budget]);
+
+  // One-time auto-migration to version 7 to force blank "vierge" mode as requested
+  useEffect(() => {
+    const migrated = localStorage.getItem("chery_gmao_db_migrated_v7");
+    if (!migrated) {
+      localStorage.setItem("chery_gmao_database_mode", "vierge");
+      localStorage.removeItem("chery_gmao_equipments");
+      localStorage.removeItem("chery_gmao_interventions");
+      localStorage.removeItem("chery_gmao_spare_parts");
+      localStorage.removeItem("chery_gmao_compliance");
+      localStorage.removeItem("chery_gmao_budget");
+      localStorage.removeItem("chery_gmao_vendors");
+      localStorage.removeItem("chery_gmao_purchase_requests");
+      localStorage.setItem("chery_gmao_db_migrated_v7", "true");
+      window.location.reload();
+    }
+  }, []);
 
   // -------------------------------------------------------------
   // CORE GMAO WORKFLOW OPERATIONS & SYSTEM INTEGRATIONS
@@ -464,28 +479,7 @@ export default function App() {
     setCompliance(INITIAL_COMPLIANCE_CHECKS);
     setBudget(BUDGET_2026);
     setVendors(INITIAL_VENDORS);
-    setPurchaseRequests([
-      {
-        id: "DA-2026-001",
-        partCode: "PR-CR-FILT",
-        quantity: 5,
-        vendorId: "VND-SOCO",
-        requestedBy: "M. Ahmed Amine Ben Salah",
-        dateRequested: "2026-06-25",
-        status: "Approuvé",
-        estimatedCost: 1600,
-      },
-      {
-        id: "DA-2026-002",
-        partCode: "PR-SR-FL1",
-        quantity: 10,
-        vendorId: "VND-SOCO",
-        requestedBy: "M. Ahmed Amine Ben Salah",
-        dateRequested: "2026-06-30",
-        status: "En attente",
-        estimatedCost: 850,
-      }
-    ]);
+    setPurchaseRequests(INITIAL_PURCHASE_REQUESTS);
     setSelectedWorkshopFilter("All");
     setSelectedMaintenanceType("All");
     setSelectedMaintenanceStatus("All");
@@ -559,6 +553,185 @@ export default function App() {
     if (importedData.compliance) setCompliance(importedData.compliance);
     if (importedData.budget) setBudget(importedData.budget);
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col justify-between antialiased font-sans">
+        {/* Top corporate header branding (Login page style) */}
+        <header className="bg-white border-b border-neutral-200 shrink-0 shadow-xs py-4">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between">
+            <div className="flex items-center gap-2 select-none mx-auto sm:mx-0">
+              <div className="bg-chery-red text-white text-xs font-black px-2.5 py-1.5 rounded-md tracking-wider flex items-center justify-center shadow-xs">
+                STA
+              </div>
+              <span className="font-sans font-black text-lg tracking-wide text-neutral-800">
+                CHERY
+              </span>
+              <div className="border-l border-neutral-200 pl-3 ml-1">
+                <span className="font-display font-black text-sm tracking-tight text-neutral-800 block leading-tight">
+                  STA TUNISIE
+                </span>
+                <span className="text-[10px] text-neutral-400 font-semibold tracking-wider block uppercase -mt-0.5">
+                  Concessionnaire Officiel Chery
+                </span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Central Auth Container */}
+        <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 max-w-4xl mx-auto w-full">
+          <div className="text-center space-y-2 mb-8 animate-fade-in">
+            <span className="text-4xl">🔐</span>
+            <h1 className="text-xl sm:text-2xl font-black text-neutral-800 tracking-tight">
+              Portail d'Accès GMAO STA
+            </h1>
+            <p className="text-xs sm:text-sm text-neutral-500 max-w-md mx-auto leading-relaxed">
+              Sélectionnez votre profil professionnel et saisissez votre code PIN pour vous connecter à la gestion de maintenance STA Tunisie.
+            </p>
+          </div>
+
+          {/* Profiles Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl">
+            {Object.entries(ROLE_LABELS).map(([role, label]) => {
+              // Custom icon/style based on role
+              let icon = "⚙️";
+              let colorClasses = "border-neutral-200 hover:border-neutral-400 hover:shadow-md";
+              let badgeText = "Chef d'Atelier";
+              let badgeColor = "bg-neutral-100 text-neutral-600";
+
+              if (role === "admin") {
+                icon = "🔑";
+                colorClasses = "border-red-200 hover:border-chery-red hover:shadow-md bg-red-50/10";
+                badgeText = "Administrateur";
+                badgeColor = "bg-red-100 text-chery-red";
+              } else if (role === "supervisor") {
+                icon = "👁️";
+                colorClasses = "border-amber-200 hover:border-amber-500 hover:shadow-md bg-amber-50/10";
+                badgeText = "Superviseur";
+                badgeColor = "bg-amber-100 text-amber-800";
+              } else if (role === "magasin") {
+                icon = "📦";
+                colorClasses = "border-slate-300 hover:border-slate-800 hover:shadow-md bg-slate-50/10";
+                badgeText = "Magasinier";
+                badgeColor = "bg-slate-800 text-white";
+              } else {
+                if (role === "service_rapide") icon = "⚡";
+                else if (role === "carrosserie") icon = "🎨";
+                else if (role === "lavage") icon = "🧼";
+                else if (role === "atelier_diagnostic") icon = "🔬";
+                else if (role === "atelier_mecanique") icon = "⚙️";
+                else if (role === "batiment") icon = "🏢";
+              }
+
+              return (
+                <button
+                  key={role}
+                  onClick={() => {
+                    setLoginPendingRole(role);
+                    setLoginPasswordInput("");
+                    setLoginPasswordError(false);
+                  }}
+                  className={`flex flex-col text-left p-5 rounded-2xl border border-neutral-200 hover:border-neutral-400 hover:shadow-md bg-white transition-all duration-200 cursor-pointer ${colorClasses} group relative overflow-hidden`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-2xl">{icon}</span>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${badgeColor}`}>
+                      {badgeText}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-xs text-neutral-800 leading-snug group-hover:text-chery-red transition-colors">
+                    {label}
+                  </h3>
+                  <p className="text-[10px] text-neutral-400 mt-1 leading-tight">
+                    {role === "admin" 
+                      ? "Configuration complète & validation globale"
+                      : role === "supervisor"
+                      ? "Consultation de tous les ateliers en lecture seule"
+                      : role === "magasin"
+                      ? "Suivi des stocks, pièces de rechange et achats"
+                      : "Saisie des pannes et bons de travail de l'atelier"}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+
+        </main>
+
+        {/* Inline Password Entry Modal / Prompt */}
+        {loginPendingRole && (
+          <div className="fixed inset-0 bg-neutral-900/80 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl max-w-sm w-full p-6 space-y-4">
+              <div className="text-center space-y-1">
+                <span className="text-3xl">🔑</span>
+                <h3 className="text-base font-bold text-neutral-800">
+                  Saisir le Code d'Accès
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Veuillez entrer le PIN pour vous authentifier en tant que :
+                </p>
+                <p className="text-xs font-bold text-neutral-700 bg-neutral-50 p-2.5 rounded-xl border border-neutral-100">
+                  {ROLE_LABELS[loginPendingRole]}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  autoFocus
+                  placeholder="Saisir le code / PIN"
+                  value={loginPasswordInput}
+                  onChange={(e) => {
+                    setLoginPasswordInput(e.target.value);
+                    setLoginPasswordError(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleLoginVerifyPassword();
+                  }}
+                  className="w-full text-center tracking-widest text-lg font-bold font-mono border border-neutral-200 rounded-xl p-2.5 bg-neutral-50 outline-none focus:ring-2 focus:ring-chery-red"
+                />
+                {loginPasswordError && (
+                  <p className="text-[11px] text-chery-red font-bold text-center">
+                    ❌ Code d'accès PIN incorrect !
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginPendingRole(null);
+                    setLoginPasswordInput("");
+                    setLoginPasswordError(false);
+                  }}
+                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLoginVerifyPassword}
+                  className="flex-1 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+                >
+                  S'authentifier
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Corporate Footer */}
+        <footer className="bg-white border-t border-neutral-200 py-4 text-center text-[10px] text-neutral-400 shrink-0">
+          <p className="font-bold text-neutral-500">
+            Portail de GMAO STA Tunisie • Ahmed Amine Ben Salah © 2026
+          </p>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
@@ -658,6 +831,22 @@ export default function App() {
                 {currentUserRole === "admin" ? "AA" : currentUserRole === "supervisor" ? "SV" : currentUserRole === "magasin" ? "MG" : "OP"}
               </div>
             </div>
+
+            {/* Logout button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsAuthenticated(false);
+                setLoginPendingRole(null);
+                setLoginPasswordInput("");
+                setLoginPasswordError(false);
+              }}
+              title="Se déconnecter (Verrouiller la session)"
+              className="ml-1 bg-red-50 hover:bg-red-100 border border-red-100 text-chery-red p-2 rounded-xl cursor-pointer transition-colors flex items-center gap-1 text-[10px] font-bold"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Quitter</span>
+            </button>
           </div>
         </div>
       </header>
@@ -1000,6 +1189,7 @@ export default function App() {
                 }
                 setActiveTab(tab);
               }}
+              onResetDemoData={handleResetDemoData}
             />
           )}
 
@@ -1014,6 +1204,7 @@ export default function App() {
               initialWorkshop={selectedWorkshopFilter}
               isReadOnly={isEquipmentsReadOnly}
               allowedWorkshop={allowedWorkshop}
+              onResetDemoData={handleResetDemoData}
             />
           )}
 
@@ -1108,6 +1299,9 @@ export default function App() {
               currentRole={currentUserRole}
               passwords={passwords}
               onUpdatePasswords={setPasswords}
+              dbMode={dbMode}
+              onResetDemoData={handleResetDemoData}
+              onClearAllData={handleClearAllData}
             />
           )}
 
@@ -1116,6 +1310,56 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Database Reset/Clear Confirmation Modal */}
+      {resetConfirmType && (
+        <div className="fixed inset-0 bg-neutral-900/85 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="text-center space-y-2">
+              <span className="text-4xl">
+                {resetConfirmType === "reset" ? "🔄" : "⚠️"}
+              </span>
+              <h3 className="text-base font-bold text-neutral-800">
+                {resetConfirmType === "reset"
+                  ? "Charger les Équipements et Demandes du Fichier STA Chery"
+                  : "Effacer Complètement la Base de Données"}
+              </h3>
+              <p className="text-xs text-neutral-500 leading-relaxed">
+                {resetConfirmType === "reset"
+                  ? "Êtes-vous sûr de vouloir charger les données réelles ? Cela peuplera la GMAO avec le parc complet d'équipements de la STA Chery Tunisie (ponts élévateurs, cabine de peinture, compresseurs, etc.) et les demandes d'achats extraites de votre fichier d'origine."
+                  : "Êtes-vous sûr de vouloir vider la base de données ? Tous vos équipements, pièces de rechange, fournisseurs, demandes d'achats et interventions seront effacés localement. Vous obtiendrez un espace de travail vierge."}
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setResetConfirmType(null)}
+                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (resetConfirmType === "reset") {
+                    executeResetDemoData();
+                  } else {
+                    executeClearAllData();
+                  }
+                }}
+                className={`flex-1 text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors ${
+                  resetConfirmType === "reset"
+                    ? "bg-chery-red hover:bg-chery-dark"
+                    : "bg-neutral-800 hover:bg-neutral-900"
+                }`}
+              >
+                {resetConfirmType === "reset" ? "Confirmer la Restauration" : "Confirmer l'Effacement"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Password Authentication Modal */}
       {pendingRole && (
