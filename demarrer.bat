@@ -25,11 +25,11 @@ echo [SUCCES] Installation terminee !
 echo.
 
 :START_APP
-:: Libération automatique du port 3000 s'il est déjà utilisé sous Windows
+:: Liberation automatique du port 3000 s'il est deja utilise sous Windows
 echo ======================================================================
 echo [INFO] Verification de la disponibilite du port 3000...
 echo ======================================================================
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000" ^| findstr "LISTENING"') do (
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000" ^| findstr "LISTENING"') do (
     echo [INFO] Liberation du port 3000 occupe par un ancien processus (PID: %%a)...
     taskkill /F /PID %%a >nul 2>&1
 )
@@ -40,7 +40,7 @@ setlocal enabledelayedexpansion
 set "LOCAL_IP=localhost"
 for /f "tokens=2 delims=:" %%A in ('ipconfig ^| findstr /i "IPv4"') do (
     set "TEMP_IP=%%A"
-    :: Supprimer les espaces autour de l'IP
+    rem Supprimer les espaces autour de l'IP
     set "TEMP_IP=!TEMP_IP: =!"
     if not "!TEMP_IP!"=="" (
         set "LOCAL_IP=!TEMP_IP!"
