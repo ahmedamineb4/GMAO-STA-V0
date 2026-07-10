@@ -390,7 +390,7 @@ export default function App() {
 
     const timer = setTimeout(() => {
       handleManualSaveToDisk();
-    }, 15000); // Debounce write updates by 15 seconds to avoid frequent reloads during fast edits
+    }, 60000); // Debounce write updates by 60 seconds (1 minute) to avoid frequent disk saves and reloads during fast edits
 
     return () => clearTimeout(timer);
   }, [equipments, interventions, spareParts, vendors, purchaseRequests, compliance, budget]);
