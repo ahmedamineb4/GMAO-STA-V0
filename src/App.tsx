@@ -188,7 +188,9 @@ export default function App() {
     return localStorage.getItem("chery_gmao_user_role") || "admin";
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem("chery_gmao_authenticated") === "true";
+  });
   const [loginPendingRole, setLoginPendingRole] = useState<string | null>(null);
   const [loginPasswordInput, setLoginPasswordInput] = useState<string>("");
   const [loginPasswordError, setLoginPasswordError] = useState<boolean>(false);
@@ -231,6 +233,7 @@ export default function App() {
       setCurrentUserRole(loginPendingRole);
       localStorage.setItem("chery_gmao_user_role", loginPendingRole);
       setIsAuthenticated(true);
+      localStorage.setItem("chery_gmao_authenticated", "true");
       setLoginPendingRole(null);
       setLoginPasswordInput("");
       setLoginPasswordError(false);
@@ -927,6 +930,7 @@ export default function App() {
               type="button"
               onClick={() => {
                 setIsAuthenticated(false);
+                localStorage.removeItem("chery_gmao_authenticated");
                 setLoginPendingRole(null);
                 setLoginPasswordInput("");
                 setLoginPasswordError(false);
