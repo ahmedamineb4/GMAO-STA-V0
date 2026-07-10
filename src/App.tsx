@@ -68,7 +68,9 @@ import UserGuide from "./components/UserGuide";
 
 export default function App() {
   // Navigation State
-  const [activeTab, setActiveTab] = useState<string>("dashboard");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return localStorage.getItem("chery_gmao_active_tab") || "dashboard";
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [resetConfirmType, setResetConfirmType] = useState<"reset" | "clear" | null>(null);
 
@@ -80,10 +82,18 @@ export default function App() {
   const [maintenanceOpen, setMaintenanceOpen] = useState<boolean>(true);
 
   // Nested filter states
-  const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>("All");
-  const [selectedMaintenanceType, setSelectedMaintenanceType] = useState<string>("All");
-  const [selectedMaintenanceStatus, setSelectedMaintenanceStatus] = useState<string>("All");
-  const [showMaintenanceCalendar, setShowMaintenanceCalendar] = useState<boolean>(false);
+  const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>(() => {
+    return localStorage.getItem("chery_gmao_filter_workshop") || "All";
+  });
+  const [selectedMaintenanceType, setSelectedMaintenanceType] = useState<string>(() => {
+    return localStorage.getItem("chery_gmao_filter_type") || "All";
+  });
+  const [selectedMaintenanceStatus, setSelectedMaintenanceStatus] = useState<string>(() => {
+    return localStorage.getItem("chery_gmao_filter_status") || "All";
+  });
+  const [showMaintenanceCalendar, setShowMaintenanceCalendar] = useState<boolean>(() => {
+    return localStorage.getItem("chery_gmao_filter_calendar") === "true";
+  });
 
   const [dbMode, setDbMode] = useState<"demo" | "vierge">(() => {
     const saved = localStorage.getItem("chery_gmao_database_mode");
@@ -290,6 +300,63 @@ export default function App() {
     localStorage.setItem("chery_gmao_budget", JSON.stringify(budget));
   }, [budget]);
 
+  // Save navigation and filter states to LocalStorage on changes
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_active_tab", activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_filter_workshop", selectedWorkshopFilter);
+  }, [selectedWorkshopFilter]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_filter_type", selectedMaintenanceType);
+  }, [selectedMaintenanceType]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_filter_status", selectedMaintenanceStatus);
+  }, [selectedMaintenanceStatus]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_filter_calendar", showMaintenanceCalendar ? "true" : "false");
+  }, [showMaintenanceCalendar]);
+
+  // Function to manually trigger database backup to disk
+  const handleManualSaveToDisk = () => {
+    setDiskSyncStatus("syncing");
+    const backupData = {
+      equipments,
+      interventions,
+      spareParts,
+      vendors,
+      purchaseRequests,
+      compliance,
+      budget,
+      exportedAt: new Date().toISOString(),
+      version: "GMAO-STA-1.0"
+    };
+
+    fetch("/api/backup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(backupData),
+    })
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success) {
+          setDiskSyncStatus("synced");
+        } else {
+          setDiskSyncStatus("error");
+        }
+      })
+      .catch((err) => {
+        console.error("[GMAO] Echec de la sauvegarde sur le disque dur:", err);
+        setDiskSyncStatus("error");
+      });
+  };
+
   // Load from local disk on first load if localStorage is empty
   useEffect(() => {
     fetch("/api/backup")
@@ -322,39 +389,8 @@ export default function App() {
     }
 
     const timer = setTimeout(() => {
-      setDiskSyncStatus("syncing");
-      const backupData = {
-        equipments,
-        interventions,
-        spareParts,
-        vendors,
-        purchaseRequests,
-        compliance,
-        budget,
-        exportedAt: new Date().toISOString(),
-        version: "GMAO-STA-1.0"
-      };
-
-      fetch("/api/backup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(backupData),
-      })
-        .then((res) => res.json())
-        .then((res) => {
-          if (res.success) {
-            setDiskSyncStatus("synced");
-          } else {
-            setDiskSyncStatus("error");
-          }
-        })
-        .catch((err) => {
-          console.error("[GMAO] Echec de la sauvegarde sur le disque dur:", err);
-          setDiskSyncStatus("error");
-        });
-    }, 2000); // Debounce write updates by 2 seconds
+      handleManualSaveToDisk();
+    }, 15000); // Debounce write updates by 15 seconds to avoid frequent reloads during fast edits
 
     return () => clearTimeout(timer);
   }, [equipments, interventions, spareParts, vendors, purchaseRequests, compliance, budget]);
@@ -841,30 +877,35 @@ export default function App() {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-2.5 bg-neutral-50 px-4 py-2 rounded-full border border-neutral-200/50">
+          <button
+            type="button"
+            onClick={handleManualSaveToDisk}
+            title="Cliquer pour forcer la sauvegarde instantanée sur votre PC"
+            className="hidden md:flex items-center gap-2.5 bg-neutral-50 hover:bg-neutral-100 px-4 py-2 rounded-full border border-neutral-200/50 transition-all cursor-pointer group active:scale-95"
+          >
             {diskSyncStatus === "syncing" ? (
               <>
                 <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
                 <span className="text-xs font-semibold text-neutral-600 font-mono flex items-center gap-1">
-                  🔄 Synchronisation PC en cours... (Port 3000)
+                  🔄 Synchronisation PC...
                 </span>
               </>
             ) : diskSyncStatus === "error" ? (
               <>
                 <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
-                <span className="text-xs font-semibold text-neutral-600 font-mono">
-                  ⚠️ Sauvegarde locale indisponible (Mode Hors-ligne)
+                <span className="text-xs font-semibold text-neutral-600 font-mono group-hover:text-amber-800">
+                  ⚠️ Réessayer la Sauvegarde
                 </span>
               </>
             ) : (
               <>
                 <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse-subtle"></span>
-                <span className="text-xs font-semibold text-neutral-600 font-mono">
-                  🟢 Sauvegarde automatique active sur votre PC
+                <span className="text-xs font-semibold text-neutral-600 font-mono group-hover:text-neutral-800 flex items-center gap-1">
+                  🟢 Sauvegardé sur PC • Enregistrer
                 </span>
               </>
             )}
-          </div>
+          </button>
 
           {/* Dynamic Role Switcher dropdown */}
           <div className="flex items-center gap-2">
