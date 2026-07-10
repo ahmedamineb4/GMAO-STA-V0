@@ -1,13 +1,17 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Support large backup payloads if needed
+  // Support large backup payloads
   app.use(express.json({ limit: "50mb" }));
 
   // Dossier local pour stocker les sauvegardes de secours
@@ -49,7 +53,7 @@ async function startServer() {
       }
 
       res.json({ success: true, message: "Sauvegarde enregistree sur le disque." });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Backup write error:", error);
       res.status(500).json({ success: false, error: error?.message || "Erreur disque" });
     }
@@ -65,7 +69,7 @@ async function startServer() {
       } else {
         res.json({ success: false, message: "Aucune sauvegarde trouvee." });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Backup read error:", error);
       res.status(500).json({ success: false, error: error?.message || "Erreur lecture disque" });
     }
@@ -136,6 +140,8 @@ async function startServer() {
     <li><strong>Le Tableau de Bord et la règle de "Disponibilité"</strong> (Indicateurs clés)</li>
     <li><strong>La Gestion du Parc d'Équipements</strong> (Suivi des machines actives)</li>
     <li><strong>La Fiche d'Intervention de A à Z</strong> (Déclarer, traiter et clôturer une panne)</li>
+    <li><strong>Créer un Nouvel Équipement Étape par Étape</strong> (Tutoriel Pratique)</li>
+    <li><strong>Formuler une Demande d'Achat (DA) Étape par Étape</strong> (Tutoriel Pratique)</li>
     <li><strong>Le Stock Magasin et l'Impact Budgétaire de l'Atelier</strong> (Sortie automatique des pièces)</li>
     <li><strong>Rapports & Exports d'Ingénierie de Maintenance</strong> (Le lien avec l'équipe Direction)</li>
     <li><strong>Fiches Pratiques d'Entraînement</strong> (Exercices types pour les chefs d'atelier)</li>
@@ -290,17 +296,64 @@ async function startServer() {
     </li>
   </ol>
 
-  <div class="note">
-    <strong>⚠️ Effet Automatique Majeur de la Clôture :</strong><br>
-    Au moment précis où vous passez l'intervention à <strong>"Terminé"</strong> :<br>
-    1. Les pièces de rechange associées sont automatiquement déduites du stock du Magasin.<br>
-    2. Le coût total de l'intervention (Pièces de rechange + Main d'œuvre estimée) est calculé et imputé directement sur l'enveloppe budgétaire annuelle de votre atelier.
+  <div class="page-break"></div>
+
+  <!-- NEW CHAPITRE 7 -->
+  <h1>7. Tutoriel : Créer un Nouvel Équipement (Étape par Étape)</h1>
+  <p>
+    L'enregistrement d'une nouvelle machine (par exemple, un nouveau pont élévateur ou un outil de diagnostic de haute technologie) s'effectue facilement. Suivez scrupuleusement ces étapes :
+  </p>
+  <div class="exercise" style="background-color: #E3F2FD; border-left: 5px solid #1976D2;">
+    <strong>📝 Guide pas-à-pas de Création d'Équipement :</strong>
+    <ol>
+      <li><strong>Sélectionnez le Rôle Admin :</strong> Seul le profil de M. Ahmed Amine (Admin) ou un utilisateur avec droits d'écriture complets peut ajouter un équipement. Assurez-vous d'avoir saisi votre PIN administrateur.</li>
+      <li><strong>Allez dans l'onglet "Parc Équipements" :</strong> Cliquez sur l'onglet correspondant dans le menu de gauche.</li>
+      <li><strong>Cliquez sur le bouton bleu "+ Ajouter un Équipement" :</strong> Ce bouton est situé en haut à droite de l'écran. Un formulaire s'ouvre à l'écran.</li>
+      <li><strong>Remplissez les informations obligatoires :</strong>
+        <ul>
+          <li><strong>Nom de l'équipement :</strong> Donnez un nom clair (ex : <em>"Équilibreuse de roues numérique N°3"</em>).</li>
+          <li><strong>Code unique (ID) :</strong> Saisissez un identifiant court et standardisé (ex : <span class="badge font-mono">EQ-SR-03</span>).</li>
+          <li><strong>Atelier d'affectation :</strong> Choisissez l'atelier de destination (ex : <em>"Service Rapide"</em>) dans le menu déroulant.</li>
+          <li><strong>Catégorie :</strong> Sélectionnez la nature de l'appareil (ex : <em>"Levage"</em>, <em>"Outillage"</em>, <em>"Électrique"</em>).</li>
+          <li><strong>Criticité :</strong> Définissez l'importance stratégique (ex : <em>"Haute"</em> si l'arrêt bloque tout l'atelier).</li>
+        </ul>
+      </li>
+      <li><strong>Renseignez les données d'achat et de garantie :</strong> Indiquez la date de mise en service et la date d'expiration de la garantie constructeur pour être alerté en cas de panne sous couverture.</li>
+      <li><strong>Enregistrez l'équipement :</strong> Cliquez sur <strong>"Créer l'équipement"</strong>. L'équipement est instantanément ajouté à la base de données de la STA et synchronisé de manière sécurisée sur votre disque dur.</li>
+    </ol>
   </div>
 
   <div class="page-break"></div>
 
-  <!-- CHAPITRE 7 -->
-  <h1>7. Magasin & Suivi Budgétaire des Ateliers</h1>
+  <!-- NEW CHAPITRE 8 -->
+  <h1>8. Tutoriel : Formuler une Demande d'Achat (DA) (Étape par Étape)</h1>
+  <p>
+    Lorsqu'une pièce de rechange critique est en rupture ou qu'un équipement nécessite des pièces non disponibles en magasin, le chef d'atelier ou le magasinier doit lancer une Demande d'Achat (DA).
+  </p>
+  <div class="exercise" style="background-color: #F3E5F5; border-left: 5px solid #8E24AA;">
+    <strong>🛒 Guide pas-à-pas pour une Demande d'Achat (DA) :</strong>
+    <ol>
+      <li><strong>Ouvrez l'onglet "Achats & DAs" :</strong> Cet onglet centralise toutes les commandes en cours de traitement de la STA Chery.</li>
+      <li><strong>Cliquez sur "+ Nouvelle Demande d'Achat (DA)" :</strong> Un volet d'édition complet apparaît.</li>
+      <li><strong>Sélectionnez la pièce de rechange concernée :</strong> Choisissez dans l'inventaire la pièce nécessaire (ex : <em>"Flexible hydraulique"</em>). Si elle n'existe pas encore, vous pouvez d'abord la créer dans l'onglet "Inventaire".</li>
+      <li><strong>Définissez les détails de la commande :</strong>
+        <ul>
+          <li><strong>Quantité requise :</strong> Saisissez le nombre exact d'unités à commander.</li>
+          <li><strong>Fournisseur :</strong> Sélectionnez le partenaire agréé par la STA dans la liste déroulante (ex : <em>"Hydrautech Tunisie"</em>).</li>
+          <li><strong>Atelier émetteur :</strong> Spécifiez quel atelier bénéficiera de cette pièce pour l'imputation budgétaire.</li>
+          <li><strong>Urgence :</strong> Définissez la priorité (ex : <em>"Urgent - Machine en panne"</em>).</li>
+        </ul>
+      </li>
+      <li><strong>Validez la création de la DA :</strong> Elle passe automatiquement au statut <span class="badge badge-purple">Brouillon</span> ou <span class="badge">En Attente de Validation</span>.</li>
+      <li><strong>Étape de Validation (Admin) :</strong> M. Ahmed Amine (Admin) reçoit une notification visuelle. Il lui suffit de cliquer sur le bouton <strong>"Valider"</strong>. La DA passe au statut <span class="badge badge-blue">Commandé</span>.</li>
+      <li><strong>Étape de Réception (Magasinier) :</strong> Une fois le colis physiquement réceptionné dans les ateliers de Tunis, le magasinier ouvre la DA correspondante et clique sur <strong>"Réceptionner les Pièces"</strong>. Le stock informatique de la pièce augmente automatiquement de la quantité commandée, et la DA est marquée comme <span class="badge badge-green">Livré & Clôturé</span> !</li>
+    </ol>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- CHAPITRE 9 -->
+  <h1>9. Magasin & Suivi Budgétaire des Ateliers</h1>
   <p>
     Le Magasinier utilise l'onglet <strong>"Inventaire Magasin"</strong> pour s'assurer que les pièces critiques pour vos machines ne tombent jamais en rupture.
   </p>
@@ -313,8 +366,8 @@ async function startServer() {
     <li>Une fois les pièces livrées physiquement à la STA Chery par le fournisseur, le magasinier clique sur <strong>"Réceptionner"</strong> dans l'application. Le stock physique est instantanément crédité et remis à niveau.</li>
   </ul>
 
-  <!-- CHAPITRE 8 -->
-  <h1>8. Rapports & Liaisons Excel de la Direction</h1>
+  <!-- CHAPITRE 10 -->
+  <h1>10. Rapports & Liaisons Excel de la Direction</h1>
   <p>
     Cette application GMAO n'est pas fermée. Elle communique de façon transparente avec les outils bureautiques traditionnels de la direction (Microsoft Excel).
   </p>
@@ -329,7 +382,7 @@ async function startServer() {
   <div class="page-break"></div>
 
   <!-- EXERCICES DE TRAVAUX PRATIQUES -->
-  <h1>9. Travaux Pratiques d'Entraînement</h1>
+  <h1>11. Travaux Pratiques d'Entraînement</h1>
   <p>
     Pour vous familiariser avec l'outil GMAO de la STA Chery, voici trois exercices pratiques que vous pouvez réaliser de manière fictive pour maîtriser l'outil :
   </p>
@@ -389,7 +442,7 @@ async function startServer() {
       res.setHeader("Content-Type", "application/msword");
       res.setHeader("Content-Disposition", "attachment; filename=Manuel_Formation_GMAO_STA_Chery.doc");
       res.send(guideHtml);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Guide download error:", err);
       res.status(500).send("Erreur lors de la génération du manuel.");
     }

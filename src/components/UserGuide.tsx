@@ -152,6 +152,44 @@ export default function UserGuide({ onNavigate }: UserGuideProps) {
       )
     },
     {
+      title: "2b. Pas-à-Pas : Créer un Équipement",
+      subtitle: "Tutoriel détaillé pour ajouter un nouvel appareil dans la base",
+      icon: Wrench,
+      bg: "from-blue-950 to-neutral-900 text-white",
+      content: (
+        <div className="space-y-3 text-xs text-left">
+          <p className="text-neutral-200 leading-relaxed">
+            L'ajout d'un nouvel équipement est réservé à l'Administrateur (M. Ahmed Amine) et s'effectue en quelques étapes simples :
+          </p>
+
+          <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-3">
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 1 : Se connecter en mode Admin</span>
+              <p className="text-neutral-300 text-[11px]">Assurez-vous de sélectionner le profil <strong className="text-white">Admin (Ahmed Amine)</strong> en haut à droite et de saisir le code PIN de sécurité correspondant.</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 2 : Accéder à l'onglet Parc Équipements</span>
+              <p className="text-neutral-300 text-[11px]">Cliquez sur l'onglet <strong className="text-white">"Parc Équipements"</strong> dans le menu de gauche.</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 3 : Ouvrir le formulaire d'ajout</span>
+              <p className="text-neutral-300 text-[11px]">Cliquez sur le bouton bleu <strong className="text-white">"+ Ajouter un Équipement"</strong> situé en haut à droite.</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 4 : Renseigner les champs critiques</span>
+              <p className="text-neutral-300 text-[11px] leading-relaxed">
+                Saisissez le <strong>Nom</strong> (ex: Pont Ciseaux 03), le <strong>Code Unique</strong> (ex: EQ-SR-03), choisissez l'<strong>Atelier</strong> (ex: Service Rapide) et la <strong>Criticité</strong> (A, B ou C). Renseignez aussi la date d'achat et la garantie pour un suivi complet.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 5 : Enregistrer la machine</span>
+              <p className="text-neutral-300 text-[11px]">Cliquez sur <strong className="text-white">"Créer l'équipement"</strong>. L'appareil est sauvegardé instantanément.</p>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
       title: "3. Cycle de Vie des Interventions",
       subtitle: "Du signalement de panne jusqu'à la clôture de la fiche de travaux",
       icon: CheckCircle2,
@@ -220,6 +258,48 @@ export default function UserGuide({ onNavigate }: UserGuideProps) {
             <p className="text-neutral-300 text-[11px]">
               La liste des fournisseurs contient leurs coordonnées complètes pour envoyer des demandes de devis d'un seul clic.
             </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "4b. Pas-à-Pas : Demande d'Achat (DA)",
+      subtitle: "Tutoriel détaillé pour lancer et valider un réapprovisionnement",
+      icon: Package,
+      bg: "from-purple-950 to-neutral-900 text-white",
+      content: (
+        <div className="space-y-3 text-xs text-left">
+          <p className="text-neutral-200 leading-relaxed">
+            Le processus de commande et d'approvisionnement des pièces de rechange est structuré et sécurisé :
+          </p>
+
+          <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-3">
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 1 : Ouvrir le module Achats</span>
+              <p className="text-neutral-300 text-[11px]">Accédez à l'onglet <strong className="text-white">"Achats & DAs"</strong> depuis le menu principal de gauche.</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 2 : Créer une nouvelle Demande d'Achat</span>
+              <p className="text-neutral-300 text-[11px]">Cliquez sur le bouton violet <strong className="text-white">"+ Nouvelle Demande d'Achat (DA)"</strong>.</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 3 : Renseigner les détails de commande</span>
+              <p className="text-neutral-300 text-[11px]">
+                Sélectionnez la <strong>Pièce de rechange</strong> requise dans la liste déroulante, indiquez la <strong>Quantité</strong>, choisissez le <strong>Fournisseur agréé</strong>, définissez l'<strong>Atelier émetteur</strong> et le degré d'urgence.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 4 : Validation par l'Admin (Ahmed Amine)</span>
+              <p className="text-neutral-300 text-[11px]">
+                La demande apparaît dans la liste. L'administrateur l'examine puis clique sur <strong className="text-white">"Valider"</strong>. La DA passe alors au statut <strong className="text-blue-300">"Commandé"</strong>.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-bold text-amber-400 block">Étape 5 : Réception physique au magasin</span>
+              <p className="text-neutral-300 text-[11px]">
+                Une fois les pièces reçues dans les ateliers de Tunis, le magasinier ouvre la DA correspondante et clique sur le bouton vert <strong className="text-emerald-400">"Réceptionner les Pièces"</strong>. Le stock informatique est alors crédité automatiquement !
+              </p>
+            </div>
           </div>
         </div>
       )
