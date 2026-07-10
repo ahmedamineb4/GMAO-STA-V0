@@ -11,7 +11,7 @@ where node >nul 2>nul
 if %errorlevel% NEQ 0 goto ERROR_NODE
 
 :: 3. Execution du script de demarrage Node.js
-node start.js
+node start.cjs
 if %errorlevel% NEQ 0 goto ERROR_RUN
 exit
 
