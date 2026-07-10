@@ -336,30 +336,78 @@ export default function SettingsManager({
                     />
                   </div>
 
-                  <div>
-                    <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
-                      <span>Chefs d'Atelier (Opérateurs) :</span>
-                      <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.2 rounded font-mono font-semibold">Ateliers Individuels</span>
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isWritable}
-                      value={localPasswords.service_rapide || ""}
-                      onChange={(e) => {
-                        const newPin = e.target.value;
-                        setLocalPasswords({
-                          ...localPasswords,
-                          service_rapide: newPin,
-                          atelier_mecanique: newPin,
-                          atelier_diagnostic: newPin,
-                          carrosserie: newPin,
-                          lavage: newPin,
-                          batiment: newPin
-                        });
-                      }}
-                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                      placeholder="PIN Code"
-                    />
+                  <div className="border-t border-neutral-100 pt-3 mt-3 space-y-3">
+                    <span className="text-[11px] font-black text-neutral-500 uppercase tracking-wider block">
+                      👤 Codes PIN Individuels des Chefs d'Atelier
+                    </span>
+                    <div className="grid grid-cols-1 gap-2.5 bg-neutral-50 p-3 rounded-xl border border-neutral-200/40">
+                      <div>
+                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">⚡ Service Rapide</label>
+                        <input
+                          type="text"
+                          disabled={!isWritable}
+                          value={localPasswords.service_rapide || ""}
+                          onChange={(e) => setLocalPasswords({ ...localPasswords, service_rapide: e.target.value })}
+                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                          placeholder="0000"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">⚙️ Mécanique / Élec</label>
+                        <input
+                          type="text"
+                          disabled={!isWritable}
+                          value={localPasswords.atelier_mecanique || ""}
+                          onChange={(e) => setLocalPasswords({ ...localPasswords, atelier_mecanique: e.target.value })}
+                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                          placeholder="0000"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">🔬 Diagnostic</label>
+                        <input
+                          type="text"
+                          disabled={!isWritable}
+                          value={localPasswords.atelier_diagnostic || ""}
+                          onChange={(e) => setLocalPasswords({ ...localPasswords, atelier_diagnostic: e.target.value })}
+                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                          placeholder="0000"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">🎨 Carrosserie</label>
+                        <input
+                          type="text"
+                          disabled={!isWritable}
+                          value={localPasswords.carrosserie || ""}
+                          onChange={(e) => setLocalPasswords({ ...localPasswords, carrosserie: e.target.value })}
+                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                          placeholder="0000"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">🧼 Lavage</label>
+                        <input
+                          type="text"
+                          disabled={!isWritable}
+                          value={localPasswords.lavage || ""}
+                          onChange={(e) => setLocalPasswords({ ...localPasswords, lavage: e.target.value })}
+                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                          placeholder="0000"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">🏢 Maintenance Bâtiment</label>
+                        <input
+                          type="text"
+                          disabled={!isWritable}
+                          value={localPasswords.batiment || ""}
+                          onChange={(e) => setLocalPasswords({ ...localPasswords, batiment: e.target.value })}
+                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                          placeholder="0000"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 

@@ -299,34 +299,54 @@ export default function UserGuide({ onNavigate }: UserGuideProps) {
       )
     },
     {
-      title: "7. Kit de Présentation de la GMAO (ZIP)",
-      subtitle: "Captures d'écran HD prêtes pour vos diapositives & Guide complet",
+      title: "7. Kit de Formation & Présentation",
+      subtitle: "Manuel complet au format Word prêt à imprimer & captures d'écran HD",
       icon: Download,
       bg: "from-neutral-950 to-neutral-850 text-white",
       content: (
         <div className="space-y-4 text-xs">
           <p className="text-neutral-200">
-            Nous avons préparé pour vous un kit de communication complet au format <strong>ZIP</strong> contenant les captures d'écran HD générées de l'application ainsi qu'un guide de présentation au format Markdown/Texte pour chaque diapositive :
+            Nous avons préparé pour vous un kit d'accompagnement et de formation complet. Téléchargez le manuel officiel au format <strong>Word</strong> ou le kit de diapositives contenant captures d'écran HD et script d'orateur :
           </p>
 
-          <div className="bg-white/10 p-5 rounded-2xl border border-white/15 space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white/10 p-5 rounded-2xl border border-white/15 flex flex-col justify-between gap-4">
               <div className="space-y-1 text-left">
                 <h5 className="font-bold text-white text-sm flex items-center gap-1.5">
-                  <Package className="h-4 w-4 text-amber-400" /> presentation_captures.zip
+                  <Package className="h-4 w-4 text-amber-400" /> Manuel de Formation (.DOC)
                 </h5>
                 <p className="text-[11px] text-neutral-300">
-                  Comprend 5 captures d'écran HD nommées (Tableau de Bord, Équipements, Interventions, Stocks, Budget) + le Guide de Présentation complet.
+                  Le guide d'utilisation complet rédigé en français spécialement pour les Chefs d'Atelier de la STA Chery. Prêt à imprimer ou ouvrir dans Word.
+                </p>
+              </div>
+
+              <a
+                href="/api/download-guide"
+                download="Manuel_Formation_GMAO_STA_Chery.doc"
+                className="w-full px-4 py-2.5 bg-chery-red hover:bg-chery-dark text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer border border-transparent text-center"
+              >
+                <Download className="h-4 w-4" />
+                Télécharger le Manuel (.doc)
+              </a>
+            </div>
+
+            <div className="bg-white/10 p-5 rounded-2xl border border-white/15 flex flex-col justify-between gap-4">
+              <div className="space-y-1 text-left">
+                <h5 className="font-bold text-white text-sm flex items-center gap-1.5">
+                  <Package className="h-4 w-4 text-blue-400" /> Kit de Diapositives (.ZIP)
+                </h5>
+                <p className="text-[11px] text-neutral-300">
+                  Comprend 5 captures d'écran HD nommées (Dashboard, Équipements, Interventions...) + le script de présentation mot-à-mot de l'orateur.
                 </p>
               </div>
 
               <a
                 href="/presentation_captures.zip"
                 download="GMAO_STA_Chery_Kit_Presentation.zip"
-                className="w-full sm:w-auto px-5 py-3 bg-white hover:bg-neutral-100 text-neutral-900 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer border border-neutral-200"
+                className="w-full px-4 py-2.5 bg-white hover:bg-neutral-100 text-neutral-900 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer border border-neutral-200 text-center"
               >
                 <Download className="h-4 w-4 text-neutral-900" />
-                Télécharger le Kit (.ZIP)
+                Télécharger le Kit ZIP (.zip)
               </a>
             </div>
           </div>
@@ -374,29 +394,40 @@ export default function UserGuide({ onNavigate }: UserGuideProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-neutral-100 p-1 rounded-xl">
-          <button
-            onClick={() => setSlideMode(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              slideMode
-                ? "bg-white text-neutral-800 shadow-xs"
-                : "text-neutral-500 hover:text-neutral-800"
-            }`}
+        <div className="flex flex-wrap items-center gap-3">
+          <a
+            href="/api/download-guide"
+            download="Manuel_Formation_GMAO_STA.doc"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-chery-red hover:bg-chery-dark text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
           >
-            <Presentation className="h-3.5 w-3.5" />
-            Mode Présentation (Slides)
-          </button>
-          <button
-            onClick={() => setSlideMode(false)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              !slideMode
-                ? "bg-white text-neutral-800 shadow-xs"
-                : "text-neutral-500 hover:text-neutral-800"
-            }`}
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            Manuel Complet (Texte)
-          </button>
+            <Download className="h-3.5 w-3.5" />
+            Télécharger le Manuel Word (.doc)
+          </a>
+
+          <div className="flex items-center gap-2 bg-neutral-100 p-1 rounded-xl">
+            <button
+              onClick={() => setSlideMode(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                slideMode
+                  ? "bg-white text-neutral-800 shadow-xs"
+                  : "text-neutral-500 hover:text-neutral-800"
+              }`}
+            >
+              <Presentation className="h-3.5 w-3.5" />
+              Mode Présentation (Slides)
+            </button>
+            <button
+              onClick={() => setSlideMode(false)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                !slideMode
+                  ? "bg-white text-neutral-800 shadow-xs"
+                  : "text-neutral-500 hover:text-neutral-800"
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Manuel Complet (Texte)
+            </button>
+          </div>
         </div>
       </div>
 
