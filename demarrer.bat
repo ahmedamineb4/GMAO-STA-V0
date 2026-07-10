@@ -25,6 +25,16 @@ echo [SUCCES] Installation terminee !
 echo.
 
 :START_APP
+:: Libération automatique du port 3000 s'il est déjà utilisé sous Windows
+echo ======================================================================
+echo [INFO] Verification de la disponibilite du port 3000...
+echo ======================================================================
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000" ^| findstr "LISTENING"') do (
+    echo [INFO] Liberation du port 3000 occupe par un ancien processus (PID: %%a)...
+    taskkill /F /PID %%a >nul 2>&1
+)
+echo.
+
 :: 4. Determination de l'adresse IP locale pour le partage reseau
 setlocal enabledelayedexpansion
 set "LOCAL_IP=localhost"
