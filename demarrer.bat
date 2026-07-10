@@ -10,69 +10,9 @@ if %errorlevel% EQU 0 goto ERROR_ZIP
 where node >nul 2>nul
 if %errorlevel% NEQ 0 goto ERROR_NODE
 
-:: 3. Installation automatique des dependances (npm install)
-if exist "node_modules" goto START_APP
-
-echo ======================================================================
-echo [INFO] Premier lancement detecte ! Installation des composants...
-echo ======================================================================
-echo Cette etape ne se produit qu'une seule fois. Veuillez patienter...
-echo.
-call npm install
-if %errorlevel% NEQ 0 goto ERROR_INSTALL
-echo.
-echo [SUCCES] Installation terminee !
-echo.
-
-:START_APP
-:: Liberation automatique du port 3000 s'il est deja utilise sous Windows
-echo ======================================================================
-echo [INFO] Verification de la disponibilite du port 3000...
-echo ======================================================================
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000" ^| findstr "LISTENING"') do (
-    echo [INFO] Liberation du port 3000 occupe par un ancien processus (PID: %%a)...
-    taskkill /F /PID %%a >nul 2>&1
-)
-echo.
-
-:: 4. Determination de l'adresse IP locale pour le partage reseau
-setlocal enabledelayedexpansion
-set "LOCAL_IP=localhost"
-for /f "tokens=2 delims=:" %%A in ('ipconfig ^| findstr /i "IPv4"') do (
-    set "TEMP_IP=%%A"
-    rem Supprimer les espaces autour de l'IP
-    set "TEMP_IP=!TEMP_IP: =!"
-    if not "!TEMP_IP!"=="" (
-        set "LOCAL_IP=!TEMP_IP!"
-    )
-)
-
-echo ======================================================================
-echo [INFO] DEMARRAGE DE LA GMAO STA CHERY TUNISIE
-echo ======================================================================
-echo.
-echo L'application est en cours de demarrage...
-echo.
-echo ----------------------------------------------------------------------
-echo 💻 SUR VOTRE ORDINATEUR (Local) :
-echo    Ouvrez ce lien : http://localhost:3000
-echo.
-echo 🔌 PARTAGE SUR VOTRE RESEAU LOCAL (LAN) :
-echo    Vos collegues peuvent s'y connecter DIRECTEMENT depuis leurs PC,
-echo    tablettes ou smartphones connectes au meme reseau Wi-Fi / Ethernet :
-echo    --^> http://!LOCAL_IP!:3000
-echo ----------------------------------------------------------------------
-echo.
-echo Pour arreter le serveur, fermez simplement cette fenetre noire.
-echo ======================================================================
-echo.
-
-:: Ouvrir automatiquement l'application dans le navigateur par defaut de l'hote
-start "" "http://localhost:3000"
-
-call npm run dev
+:: 3. Execution du script de demarrage Node.js
+node start.js
 if %errorlevel% NEQ 0 goto ERROR_RUN
-pause
 exit
 
 :ERROR_ZIP
@@ -94,16 +34,6 @@ echo Veuillez le telecharger et l'installer (version LTS recommandee) sur :
 echo https://nodejs.org/
 echo.
 echo Une fois installe, fermez cette fenetre et double-cliquez a nouveau sur ce fichier.
-echo.
-pause
-exit
-
-:ERROR_INSTALL
-echo.
-echo ======================================================================
-echo [ERREUR] L'installation des composants a echoue.
-echo ======================================================================
-echo Verifiez que vous etes bien connecte a Internet et reessayez.
 echo.
 pause
 exit
