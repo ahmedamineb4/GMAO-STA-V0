@@ -54,6 +54,8 @@ export interface Intervention {
   status: InterventionStatus;
   partsUsed: PartUsed[];
   notes?: string;
+  executorType?: "Interne" | "Externe";
+  externalProvider?: string;
 }
 
 export interface SparePart {
@@ -120,12 +122,15 @@ export interface AlertNotification {
 
 export interface PurchaseRequest {
   id: string;
-  partCode: string;
+  equipmentName: string;
+  needReason: string;
+  urgency: "Faible" | "Moyenne" | "Critique";
   quantity: number;
   vendorId: string;
   requestedBy: string;
   dateRequested: string;
   status: "En attente" | "Approuvé" | "Commandé" | "Reçu" | "Refusé";
   estimatedCost: number;
+  category?: "Équipement" | "Infrastructure";
 }
 

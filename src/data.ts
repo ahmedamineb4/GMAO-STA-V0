@@ -1528,425 +1528,112 @@ export const BUDGET_2026: BudgetYear = {
 };
 
 export const INITIAL_PURCHASE_REQUESTS: PurchaseRequest[] = [
-  // === EXTACTED DEMANDS FOR NEW EQUIPMENTS (STOCK = 0) ===
+  {
+    id: "DA-2026-001",
+    equipmentName: "Pont élévateur 2 colonnes Ravaglioli 4T",
+    needReason: "Remplacement du pont hydraulique principal tombé en panne structurelle irréparable",
+    urgency: "Critique",
+    quantity: 1,
+    vendorId: "VND-SOCO",
+    requestedBy: "Atelier Mécanique / Elec",
+    dateRequested: "2026-06-20",
+    status: "Approuvé",
+    estimatedCost: 15500
+  },
+  {
+    id: "DA-2026-002",
+    equipmentName: "Station de charge climatisation Konfort automatique",
+    needReason: "Forte demande sur le service climatisation d'été, station additionnelle requise",
+    urgency: "Moyenne",
+    quantity: 1,
+    vendorId: "VND-AUTOEQUIP",
+    requestedBy: "Atelier Service Rapide",
+    dateRequested: "2026-06-25",
+    status: "Commandé",
+    estimatedCost: 9800
+  },
   {
     id: "DA-2026-003",
-    partCode: "EQ-REQ-01",
-    quantity: 2,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 700
-  },
-  {
-    id: "DA-2026-004",
-    partCode: "EQ-REQ-02",
-    quantity: 3,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 360
-  },
-  {
-    id: "DA-2026-005",
-    partCode: "EQ-REQ-03",
-    quantity: 2,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 2400
-  },
-  {
-    id: "DA-2026-006",
-    partCode: "EQ-REQ-04",
-    quantity: 4,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 1920
-  },
-  {
-    id: "DA-2026-007",
-    partCode: "EQ-REQ-05",
-    quantity: 20,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 900
-  },
-  {
-    id: "DA-2026-008",
-    partCode: "EQ-REQ-06",
-    quantity: 2,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 300
-  },
-  {
-    id: "DA-2026-009",
-    partCode: "EQ-REQ-07",
-    quantity: 4,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 3800
-  },
-  {
-    id: "DA-2026-010",
-    partCode: "EQ-REQ-08",
-    quantity: 4,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 8800
-  },
-  {
-    id: "DA-2026-011",
-    partCode: "EQ-REQ-09",
+    equipmentName: "Nettoyeur haute pression eau chaude (Kärcher)",
+    needReason: "Le nettoyeur actuel n'atteint plus la température requise pour le dégraissage châssis",
+    urgency: "Critique",
     quantity: 1,
     vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 65
-  },
-  {
-    id: "DA-2026-012",
-    partCode: "EQ-REQ-10",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Service Rapide",
-    dateRequested: "2026-07-08",
+    requestedBy: "Atelier Lavage",
+    dateRequested: "2026-07-01",
     status: "En attente",
     estimatedCost: 1800
   },
   {
-    id: "DA-2026-013",
-    partCode: "EQ-REQ-11",
+    id: "DA-2026-004",
+    equipmentName: "Machine de rinçage de boîte de vitesse automatique",
+    needReason: "Lancement de la nouvelle prestation de vidange complète de BVA agréée par Chery",
+    urgency: "Moyenne",
     quantity: 1,
     vendorId: "VND-SOCO",
     requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 180
-  },
-  {
-    id: "DA-2026-014",
-    partCode: "EQ-REQ-12",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 450
-  },
-  {
-    id: "DA-2026-015",
-    partCode: "EQ-REQ-13",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 85
-  },
-  {
-    id: "DA-2026-016",
-    partCode: "EQ-REQ-14",
-    quantity: 3,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 1140
-  },
-  {
-    id: "DA-2026-017",
-    partCode: "EQ-REQ-15",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
+    dateRequested: "2026-07-02",
     status: "En attente",
     estimatedCost: 6800
   },
   {
-    id: "DA-2026-018",
-    partCode: "EQ-REQ-16",
+    id: "DA-2026-005",
+    equipmentName: "Servantes d'atelier 7 tiroirs équipées (Beta)",
+    needReason: "Mise à niveau de l'outillage individuel des nouveaux techniciens recrutés",
+    urgency: "Faible",
     quantity: 3,
     vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 46500
-  },
-  {
-    id: "DA-2026-019",
-    partCode: "EQ-REQ-17",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 290
-  },
-  {
-    id: "DA-2026-020",
-    partCode: "EQ-REQ-18",
-    quantity: 6,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 840
-  },
-  {
-    id: "DA-2026-021",
-    partCode: "EQ-REQ-19",
-    quantity: 2,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 840
-  },
-  {
-    id: "DA-2026-022",
-    partCode: "EQ-REQ-20",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 1100
-  },
-  {
-    id: "DA-2026-023",
-    partCode: "EQ-REQ-21",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 4500
-  },
-  {
-    id: "DA-2026-024",
-    partCode: "EQ-REQ-22",
-    quantity: 4,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 3400
-  },
-  {
-    id: "DA-2026-025",
-    partCode: "EQ-REQ-23",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 680
-  },
-  {
-    id: "DA-2026-026",
-    partCode: "EQ-REQ-24",
-    quantity: 2,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 1440
-  },
-  {
-    id: "DA-2026-027",
-    partCode: "EQ-REQ-25",
-    quantity: 4,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 760
-  },
-  {
-    id: "DA-2026-028",
-    partCode: "EQ-REQ-26",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 9800
-  },
-  {
-    id: "DA-2026-029",
-    partCode: "EQ-REQ-08", // Servantes Atelier
-    quantity: 2,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Mécanique / Elec",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 4400
-  },
-  {
-    id: "DA-2026-030",
-    partCode: "EQ-REQ-27",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 380
-  },
-  {
-    id: "DA-2026-031",
-    partCode: "EQ-REQ-21", // Presse Carrosserie
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 4500
-  },
-  {
-    id: "DA-2026-032",
-    partCode: "EQ-REQ-28",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 320
-  },
-  {
-    id: "DA-2026-033",
-    partCode: "EQ-REQ-29",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 260
-  },
-  {
-    id: "DA-2026-034",
-    partCode: "EQ-REQ-30",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 1450
-  },
-  {
-    id: "DA-2026-035",
-    partCode: "EQ-REQ-31",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 420
-  },
-  {
-    id: "DA-2026-036",
-    partCode: "EQ-REQ-04", // Clés à choc Carrosserie
-    quantity: 2,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 960
-  },
-  {
-    id: "DA-2026-037",
-    partCode: "EQ-REQ-32",
-    quantity: 2,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 560
-  },
-  {
-    id: "DA-2026-038",
-    partCode: "EQ-REQ-08", // Servantes Tôlerie
-    quantity: 3,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
+    requestedBy: "Atelier Service Rapide",
+    dateRequested: "2026-07-04",
     status: "En attente",
     estimatedCost: 6600
   },
   {
-    id: "DA-2026-039",
-    partCode: "EQ-REQ-33",
+    id: "DA-2026-006",
+    equipmentName: "Presse hydraulique robuste 30 tonnes",
+    needReason: "Presse actuelle du pôle tolerie déformée et non sécuritaire pour les opérateurs",
+    urgency: "Critique",
     quantity: 1,
     vendorId: "VND-SOCO",
     requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
+    dateRequested: "2026-07-05",
+    status: "En attente",
+    estimatedCost: 4500
+  },
+  {
+    id: "DA-2026-007",
+    equipmentName: "Lustreuse pneumatique orbitale LHR15",
+    needReason: "Amélioration de la productivité du pôle lustrage et finition de la peinture carrosserie",
+    urgency: "Moyenne",
+    quantity: 2,
+    vendorId: "VND-AUTOEQUIP",
+    requestedBy: "Atelier Carrosserie",
+    dateRequested: "2026-07-06",
+    status: "En attente",
+    estimatedCost: 2500
+  },
+  {
+    id: "DA-2026-008",
+    equipmentName: "Kit de débosselage à froid sans peinture (DSP)",
+    needReason: "Permettre d'effectuer les réparations rapides d'impacts de grêle sans peinture",
+    urgency: "Faible",
+    quantity: 1,
+    vendorId: "VND-SOCO",
+    requestedBy: "Atelier Carrosserie",
+    dateRequested: "2026-07-07",
     status: "En attente",
     estimatedCost: 890
   },
   {
-    id: "DA-2026-040",
-    partCode: "EQ-REQ-34",
+    id: "DA-2026-009",
+    equipmentName: "Étau de serrage d'établi Expert 150mm",
+    needReason: "Équipement de l'établi supplémentaire installé dans la zone diagnostic mécanique",
+    urgency: "Faible",
     quantity: 1,
     vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
+    requestedBy: "Atelier Diagnostic",
     dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 410
-  },
-  {
-    id: "DA-2026-041",
-    partCode: "EQ-REQ-35",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 340
-  },
-  {
-    id: "DA-2026-042",
-    partCode: "EQ-REQ-07", // Table de travail Carrosserie
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 950
-  },
-  {
-    id: "DA-2026-043",
-    partCode: "EQ-REQ-36",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 220
-  },
-  {
-    id: "DA-2026-044",
-    partCode: "EQ-REQ-37",
-    quantity: 1,
-    vendorId: "VND-SOCO",
-    requestedBy: "Atelier Carrosserie",
-    dateRequested: "2026-07-08",
-    status: "En attente",
-    estimatedCost: 1250
+    status: "Reçu",
+    estimatedCost: 290
   }
 ];

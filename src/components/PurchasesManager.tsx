@@ -16,17 +16,15 @@ import {
   Mail,
   Building,
   Star,
-  Package,
   ArrowRight,
   TrendingUp,
   X,
   FileSpreadsheet
 } from "lucide-react";
-import { Vendor, SparePart, PurchaseRequest } from "../types";
+import { Vendor, PurchaseRequest } from "../types";
 
 interface PurchasesManagerProps {
   vendors: Vendor[];
-  spareParts: SparePart[];
   purchaseRequests: PurchaseRequest[];
   onAddPurchaseRequest: (req: PurchaseRequest) => void;
   onUpdatePurchaseRequestStatus: (id: string, status: PurchaseRequest["status"]) => void;
@@ -37,7 +35,6 @@ interface PurchasesManagerProps {
 
 export default function PurchasesManager({
   vendors,
-  spareParts,
   purchaseRequests,
   onAddPurchaseRequest,
   onUpdatePurchaseRequestStatus,
@@ -59,10 +56,14 @@ export default function PurchasesManager({
 
   // Add Request form state
   const [showRequestForm, setShowRequestForm] = useState(false);
-  const [selectedPartCode, setSelectedPartCode] = useState("");
-  const [requestedQty, setRequestedQty] = useState<number>(10);
+  const [equipmentName, setEquipmentName] = useState("");
+  const [needReason, setNeedReason] = useState("");
+  const [urgency, setUrgency] = useState<"Faible" | "Moyenne" | "Critique">("Moyenne");
+  const [requestedQty, setRequestedQty] = useState<number>(1);
+  const [estimatedCost, setEstimatedCost] = useState<number>(1000);
   const [selectedVendorId, setSelectedVendorId] = useState("");
   const [requesterName, setRequesterName] = useState("M. Ahmed Amine Ben Salah");
+  const [purchaseCategory, setPurchaseCategory] = useState<"Équipement" | "Infrastructure">("Équipement");
 
   // Add Vendor form state
   const [showVendorForm, setShowVendorForm] = useState(false);
@@ -97,15 +98,15 @@ export default function PurchasesManager({
   // Filtered requests
   const filteredRequests = useMemo(() => {
     return purchaseRequests.filter((req) => {
-      const part = spareParts.find((p) => p.code === req.partCode);
       const vendor = vendors.find((v) => v.id === req.vendorId);
-      const partName = part ? part.name.toLowerCase() : "";
       const vendorName = vendor ? vendor.name.toLowerCase() : "";
+      const eqName = req.equipmentName ? req.equipmentName.toLowerCase() : "";
+      const reason = req.needReason ? req.needReason.toLowerCase() : "";
 
       const matchesSearch =
         req.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        req.partCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        partName.includes(searchQuery.toLowerCase()) ||
+        eqName.includes(searchQuery.toLowerCase()) ||
+        reason.includes(searchQuery.toLowerCase()) ||
         vendorName.includes(searchQuery.toLowerCase()) ||
         req.requestedBy.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -113,7 +114,7 @@ export default function PurchasesManager({
 
       return matchesSearch && matchesStatus;
     });
-  }, [purchaseRequests, spareParts, vendors, searchQuery, statusFilter]);
+  }, [purchaseRequests, vendors, searchQuery, statusFilter]);
 
   // Filtered vendors
   const filteredVendors = useMemo(() => {
@@ -138,35 +139,36 @@ export default function PurchasesManager({
       .reduce((sum, req) => sum + req.estimatedCost, 0);
   }, [purchaseRequests]);
 
-  // Auto-calculated estimated cost on request form
-  const computedEstimatedCost = useMemo(() => {
-    const part = spareParts.find((p) => p.code === selectedPartCode);
-    return part ? part.unitPrice * requestedQty : 0;
-  }, [selectedPartCode, requestedQty, spareParts]);
-
   const handleRequestSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPartCode || !selectedVendorId || requestedQty <= 0) {
+    if (!equipmentName || !needReason || requestedQty <= 0) {
       alert("Veuillez renseigner tous les champs obligatoires.");
       return;
     }
 
     const newRequest: PurchaseRequest = {
       id: `DA-2026-${String(purchaseRequests.length + 1).padStart(3, "0")}`,
-      partCode: selectedPartCode,
+      equipmentName,
+      needReason,
+      urgency,
       quantity: Number(requestedQty),
-      vendorId: selectedVendorId,
+      vendorId: selectedVendorId || "",
       requestedBy: requesterName,
       dateRequested: new Date().toISOString().split("T")[0],
       status: "En attente",
-      estimatedCost: computedEstimatedCost
+      estimatedCost: Number(estimatedCost),
+      category: purchaseCategory
     };
 
     onAddPurchaseRequest(newRequest);
     setShowRequestForm(false);
-    setSelectedPartCode("");
-    setRequestedQty(10);
+    setEquipmentName("");
+    setNeedReason("");
+    setUrgency("Moyenne");
+    setRequestedQty(1);
+    setEstimatedCost(1000);
     setSelectedVendorId("");
+    setPurchaseCategory("Équipement");
   };
 
   const handleVendorSubmit = (e: React.FormEvent) => {
@@ -208,7 +210,7 @@ export default function PurchasesManager({
               <p className="text-[11px] text-blue-700/95 mt-0.5">
                 {currentRole === "supervisor" 
                   ? "Vous êtes en mode lecture seule (Superviseur). Vous ne pouvez pas créer de demandes ni modifier le workflow."
-                  : "En tant qu'opérateur d'Atelier, vous pouvez créer de nouvelles demandes de pièces (DA), mais seuls l'Administrateur et le Magasin peuvent approuver, commander et réceptionner les articles."}
+                  : "En tant qu'opérateur d'Atelier, vous pouvez créer de nouvelles demandes d'équipements (DA), mais seuls l'Administrateur et le Magasin peuvent approuver, commander et réceptionner les articles."}
               </p>
             </div>
           </div>
@@ -219,7 +221,7 @@ export default function PurchasesManager({
       {/* KPI stats at the top */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-xl border border-neutral-100 shadow-xs">
         <div className="p-3 bg-neutral-50 rounded-lg text-xs">
-          <span className="text-neutral-400 block font-semibold uppercase">Total Demandes d'Achat</span>
+          <span className="text-neutral-400 block font-semibold uppercase">Total Demandes Équipement</span>
           <span className="text-xl font-extrabold text-neutral-800 font-mono mt-0.5">
             {purchaseRequests.length} demandes
           </span>
@@ -239,12 +241,12 @@ export default function PurchasesManager({
         </div>
 
         <div className="p-3 bg-neutral-50 rounded-lg text-xs">
-          <span className="text-neutral-400 block font-semibold uppercase">Volume Commandes</span>
+          <span className="text-neutral-400 block font-semibold uppercase">Volume d'Engagements</span>
           <span className="text-xl font-extrabold text-neutral-800 font-mono mt-0.5">
             {totalRequestsValue.toLocaleString()} TND
           </span>
           <span className="text-[10px] text-neutral-400 block mt-0.5">
-            Engagements globaux d'achats
+            Investissements d'équipement globaux
           </span>
         </div>
 
@@ -274,7 +276,7 @@ export default function PurchasesManager({
                 : "text-neutral-500 hover:text-neutral-800"
             }`}
           >
-            📋 Demandes d'Achat & Suivi
+            📋 Demandes d'Achat Équipement
           </button>
           <button
             onClick={() => {
@@ -297,7 +299,7 @@ export default function PurchasesManager({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
             <input
               type="text"
-              placeholder={activeSubTab === "requests" ? "Chercher DA, pièce, fournisseur..." : "Rechercher fournisseur..."}
+              placeholder={activeSubTab === "requests" ? "Chercher DA, équipement, demandeur..." : "Rechercher fournisseur..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg text-xs bg-neutral-50/50 focus:bg-white outline-none"
@@ -326,7 +328,7 @@ export default function PurchasesManager({
                 className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Nouvelle Demande (DA)
+                Nouvelle Demande d'Équipement
               </button>
             )
           ) : (
@@ -347,23 +349,24 @@ export default function PurchasesManager({
       {activeSubTab === "requests" ? (
         <div className="bg-white rounded-xl border border-neutral-100 shadow-xs overflow-hidden">
           <div className="p-4 bg-neutral-50 border-b border-neutral-100 flex justify-between items-center">
-            <h3 className="text-sm font-bold text-neutral-700">Registre des Demandes d'Achat & Approvisionnement</h3>
-            <span className="text-xs text-neutral-400">Restockage automatique magasin lors du passage au statut "Reçu"</span>
+            <h3 className="text-sm font-bold text-neutral-700">Registre des Demandes d'Achat d'Équipements</h3>
+            <span className="text-xs text-neutral-400">Suivi et validation du workflow d'approvisionnement des ateliers</span>
           </div>
 
           <div className="overflow-x-auto">
             {filteredRequests.length === 0 ? (
               <div className="p-12 text-center text-neutral-400 flex flex-col items-center">
                 <ShoppingCart className="h-10 w-10 text-neutral-300 mb-2" />
-                <p className="text-sm font-bold">Aucune demande d'achat</p>
-                <p className="text-xs">Aucune demande ne correspond à vos filtres de recherche.</p>
+                <p className="text-sm font-bold">Aucune demande d'équipement</p>
+                <p className="text-xs">Aucune demande ne correspond à vos critères.</p>
               </div>
             ) : (
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-neutral-100 text-neutral-400 font-semibold uppercase bg-neutral-50/20">
                     <th className="py-3 px-4">DA ID</th>
-                    <th className="py-3 px-4">Pièce demandée</th>
+                    <th className="py-3 px-4">Équipement requis & Cause du besoin</th>
+                    <th className="py-3 px-4 text-center">Urgence</th>
                     <th className="py-3 px-4 text-center">Quantité</th>
                     <th className="py-3 px-4">Fournisseur préconisé</th>
                     <th className="py-3 px-4">Demandeur</th>
@@ -375,20 +378,45 @@ export default function PurchasesManager({
                 </thead>
                 <tbody className="divide-y divide-neutral-50 font-medium">
                   {filteredRequests.map((req) => {
-                    const part = spareParts.find((p) => p.code === req.partCode);
                     const vendor = vendors.find((v) => v.id === req.vendorId);
 
                     return (
                       <tr key={req.id} className="hover:bg-neutral-50/50 transition-all">
                         <td className="py-3 px-4 font-mono font-bold text-neutral-400">{req.id}</td>
-                        <td className="py-3 px-4">
-                          <span className="font-bold text-neutral-700 block font-mono">{req.partCode}</span>
-                          <span className="text-[11px] text-neutral-500 block">
-                            {part ? part.name : "Pièce Inconnue"}
+                        <td className="py-3 px-4 max-w-sm">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-neutral-800 text-xs">
+                              {req.equipmentName}
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.2 rounded-sm text-[8px] font-extrabold uppercase shrink-0 border ${
+                                req.category === "Infrastructure"
+                                  ? "bg-purple-50 border-purple-150 text-purple-700"
+                                  : "bg-teal-50 border-teal-150 text-teal-700"
+                              }`}
+                            >
+                              {req.category === "Infrastructure" ? "🏢 Infrastructure" : "⚙️ Équipement"}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-neutral-500 block leading-relaxed">
+                            {req.needReason}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span
+                            className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold inline-block ${
+                              req.urgency === "Critique"
+                                ? "bg-red-100 text-red-800 animate-pulse-subtle"
+                                : req.urgency === "Moyenne"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-neutral-100 text-neutral-700"
+                            }`}
+                          >
+                            {req.urgency || "Moyenne"}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center font-mono text-neutral-700">
-                          {req.quantity} unités
+                          {req.quantity} unité(s)
                         </td>
                         <td className="py-3 px-4 font-semibold text-neutral-600">
                           {vendor ? vendor.name : "N/A"}
@@ -452,31 +480,27 @@ export default function PurchasesManager({
                                 {req.status === "Approuvé" && (
                                   <button
                                     onClick={() => onUpdatePurchaseRequestStatus(req.id, "Commandé")}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded text-[10px] cursor-pointer transition-colors flex items-center gap-1"
-                                    title="Passer commande officielle"
+                                    className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded text-[10px] border border-blue-200 cursor-pointer transition-colors"
+                                    title="Générer le bon de commande"
                                   >
-                                    Commandé <ArrowRight className="h-3 w-3" />
+                                    Commander
                                   </button>
                                 )}
 
                                 {req.status === "Commandé" && (
                                   <button
                                     onClick={() => onUpdatePurchaseRequestStatus(req.id, "Reçu")}
-                                    className="bg-green-600 hover:bg-green-700 text-white font-bold px-2 py-1 rounded text-[10px] cursor-pointer transition-colors flex items-center gap-1"
-                                    title="Enregistrer la réception et restocker automatiquement"
+                                    className="bg-green-600 hover:bg-green-700 text-white font-bold px-2.5 py-1 rounded text-[10px] shadow-xs cursor-pointer transition-colors"
+                                    title="Confirmer la réception de l'équipement"
                                   >
-                                    Réceptionner <Package className="h-3 w-3" />
+                                    Réceptionner
                                   </button>
                                 )}
 
-                                {req.status === "Reçu" && (
-                                  <span className="text-[10px] text-neutral-400 font-bold flex items-center gap-1">
-                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> Stocké
+                                {(req.status === "Reçu" || req.status === "Refusé") && (
+                                  <span className="text-[10px] text-neutral-400 font-bold italic">
+                                    Verrouillé
                                   </span>
-                                )}
-
-                                {req.status === "Refusé" && (
-                                  <span className="text-[10px] text-neutral-400 font-medium">Rejeté</span>
                                 )}
                               </>
                             )}
@@ -491,57 +515,67 @@ export default function PurchasesManager({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        /* VENDORS SUBTAB VIEW */
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {filteredVendors.length === 0 ? (
-            <div className="col-span-full bg-white p-12 text-center rounded-xl border border-neutral-100 text-neutral-400">
-              <Building className="h-10 w-10 text-neutral-300 mx-auto mb-2" />
-              <p className="text-sm font-bold">Aucun fournisseur trouvé</p>
-              <p className="text-xs">Modifiez vos filtres ou effectuez un nouveau référencement.</p>
+            <div className="col-span-full bg-white p-12 text-center text-neutral-400 rounded-xl border border-neutral-100 flex flex-col items-center">
+              <Building className="h-10 w-10 text-neutral-300 mb-2" />
+              <p className="text-sm font-bold">Aucun partenaire</p>
+              <p className="text-xs">Aucun fournisseur ne correspond à votre filtre de recherche.</p>
             </div>
           ) : (
             filteredVendors.map((vendor) => (
               <div
                 key={vendor.id}
-                className="bg-white rounded-xl border border-neutral-100 p-5 shadow-xs space-y-4 hover:shadow-md transition-all relative overflow-hidden"
+                className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs flex flex-col justify-between gap-4 hover:border-neutral-200 transition-all"
               >
-                {/* Score rating in corner */}
-                <div className="absolute top-4 right-4 flex items-center gap-0.5 bg-yellow-50 px-2 py-0.5 rounded-full text-yellow-600 text-[10px] font-bold">
-                  <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                  <span>{vendor.rating} / 5</span>
-                </div>
+                <div className="space-y-2.5">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <span className="text-[10px] text-neutral-400 font-mono font-bold uppercase tracking-wider block">
+                        {vendor.id}
+                      </span>
+                      <h4 className="text-xs font-extrabold text-neutral-800 leading-tight">
+                        {vendor.name}
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`h-3 w-3 ${
+                            star <= vendor.rating ? "fill-amber-400 text-amber-400" : "text-neutral-200"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
 
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
-                    {vendor.id}
-                  </span>
-                  <h4 className="font-bold text-neutral-800 text-sm leading-tight pr-12">
-                    {vendor.name}
-                  </h4>
-                  <span className="bg-neutral-100 text-neutral-700 font-semibold text-[10px] px-2 py-0.5 rounded inline-block">
+                  <span className="inline-block bg-neutral-50 border border-neutral-100 text-neutral-500 font-bold px-2 py-0.5 rounded text-[10px]">
                     {vendor.serviceType}
                   </span>
-                </div>
 
-                <div className="border-t border-neutral-100 pt-3 space-y-2 text-xs text-neutral-500 font-medium">
-                  <div className="flex items-center gap-2">
-                    <User className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-                    <span>Contact : <strong className="text-neutral-700">{vendor.contactPerson}</strong></span>
+                  <div className="space-y-1 text-[11px] text-neutral-500 border-t border-neutral-50 pt-2.5">
+                    <div className="flex items-center gap-2">
+                      <User className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                      <span className="font-semibold text-neutral-600">{vendor.contactPerson}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                      <span className="font-mono">{vendor.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                      <span className="font-mono text-neutral-600 truncate">{vendor.email}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-                    <span className="font-mono">{vendor.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-                    <span className="font-mono text-neutral-600 truncate">{vendor.email}</span>
-                  </div>
-                </div>
 
-                <div className="bg-neutral-50 p-2 rounded-lg text-[11px] text-neutral-500 flex justify-between items-center">
-                  <span>Demandes associées</span>
-                  <span className="font-bold font-mono text-neutral-800">
-                    {purchaseRequests.filter((r) => r.vendorId === vendor.id).length} demande(s)
-                  </span>
+                  <div className="bg-neutral-50 p-2 rounded-lg text-[11px] text-neutral-500 flex justify-between items-center">
+                    <span>Demandes d'équipements</span>
+                    <span className="font-bold font-mono text-neutral-800">
+                      {purchaseRequests.filter((r) => r.vendorId === vendor.id).length} demande(s)
+                    </span>
+                  </div>
                 </div>
               </div>
             ))
@@ -556,7 +590,7 @@ export default function PurchasesManager({
             <div className="flex items-center justify-between p-5 border-b border-neutral-100">
               <h3 className="text-base font-bold text-neutral-800 flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5 text-chery-red" />
-                Émettre une Demande d'Achat (DA)
+                Émettre une Demande d'Équipement (DA)
               </h3>
               <button
                 onClick={() => setShowRequestForm(false)}
@@ -568,43 +602,114 @@ export default function PurchasesManager({
 
             <form onSubmit={handleRequestSubmit} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-neutral-600 mb-1">Pièce de Rechange Cible *</label>
-                <select
-                  required
-                  value={selectedPartCode}
-                  onChange={(e) => setSelectedPartCode(e.target.value)}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
-                >
-                  <option value="">Sélectionner une pièce...</option>
-                  {spareParts.map((part) => (
-                    <option key={part.code} value={part.code}>
-                      [{part.code}] {part.name} (Stock actuel: {part.currentStock} u • {part.unitPrice} TND / u)
-                    </option>
-                  ))}
-                </select>
+                <label className="block font-bold text-neutral-600 mb-1">Catégorie de la Demande d'Achat *</label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200/50">
+                  <button
+                    type="button"
+                    onClick={() => setPurchaseCategory("Équipement")}
+                    className={`py-2 px-3 rounded-lg text-center font-bold transition-all cursor-pointer text-[11px] ${
+                      purchaseCategory === "Équipement"
+                        ? "bg-white text-neutral-800 shadow-sm"
+                        : "text-neutral-500 hover:text-neutral-700"
+                    }`}
+                  >
+                    ⚙️ Équipement
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPurchaseCategory("Infrastructure")}
+                    className={`py-2 px-3 rounded-lg text-center font-bold transition-all cursor-pointer text-[11px] ${
+                      purchaseCategory === "Infrastructure"
+                        ? "bg-white text-neutral-800 shadow-sm"
+                        : "text-neutral-500 hover:text-neutral-700"
+                    }`}
+                  >
+                    🏢 Infrastructure
+                  </button>
+                </div>
+                <p className="text-[10px] text-neutral-400 mt-1 pl-1">
+                  {purchaseCategory === "Infrastructure"
+                    ? "Travaux, gros œuvre, raccordements d'air ou d'électricité, réfection de sol, etc."
+                    : "Machines d'atelier, ponts, compresseurs, démonte-pneus, outillage spécialisé."}
+                </p>
               </div>
 
               <div>
-                <label className="block font-bold text-neutral-600 mb-1">Quantité Demandée *</label>
+                <label className="block font-bold text-neutral-600 mb-1">
+                  {purchaseCategory === "Infrastructure" ? "Nom des travaux / de l'infrastructure requis *" : "Nom de l'équipement requis *"}
+                </label>
                 <input
-                  type="number"
-                  min="1"
+                  type="text"
                   required
-                  value={requestedQty}
-                  onChange={(e) => setRequestedQty(Number(e.target.value))}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none text-xs font-mono"
+                  placeholder={purchaseCategory === "Infrastructure" ? "ex: Réfection réseau d'air comprimé, Cablage triphasé..." : "ex: Pont élévateur 4T, Lustreuse pneumatique..."}
+                  value={equipmentName}
+                  onChange={(e) => setEquipmentName(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red text-xs font-medium"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-neutral-600 mb-1">Fournisseur Suggéré *</label>
-                <select
+                <label className="block font-bold text-neutral-600 mb-1">Cause / Motif du besoin *</label>
+                <textarea
                   required
+                  rows={3}
+                  placeholder="Expliquez en détail pourquoi cet équipement est requis (ex: panne irréparable, augmentation d'activité, sécurité...)"
+                  value={needReason}
+                  onChange={(e) => setNeedReason(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red text-xs font-medium resize-none leading-relaxed"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Niveau d'Urgence *</label>
+                  <select
+                    required
+                    value={urgency}
+                    onChange={(e) => setUrgency(e.target.value as any)}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red text-xs font-semibold cursor-pointer"
+                  >
+                    <option value="Faible">🟢 Faible (Amélioration)</option>
+                    <option value="Moyenne">🟡 Moyenne (Nouveau service)</option>
+                    <option value="Critique">🔴 Critique (Panne ou Sécurité)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Quantité requise *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={requestedQty}
+                    onChange={(e) => setRequestedQty(Math.max(1, Number(e.target.value)))}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none text-xs font-mono font-bold focus:ring-1 focus:ring-chery-red"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Coût Estimé Total (TND) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={estimatedCost}
+                    onChange={(e) => setEstimatedCost(Math.max(0, Number(e.target.value)))}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-chery-red"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Fournisseur Suggéré (Optionnel)</label>
+                <select
                   value={selectedVendorId}
                   onChange={(e) => setSelectedVendorId(e.target.value)}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red cursor-pointer"
                 >
-                  <option value="">Sélectionner un fournisseur...</option>
+                  <option value="">Sélectionner un fournisseur... (Non spécifié)</option>
                   {vendors.map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.name} ({v.serviceType})
@@ -614,46 +719,27 @@ export default function PurchasesManager({
               </div>
 
               <div>
-                <label className="block font-bold text-neutral-600 mb-1">Nom du Demandeur</label>
+                <label className="block font-bold text-neutral-600 mb-1">Demandeur</label>
                 <input
                   type="text"
                   required
                   disabled
                   value={requesterName}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-neutral-100 text-neutral-500 outline-none"
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-neutral-100 text-neutral-500 outline-none font-semibold"
                 />
               </div>
-
-              {selectedPartCode && (
-                <div className="bg-red-50/50 border border-red-100 rounded-xl p-4 space-y-1.5">
-                  <div className="flex justify-between items-center text-[11px] font-bold text-neutral-600">
-                    <span>Prix unitaire :</span>
-                    <span className="font-mono">
-                      {(spareParts.find((p) => p.code === selectedPartCode)?.unitPrice || 0).toLocaleString()} TND
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-[11px] font-bold text-neutral-600">
-                    <span>Quantité :</span>
-                    <span className="font-mono">x {requestedQty}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-extrabold text-neutral-800 pt-1.5 border-t border-red-200/50">
-                    <span>Coût Estimé Total :</span>
-                    <span className="text-chery-red font-mono text-sm">{computedEstimatedCost.toLocaleString()} TND</span>
-                  </div>
-                </div>
-              )}
 
               <div className="pt-4 border-t border-neutral-100 flex gap-2">
                 <button
                   type="button"
                   onClick={() => setShowRequestForm(false)}
-                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-lg font-medium text-center cursor-pointer"
+                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-lg font-medium text-center cursor-pointer transition-colors"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-chery-red hover:bg-chery-dark text-white py-2.5 rounded-lg font-bold text-center cursor-pointer"
+                  className="flex-1 bg-chery-red hover:bg-chery-dark text-white py-2.5 rounded-lg font-bold text-center cursor-pointer transition-colors"
                 >
                   Émettre la Demande
                 </button>
@@ -689,7 +775,7 @@ export default function PurchasesManager({
                   placeholder="ex: Weinmann Tunisie S.A."
                   value={vendorName}
                   onChange={(e) => setVendorName(e.target.value)}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none focus:ring-1 focus:ring-chery-red"
                 />
               </div>
 
@@ -701,7 +787,7 @@ export default function PurchasesManager({
                   placeholder="ex: Fourniture d'Équipements, Outillage, SAV, Tarage"
                   value={vendorService}
                   onChange={(e) => setVendorService(e.target.value)}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none focus:ring-1 focus:ring-chery-red"
                 />
               </div>
 
@@ -713,7 +799,7 @@ export default function PurchasesManager({
                     placeholder="+216 71 --- ---"
                     value={vendorPhone}
                     onChange={(e) => setVendorPhone(e.target.value)}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono"
+                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono focus:ring-1 focus:ring-chery-red"
                   />
                 </div>
                 <div>
@@ -723,7 +809,7 @@ export default function PurchasesManager({
                     placeholder="contact@societe.tn"
                     value={vendorEmail}
                     onChange={(e) => setVendorEmail(e.target.value)}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono"
+                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono focus:ring-1 focus:ring-chery-red"
                   />
                 </div>
               </div>
@@ -735,7 +821,7 @@ export default function PurchasesManager({
                   placeholder="M. Hédi Ben Younes"
                   value={vendorContact}
                   onChange={(e) => setVendorContact(e.target.value)}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none focus:ring-1 focus:ring-chery-red"
                 />
               </div>
 
@@ -744,7 +830,7 @@ export default function PurchasesManager({
                 <select
                   value={vendorRating}
                   onChange={(e) => setVendorRating(Number(e.target.value))}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none focus:ring-1 focus:ring-chery-red cursor-pointer"
                 >
                   <option value="5">⭐⭐⭐⭐⭐ (Excellent / Certifié)</option>
                   <option value="4">⭐⭐⭐⭐ (Très bon / Fiable)</option>
@@ -757,13 +843,13 @@ export default function PurchasesManager({
                 <button
                   type="button"
                   onClick={() => setShowVendorForm(false)}
-                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-lg font-medium text-center cursor-pointer"
+                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-lg font-medium text-center cursor-pointer transition-colors"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white py-2.5 rounded-lg font-bold text-center cursor-pointer"
+                  className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white py-2.5 rounded-lg font-bold text-center cursor-pointer transition-colors"
                 >
                   Enregistrer
                 </button>

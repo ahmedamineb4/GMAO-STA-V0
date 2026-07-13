@@ -24,6 +24,7 @@ interface UserGuideProps {
 export default function UserGuide({ onNavigate }: UserGuideProps) {
   const [slideMode, setSlideMode] = useState<boolean>(true);
   const [currentSlide, setCurrentSlide] = useState<number>(0);
+  const [docPage, setDocPage] = useState<number>(1);
 
   const slides = [
     {
@@ -305,6 +306,45 @@ export default function UserGuide({ onNavigate }: UserGuideProps) {
       )
     },
     {
+      title: "4c. Formation Dédiée : Chef d'Atelier",
+      subtitle: "Guide condensé et bonnes pratiques opérationnelles pour les chefs d'ateliers",
+      icon: Users,
+      bg: "from-amber-950 to-neutral-900 text-white",
+      content: (
+        <div className="space-y-4 text-xs text-left">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-xs space-y-2">
+            <h5 className="font-bold text-emerald-400 flex items-center gap-1.5">
+              <Lightbulb className="h-4 w-4" /> Vos privilèges et obligations simplifiés
+            </h5>
+            <p className="text-neutral-200 leading-relaxed text-[11px]">
+              Chaque chef d'atelier (Service Rapide, Mécanique, Diag, Carrosserie, Lavage, Bâtiment) accède uniquement aux données de sa section via son <strong>code PIN unique</strong> (par défaut <span className="text-amber-400 font-bold">0000</span>, modifiable dans les paramètres).
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="space-y-2">
+              <h5 className="font-bold text-emerald-400 border-b border-white/10 pb-1">🛒 Demandes d'Achat (DA) Assouplies</h5>
+              <ul className="list-disc list-inside space-y-1 text-neutral-300 text-[11px]">
+                <li>Vous pouvez créer une demande d'achat d'équipement en toute liberté.</li>
+                <li><strong>Fournisseur Optionnel :</strong> Le champ "Fournisseur Suggéré" n'est plus obligatoire ! S'il est inconnu, laissez-le vide.</li>
+                <li>Saisissez simplement le <strong className="text-white">nom de l'équipement</strong>, la <strong className="text-white">cause du besoin</strong>, l'urgence, et la quantité requise.</li>
+                <li>L'Administrateur se charge d'affecter le fournisseur officiel de la STA lors de sa phase de validation.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h5 className="font-bold text-emerald-400 border-b border-white/10 pb-1">📋 Cycle de Panne & Clôture</h5>
+              <ul className="list-disc list-inside space-y-1 text-neutral-300 text-[11px]">
+                <li><strong className="text-white">Signalement :</strong> Mettez l'équipement en état "En Panne" et créez une fiche d'intervention.</li>
+                <li><strong className="text-white">Pièces Détachées :</strong> Ajoutez directement vos pièces. À la clôture (statut "Terminé"), elles sortent automatiquement du stock physique magasin.</li>
+                <li><strong className="text-white">Mise au rebut :</strong> Utilisez l'état "Hors Service" pour éliminer les vieux appareils des calculs statistiques de disponibilité.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
       title: "5. Rapports, Exports & Excel",
       subtitle: "Génération de rapports d'ingénierie et exportations Excel",
       icon: FileSpreadsheet,
@@ -379,71 +419,166 @@ export default function UserGuide({ onNavigate }: UserGuideProps) {
       )
     },
     {
-      title: "7. Kit de Formation & Présentation",
-      subtitle: "Manuel complet au format Word prêt à imprimer & captures d'écran HD",
+      title: "7. Support de Formation Officiel",
+      subtitle: "Visualisez la fiche d'utilisation et téléchargez-la directement",
       icon: Download,
-      bg: "from-neutral-950 to-neutral-850 text-white",
+      bg: "from-neutral-900 to-emerald-950 text-white",
       content: (
         <div className="space-y-4 text-xs">
-          <p className="text-neutral-200">
-            Nous avons préparé pour vous un kit d'accompagnement et de formation complet. Téléchargez le manuel officiel au format <strong>Word</strong> ou le kit de diapositives contenant captures d'écran HD et script d'orateur :
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white/10 p-5 rounded-2xl border border-white/15 flex flex-col justify-between gap-4">
-              <div className="space-y-1 text-left">
-                <h5 className="font-bold text-white text-sm flex items-center gap-1.5">
-                  <Package className="h-4 w-4 text-amber-400" /> Manuel de Formation (.DOC)
-                </h5>
-                <p className="text-[11px] text-neutral-300">
-                  Le guide d'utilisation complet rédigé en français spécialement pour les Chefs d'Atelier de la STA Chery. Prêt à imprimer ou ouvrir dans Word.
-                </p>
-              </div>
-
-              <a
-                href="/api/download-guide"
-                download="Manuel_Formation_GMAO_STA_Chery.doc"
-                className="w-full px-4 py-2.5 bg-chery-red hover:bg-chery-dark text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer border border-transparent text-center"
-              >
-                <Download className="h-4 w-4" />
-                Télécharger le Manuel (.doc)
-              </a>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
+              {[1, 2, 3, 4].map((page) => (
+                <button
+                  key={page}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDocPage(page);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    docPage === page
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
+                >
+                  Page {page}
+                </button>
+              ))}
             </div>
 
-            <div className="bg-white/10 p-5 rounded-2xl border border-white/15 flex flex-col justify-between gap-4">
-              <div className="space-y-1 text-left">
-                <h5 className="font-bold text-white text-sm flex items-center gap-1.5">
-                  <Package className="h-4 w-4 text-blue-400" /> Kit de Diapositives (.ZIP)
-                </h5>
-                <p className="text-[11px] text-neutral-300">
-                  Comprend 5 captures d'écran HD nommées (Dashboard, Équipements, Interventions...) + le script de présentation mot-à-mot de l'orateur.
-                </p>
-              </div>
-
-              <a
-                href="/presentation_captures.zip"
-                download="GMAO_STA_Chery_Kit_Presentation.zip"
-                className="w-full px-4 py-2.5 bg-white hover:bg-neutral-100 text-neutral-900 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer border border-neutral-200 text-center"
-              >
-                <Download className="h-4 w-4 text-neutral-900" />
-                Télécharger le Kit ZIP (.zip)
-              </a>
-            </div>
+            <a
+              href="/api/download-chef-guide"
+              download="Fiche_Formation_Chef_Atelier_GMAO_STA.doc"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer border border-transparent"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Télécharger .doc
+            </a>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-1">
-              <h6 className="font-bold text-white text-[11px]">📸 Captures HD Incluses</h6>
-              <p className="text-[10px] text-neutral-300">
-                Images au format 16:9 optimisées pour vos diapositives PowerPoint, Google Slides ou Keynote.
-              </p>
-            </div>
-            <div className="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-1">
-              <h6 className="font-bold text-white text-[11px]">📝 Guide d'Accompagnement</h6>
-              <p className="text-[10px] text-neutral-300">
-                Fichier texte contenant le script de l'orateur (notes de présentation) pour chaque diapositive, mot à mot.
-              </p>
-            </div>
+          {/* Interactive Page Container */}
+          <div className="transition-all duration-300">
+            {docPage === 1 && (
+              <div className="bg-neutral-800/80 text-white p-5 rounded-2xl border border-neutral-700 space-y-4 max-w-2xl mx-auto shadow-inner text-center">
+                <div className="text-xl font-extrabold text-red-500 tracking-wider">STA CHERY TUNISIE</div>
+                <div className="text-sm font-black text-white tracking-tight">FICHE DE FORMATION DÉDIÉE</div>
+                <div className="text-[11px] text-neutral-300 italic">Guide d'Utilisation Pratique pour le Chef d'Atelier (GMAO)</div>
+                
+                <div className="bg-neutral-900/50 p-4 rounded-xl border border-neutral-700/50 text-left space-y-2">
+                  <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                    <Lightbulb className="h-4 w-4 text-amber-400" /> Guide Opérationnel Spécialisé :
+                  </div>
+                  <p className="text-[11px] text-neutral-300 leading-relaxed">
+                    Ce document a été spécifiquement conçu pour accompagner le Chef d'Atelier. Il résume l'accès par code PIN sécurisé, le contrôle du parc d'équipements, le cycle complet d'intervention (bons de travaux) et la formulation des demandes d'achat (DA).
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-left border-t border-neutral-700/50 pt-3 text-[10px] text-neutral-400 font-mono">
+                  <div>
+                    <strong>Auteur :</strong> M. Ahmed Amine Ben Salah<br />
+                    <strong>STA Tunisie :</strong> Concessionnaire Chery
+                  </div>
+                  <div className="text-right">
+                    <strong>Version :</strong> 1.0 • 2026<br />
+                    <strong>Statut :</strong> Officiel & Validé
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {docPage === 2 && (
+              <div className="bg-neutral-800/80 text-white p-5 rounded-2xl border border-neutral-700 space-y-4 max-w-2xl mx-auto text-left">
+                <div className="space-y-2 border-b border-neutral-700/50 pb-3">
+                  <h5 className="font-bold text-red-400 text-xs uppercase tracking-wider">1. Rôle & Accès de l'Atelier (Sécurité par Code PIN)</h5>
+                  <p className="text-[11px] text-neutral-300 leading-relaxed">
+                    Pour refléter l'organisation opérationnelle de la <strong>STA</strong>, l'application est compartimentée en ateliers. Chaque Chef d'Atelier accède à l'application avec un <strong>code PIN sécurisé (par défaut : 0000)</strong> :
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-neutral-300 font-mono bg-neutral-900/30 p-2.5 rounded-lg border border-neutral-700/30">
+                    <div>• Service Rapide</div>
+                    <div>• Atelier Mécanique / élec</div>
+                    <div>• Atelier Diagnostic</div>
+                    <div>• Carrosserie</div>
+                    <div>• Lavage</div>
+                    <div>• Maintenance Bâtiment</div>
+                  </div>
+                  <div className="bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-lg text-[10px] text-amber-300 leading-relaxed">
+                    <strong>🔒 Règle de cloisonnement :</strong> Le Chef d'Atelier ne voit et ne gère que les équipements et bons de travaux appartenant strictement à son propre atelier. L'administrateur supervise l'intégralité du parc.
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h5 className="font-bold text-red-400 text-xs uppercase tracking-wider">2. Suivi du Parc & Création d'un Équipement</h5>
+                  <p className="text-[11px] text-neutral-300 leading-relaxed">
+                    Le parc de chaque atelier affiche le taux de disponibilité en temps réel de ses machines.
+                  </p>
+                  <div className="bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg text-[10px] text-red-300 leading-relaxed">
+                    <strong>⚠️ Règle Métier Majeure - Équipement "Hors Service" :</strong> Lorsqu'un équipement est déclassé, vendu ou définitivement arrêté, changez son état en <strong>"Hors Service"</strong>. La GMAO l'exclura alors automatiquement de tous les calculs de taux de disponibilité globale pour éviter de fausser les indicateurs de performance.
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-neutral-200">Tutoriel pas-à-pas de création d'équipement :</span>
+                    <ol className="list-decimal list-inside text-[11px] text-neutral-300 space-y-0.5 pl-1 leading-relaxed">
+                      <li>Connectez-vous avec le profil et allez dans "Parc Équipements".</li>
+                      <li>Cliquez sur le bouton bleu "+ Ajouter un Équipement".</li>
+                      <li>Saisissez le Nom (ex: Pont Ciseaux 03), le Code Unique (ex: EQ-SR-03), sélectionnez l'Atelier, et attribuez la Criticité (A, B ou C).</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {docPage === 3 && (
+              <div className="bg-neutral-800/80 text-white p-5 rounded-2xl border border-neutral-700 space-y-4 max-w-2xl mx-auto text-left">
+                <div className="space-y-2 border-b border-neutral-700/50 pb-3">
+                  <h5 className="font-bold text-red-400 text-xs uppercase tracking-wider">3. Cycle Complet des Interventions (Bons de travaux)</h5>
+                  <p className="text-[11px] text-neutral-300 leading-relaxed">
+                    Les interventions de maintenance peuvent être effectuées en interne par nos techniciens, ou confiées à un prestataire extérieur qualifié :
+                  </p>
+                  <ul className="list-disc list-inside text-[11px] text-neutral-300 space-y-1 pl-1 leading-relaxed">
+                    <li><strong>1. Création :</strong> Renseignez le titre, l'équipement concerné, l'urgence et le type (Préventif, Correctif, Réglementaire).</li>
+                    <li><strong>2. Exécutant :</strong> Interne (Technicien STA) ou Externe (Prestataire).</li>
+                    <li><strong>3. Pièces :</strong> Ajoutez les pièces consommées du magasin central. Le stock est vérifié en temps réel.</li>
+                    <li><strong>4. Clôture :</strong> Passez à "En cours" puis "Terminé", saisissez la durée réelle et les notes de clôture.</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-2">
+                  <h5 className="font-bold text-red-400 text-xs uppercase tracking-wider">4. Formulation d'une Demande d'Achat (DA)</h5>
+                  <p className="text-[11px] text-neutral-300 leading-relaxed">
+                    En cas de besoin de nouvel outillage ou de travaux d'aménagement de l'atelier, le Chef d'Atelier ou le Magasinier formule une Demande d'Achat (DA) numérique.
+                  </p>
+                  <div className="bg-neutral-900/40 p-2.5 rounded-lg border border-neutral-700/40 text-[10px] space-y-1 leading-relaxed">
+                    <div className="text-amber-400 font-bold">• Choix Catégorie :</div>
+                    <p className="text-neutral-300">Spécifier s'il s'agit d'un <strong>Équipement</strong> (machines, outils) ou d'une <strong>Infrastructure</strong> (réseau d'air, raccordement électrique, sols, bâtiment, etc. non inclus dans les machines).</p>
+                    
+                    <div className="text-amber-400 font-bold mt-1">• Fournisseur Optionnel :</div>
+                    <p className="text-neutral-300">Le champ "Fournisseur Suggéré" est facultatif. Vous pouvez sélectionner <strong>"Non spécifié"</strong> si vous n'avez pas de devis.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {docPage === 4 && (
+              <div className="bg-neutral-800/80 text-white p-5 rounded-2xl border border-neutral-700 space-y-4 max-w-2xl mx-auto text-left">
+                <div className="space-y-2 pb-2">
+                  <h5 className="font-bold text-red-400 text-xs uppercase tracking-wider">Procédure de soumission</h5>
+                  <ol className="list-decimal list-inside text-[11px] text-neutral-300 space-y-1 bg-neutral-900/30 p-3 rounded-xl border border-neutral-700/30 leading-relaxed">
+                    <li>Dans l'onglet <strong>"Achats"</strong>, cliquez sur <strong>"+ Nouvelle Demande d'Achat (DA)"</strong>.</li>
+                    <li>Sélectionnez la catégorie (<strong>Équipement</strong> ou <strong>Infrastructure</strong>).</li>
+                    <li>Saisissez l'intitulé, le motif précis du besoin, la quantité demandée, le coût estimé et le niveau d'urgence.</li>
+                    <li>Indiquez votre nom de demandeur et cliquez sur <strong>"Soumettre la Demande d'Achat"</strong>.</li>
+                  </ol>
+                </div>
+
+                <div className="border-t border-neutral-700 pt-3 text-center space-y-1">
+                  <div className="text-[11px] font-bold text-red-500 uppercase tracking-wider">FIN DE LA FICHE DE FORMATION CHEF D'ATELIER</div>
+                  <p className="text-[10px] text-neutral-400">
+                    Pour toute assistance technique, contactez M. Ahmed Amine Ben Salah, administrateur de la GMAO STA.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )
@@ -476,12 +611,14 @@ export default function UserGuide({ onNavigate }: UserGuideProps) {
 
         <div className="flex flex-wrap items-center gap-3">
           <a
-            href="/api/download-guide"
-            download="Manuel_Formation_GMAO_STA.doc"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-chery-red hover:bg-chery-dark text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+            href="/api/download-chef-guide"
+            download="Fiche_Formation_Chef_Atelier_GMAO_STA.doc"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-xs cursor-pointer"
           >
             <Download className="h-3.5 w-3.5" />
-            Télécharger le Manuel Word (.doc)
+            🎓 Télécharger la Fiche de Formation (.doc)
           </a>
 
           <div className="flex items-center gap-2 bg-neutral-100 p-1 rounded-xl">

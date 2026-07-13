@@ -33,7 +33,7 @@ import {
   Info,
   RefreshCw
 } from "lucide-react";
-import { Equipment, Intervention, SparePart, ComplianceCheck, BudgetYear, Workshop } from "../types";
+import { Equipment, Intervention, SparePart, ComplianceCheck, BudgetYear, Workshop, PurchaseRequest } from "../types";
 
 interface GmaoDashboardProps {
   equipments: Equipment[];
@@ -41,6 +41,7 @@ interface GmaoDashboardProps {
   spareParts: SparePart[];
   compliance: ComplianceCheck[];
   budget: BudgetYear;
+  purchaseRequests: PurchaseRequest[];
   onNavigate: (tab: string) => void;
   onResetDemoData?: () => void;
 }
@@ -51,6 +52,7 @@ export default function GmaoDashboard({
   spareParts,
   compliance,
   budget,
+  purchaseRequests,
   onNavigate,
   onResetDemoData
 }: GmaoDashboardProps) {
@@ -115,7 +117,7 @@ export default function GmaoDashboard({
   const alerts = useMemo(() => {
     const list: Array<{
       id: string;
-      category: "Pneu" | "Stock" | "Garantie" | "Budget" | "Réglementaire" | "Panne";
+      category: "Pneu" | "Garantie" | "Budget" | "Réglementaire" | "Panne" | "Achat";
       title: string;
       desc: string;
       severity: "critical" | "warning" | "info";
@@ -134,15 +136,15 @@ export default function GmaoDashboard({
       }
     });
 
-    // Low stock alert
-    spareParts.forEach((part) => {
-      if (part.currentStock <= part.reorderPoint) {
+    // Urgent Purchase Requests (DAs) alert
+    purchaseRequests.forEach((req) => {
+      if (req.status === "En attente" && (req.urgency === "Critique" || req.urgency === "Moyenne")) {
         list.push({
-          id: `s-${part.code}`,
-          category: "Stock",
-          title: `Stock Bas : ${part.code}`,
-          desc: `La pièce "${part.name}" est à un stock de ${part.currentStock} (Seuil d'alerte: ${part.reorderPoint}).`,
-          severity: "warning"
+          id: `da-${req.id}`,
+          category: "Achat",
+          title: `Demande d'Achat Urgente (${req.urgency})`,
+          desc: `La DA pour "${req.equipmentName}" (${req.estimatedCost} TND) émise par ${req.requestedBy} requiert une validation.`,
+          severity: req.urgency === "Critique" ? "critical" : "warning"
         });
       }
     });
@@ -220,7 +222,7 @@ export default function GmaoDashboard({
     });
 
     return list;
-  }, [equipments, spareParts, compliance, budget]);
+  }, [equipments, compliance, budget, purchaseRequests]);
 
   // 3. Charts Data Preparation
   // A. Spent vs Allocated by workshop
@@ -565,10 +567,10 @@ export default function GmaoDashboard({
 
           <div className="pt-4 border-t border-neutral-100 mt-4 flex gap-2">
             <button
-              onClick={() => onNavigate("inventaire")}
+              onClick={() => onNavigate("achats")}
               className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-center text-xs py-2 px-3 rounded-lg font-medium transition-colors cursor-pointer"
             >
-              Voir le Stock
+              Voir les Achats
             </button>
             <button
               onClick={() => onNavigate("interventions")}

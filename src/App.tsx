@@ -59,7 +59,6 @@ import {
 import GmaoDashboard from "./components/GmaoDashboard";
 import EquipmentsManager from "./components/EquipmentsManager";
 import InterventionsManager from "./components/InterventionsManager";
-import InventoryManager from "./components/InventoryManager";
 import ContractsManager from "./components/ContractsManager";
 import ExcelBlueprint from "./components/ExcelBlueprint";
 import PurchasesManager from "./components/PurchasesManager";
@@ -537,10 +536,6 @@ export default function App() {
     setPurchaseRequests((prev) =>
       prev.map((req) => {
         if (req.id === id) {
-          // If the request transitions to "Reçu" for the first time, automatically replenish the inventory!
-          if (nextStatus === "Reçu" && req.status !== "Reçu") {
-            handleRestockPart(req.partCode, req.quantity);
-          }
           return { ...req, status: nextStatus };
         }
         return req;
@@ -1136,24 +1131,6 @@ export default function App() {
               <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "interventions" ? "opacity-100" : ""}`} />
             </button>
 
-            {/* 📦 Stock & Pièces */}
-            <button
-              onClick={() => {
-                setActiveTab("inventaire");
-              }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "inventaire"
-                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
-                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Package className="h-4 w-4" />
-                <span>📦 Stock & Pièces</span>
-              </div>
-              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "inventaire" ? "opacity-100" : ""}`} />
-            </button>
-
             {/* 🛒 Achats */}
             <button
               onClick={() => {
@@ -1273,7 +1250,6 @@ export default function App() {
                     { id: "dashboard", label: "🏠 Tableau de Bord", icon: LayoutDashboard },
                     { id: "equipements", label: "🏭 Parc Équipements", icon: Wrench },
                     { id: "interventions", label: "📋 Interventions", icon: FileText },
-                    { id: "inventaire", label: "📦 Stock & Pièces", icon: Package },
                     { id: "achats", label: "🛒 Achats", icon: ShoppingCart },
                     { id: "contracts", label: "📑 Contrats & Conformité", icon: ShieldCheck },
                     { id: "excel", label: "📊 Rapports & Export", icon: FileSpreadsheet },
@@ -1318,6 +1294,7 @@ export default function App() {
               spareParts={spareParts}
               compliance={compliance}
               budget={budget}
+              purchaseRequests={purchaseRequests}
               onNavigate={(tab) => {
                 if (tab === "equipements") {
                   setSelectedWorkshopFilter("All");
@@ -1373,21 +1350,9 @@ export default function App() {
             />
           )}
 
-          {activeTab === "inventaire" && (
-            <InventoryManager
-              spareParts={spareParts}
-              equipments={equipments}
-              onRestockPart={handleRestockPart}
-              onAddPart={handleAddPart}
-              isReadOnly={currentUserRole === "supervisor" || (currentUserRole !== "admin" && currentUserRole !== "magasin")}
-              currentRole={currentUserRole}
-            />
-          )}
-
           {activeTab === "achats" && (
             <PurchasesManager
               purchaseRequests={purchaseRequests}
-              spareParts={spareParts}
               vendors={vendors}
               onAddPurchaseRequest={handleAddPurchaseRequest}
               onUpdatePurchaseRequestStatus={handleUpdatePurchaseRequestStatus}

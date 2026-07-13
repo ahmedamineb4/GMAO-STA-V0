@@ -106,6 +106,8 @@ export default function InterventionsManager({
   const [newTechnician, setNewTechnician] = useState("");
   const [newStatus, setNewStatus] = useState<InterventionStatus>("Planifié");
   const [newNotes, setNewNotes] = useState("");
+  const [newExecutorType, setNewExecutorType] = useState<"Interne" | "Externe">("Interne");
+  const [newExternalProvider, setNewExternalProvider] = useState("");
 
   // Spare parts select list for form
   const [formPartsUsed, setFormPartsUsed] = useState<PartUsed[]>([]);
@@ -199,7 +201,9 @@ export default function InterventionsManager({
       technician: newTechnician,
       status: newStatus,
       partsUsed: formPartsUsed,
-      notes: newNotes
+      notes: newNotes,
+      executorType: newExecutorType,
+      externalProvider: newExecutorType === "Externe" ? newExternalProvider : undefined
     };
 
     onAddIntervention(created);
@@ -212,6 +216,8 @@ export default function InterventionsManager({
     setNewTechnician("");
     setNewNotes("");
     setFormPartsUsed([]);
+    setNewExecutorType("Interne");
+    setNewExternalProvider("");
   };
 
   return (
@@ -403,9 +409,22 @@ export default function InterventionsManager({
                           {(int.costParts + int.costLabor).toLocaleString()}
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-1.5 text-neutral-700">
-                            <User className="h-3 w-3 text-neutral-400" />
-                            <span>{int.technician}</span>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1 text-neutral-800 font-bold">
+                              <User className="h-3 w-3 text-neutral-400" />
+                              <span>{int.technician}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {int.executorType === "Externe" ? (
+                                <span className="px-1.5 py-0.5 rounded-sm text-[8px] font-extrabold uppercase bg-purple-50 text-purple-700 border border-purple-200">
+                                  Externe {int.externalProvider ? `(${int.externalProvider})` : ""}
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded-sm text-[8px] font-extrabold uppercase bg-teal-50 text-teal-700 border border-teal-200">
+                                  Interne (STA)
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="py-3 px-4 text-center">
@@ -638,9 +657,14 @@ export default function InterventionsManager({
                         </p>
 
                         <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 pt-2 border-t border-neutral-100">
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3 text-neutral-400" />
-                            {int.technician}
+                          <span className="flex flex-col gap-0.5">
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3 text-neutral-400" />
+                              {int.technician}
+                            </span>
+                            <span className="text-[8px] uppercase tracking-wider font-extrabold text-neutral-400">
+                              {int.executorType === "Externe" ? `Ext (${int.externalProvider || "Prestataire"})` : "Int (STA)"}
+                            </span>
                           </span>
                           <select
                             disabled={isReadOnly}
@@ -779,14 +803,49 @@ export default function InterventionsManager({
                 </div>
               </div>
 
+              {/* Row 4.5: Executor Type */}
+              <div className="grid grid-cols-2 gap-4 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Type d'Intervenant *</label>
+                  <select
+                    value={newExecutorType}
+                    onChange={(e) => setNewExecutorType(e.target.value as "Interne" | "Externe")}
+                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-semibold text-neutral-800"
+                  >
+                    <option value="Interne">Nos techniciens (Interne STA)</option>
+                    <option value="Externe">Prestataire (Externe)</option>
+                  </select>
+                </div>
+
+                {newExecutorType === "Externe" ? (
+                  <div>
+                    <label className="block font-bold text-neutral-600 mb-1">Société Prestataire *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ex: Weinmann, ABAC, Sotradies..."
+                      value={newExternalProvider}
+                      onChange={(e) => setNewExternalProvider(e.target.value)}
+                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-medium focus:ring-1 focus:ring-chery-red"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center text-[11px] text-neutral-500 pt-5 pl-2">
+                    💡 Exécuté par les équipes internes de la STA Chery.
+                  </div>
+                )}
+              </div>
+
               {/* Row 5: Technician & Status */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-neutral-600 mb-1">Technicien / Prestataire Assigné *</label>
+                  <label className="block font-bold text-neutral-600 mb-1">
+                    {newExecutorType === "Externe" ? "Technicien du Prestataire *" : "Technicien Interne Assigné *"}
+                  </label>
                   <input
                     type="text"
                     required
-                    placeholder="ex: Ridha Ben Abdallah ou Externe (Weinmann)"
+                    placeholder="ex: Ridha Ben Abdallah ou Agent Technique"
                     value={newTechnician}
                     onChange={(e) => setNewTechnician(e.target.value)}
                     className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
