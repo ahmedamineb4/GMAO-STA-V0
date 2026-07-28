@@ -495,79 +495,36 @@ export default function App() {
     localStorage.setItem("chery_gmao_filter_calendar", showMaintenanceCalendar ? "true" : "false");
   }, [showMaintenanceCalendar]);
 
-  // Function to manually trigger database backup to disk
+  // Function to manually trigger database backup to LocalStorage
   const handleManualSaveToDisk = () => {
     setDiskSyncStatus("syncing");
-    const backupData = {
-      equipments,
-      interventions,
-      spareParts,
-      vendors,
-      purchaseRequests,
-      compliance,
-      budget,
-      exportedAt: new Date().toISOString(),
-      version: "GMAO-STA-1.0"
-    };
+    try {
+      localStorage.setItem("chery_gmao_equipments", JSON.stringify(equipments));
+      localStorage.setItem("chery_gmao_interventions", JSON.stringify(interventions));
+      localStorage.setItem("chery_gmao_spare_parts", JSON.stringify(spareParts));
+      localStorage.setItem("chery_gmao_vendors", JSON.stringify(vendors));
+      localStorage.setItem("chery_gmao_purchase_requests", JSON.stringify(purchaseRequests));
+      localStorage.setItem("chery_gmao_compliance", JSON.stringify(compliance));
+      localStorage.setItem("chery_gmao_budget", JSON.stringify(budget));
+      localStorage.setItem("chery_gmao_contracts", JSON.stringify(contracts));
+      localStorage.setItem("chery_gmao_activity_logs", JSON.stringify(activityLogs));
+      localStorage.setItem("chery_gmao_user_profiles", JSON.stringify(userProfiles));
 
-    fetch("/api/backup", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(backupData),
-    })
-      .then((res) => res.json())
-      .then((res) => {
-        if (res.success) {
-          setDiskSyncStatus("synced");
-        } else {
-          setDiskSyncStatus("error");
-        }
-      })
-      .catch((err) => {
-        console.error("[GMAO] Echec de la sauvegarde sur le disque dur:", err);
-        setDiskSyncStatus("error");
-      });
+      setTimeout(() => {
+        setDiskSyncStatus("synced");
+        showToast("💾 Base de données enregistrée en mémoire locale (LocalStorage)", "success");
+      }, 250);
+    } catch (err) {
+      console.error("[GMAO] Échec de la sauvegarde locale:", err);
+      setDiskSyncStatus("error");
+      showToast("⚠️ Mémoire locale pleine ou inaccessible", "error");
+    }
   };
 
-  // Load from local disk on first load if localStorage is empty
+  // Set disk sync status to synced on mount
   useEffect(() => {
-    fetch("/api/backup")
-      .then((res) => res.json())
-      .then((res) => {
-        if (res.success && res.data) {
-          const diskData = res.data;
-          const hasLocalData = localStorage.getItem("chery_gmao_equipments");
-          if (!hasLocalData && diskData.equipments && diskData.equipments.length > 0) {
-            console.log("[GMAO] Chargement initial de la sauvegarde automatique depuis le disque dur.");
-            handleImportAllData(diskData);
-            setDiskSyncStatus("synced");
-          } else {
-            setDiskSyncStatus("synced");
-          }
-        } else {
-          setDiskSyncStatus("idle");
-        }
-      })
-      .catch((err) => {
-        console.warn("[GMAO] Serveur de sauvegarde locale non disponible ou inaccessible:", err);
-      });
+    setDiskSyncStatus("synced");
   }, []);
-
-  // Automatic periodic backup to disk on any state modification
-  useEffect(() => {
-    // Avoid backing up empty data on very first render before state initialization is fully done
-    if (equipments.length === 0 && interventions.length === 0 && spareParts.length === 0) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      handleManualSaveToDisk();
-    }, 60000); // Debounce write updates by 60 seconds (1 minute) to avoid frequent disk saves and reloads during fast edits
-
-    return () => clearTimeout(timer);
-  }, [equipments, interventions, spareParts, vendors, purchaseRequests, compliance, budget]);
 
   // Auto-migration to version 9: Populated with full STA Chery Tunisia dataset
   useEffect(() => {
@@ -1710,28 +1667,28 @@ export default function App() {
           <button
             type="button"
             onClick={handleManualSaveToDisk}
-            title="Cliquer pour forcer la sauvegarde instantanée sur votre PC"
-            className="hidden md:flex items-center gap-2.5 bg-slate-800/80 hover:bg-slate-700 px-4 py-2 rounded-full border border-slate-700/80 transition-all cursor-pointer group active:scale-95 shadow-xs"
+            title="Cliquer pour forcer la sauvegarde instantanée dans votre navigateur"
+            className="hidden md:flex items-center gap-2 bg-slate-800/90 hover:bg-slate-700 px-3.5 py-1.5 rounded-xl border border-slate-700/80 transition-all cursor-pointer group active:scale-95 shadow-xs whitespace-nowrap shrink-0"
           >
             {diskSyncStatus === "syncing" ? (
               <>
-                <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
-                <span className="text-xs font-semibold text-neutral-200 font-mono flex items-center gap-1">
-                  🔄 Synchronisation PC...
+                <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
+                <span className="text-xs font-bold text-neutral-200 font-mono flex items-center gap-1.5">
+                  🔄 Enregistrement...
                 </span>
               </>
             ) : diskSyncStatus === "error" ? (
               <>
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
-                <span className="text-xs font-semibold text-amber-300 font-mono group-hover:text-amber-200">
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+                <span className="text-xs font-bold text-amber-300 font-mono group-hover:text-amber-200 flex items-center gap-1.5">
                   ⚠️ Réessayer la Sauvegarde
                 </span>
               </>
             ) : (
               <>
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse-subtle"></span>
-                <span className="text-xs font-semibold text-neutral-300 font-mono group-hover:text-white flex items-center gap-1">
-                  🟢 Sauvegardé sur PC • Enregistrer
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse-subtle shrink-0"></span>
+                <span className="text-xs font-bold text-emerald-300 font-mono group-hover:text-white flex items-center gap-1.5">
+                  💾 Sauvegardé • Enregistrer
                 </span>
               </>
             )}
