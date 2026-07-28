@@ -822,7 +822,7 @@ export default function SettingsManager({
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
-                                {!role.isSystem && (
+                                {!role.isSystem && currentRole === "admin" && (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -830,7 +830,7 @@ export default function SettingsManager({
                                         if (onDeleteRoleProfile) onDeleteRoleProfile(role.id);
                                       }
                                     }}
-                                    title="Supprimer ce profil"
+                                    title="Supprimer ce profil (Admin uniquement)"
                                     className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -1284,18 +1284,20 @@ export default function SettingsManager({
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (confirm(`Voulez-vous vraiment supprimer le prestataire "${vendor.name}" ?`)) {
-                                    if (onDeleteVendor) onDeleteVendor(vendor.id);
-                                  }
-                                }}
-                                title="Supprimer ce prestataire"
-                                className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              {currentRole === "admin" && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm(`Voulez-vous vraiment supprimer le prestataire "${vendor.name}" ?`)) {
+                                      if (onDeleteVendor) onDeleteVendor(vendor.id);
+                                    }
+                                  }}
+                                  title="Supprimer ce prestataire (Admin uniquement)"
+                                  className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>

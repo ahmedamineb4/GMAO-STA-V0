@@ -72,6 +72,7 @@ interface EquipmentsManagerProps {
   isReadOnly?: boolean;
   allowedWorkshop?: string;
   onResetDemoData?: () => void;
+  currentUserRole?: string;
 }
 
 export default function EquipmentsManager({
@@ -87,7 +88,8 @@ export default function EquipmentsManager({
   initialWorkshop = "All",
   isReadOnly = false,
   allowedWorkshop,
-  onResetDemoData
+  onResetDemoData,
+  currentUserRole = "atelier"
 }: EquipmentsManagerProps) {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -343,10 +345,19 @@ export default function EquipmentsManager({
   };
 
   const handleDeleteClick = (code: string) => {
+    if (currentUserRole !== "admin") {
+      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer un équipement du parc.");
+      return;
+    }
     setEquipmentToDelete(code);
   };
 
   const executeDelete = () => {
+    if (currentUserRole !== "admin") {
+      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à exécuter la suppression.");
+      setEquipmentToDelete(null);
+      return;
+    }
     if (equipmentToDelete) {
       onDeleteEquipment(equipmentToDelete);
       setSelectedEqCode(null);
@@ -433,6 +444,10 @@ export default function EquipmentsManager({
   };
 
   const handleDeletePhoto = (index: number) => {
+    if (currentUserRole !== "admin") {
+      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer une photo d'équipement.");
+      return;
+    }
     if (!selectedEqCode) return;
     const currentPhotos = getActivePhotos(selectedEqCode);
     const updated = currentPhotos.filter((_, i) => i !== index);
@@ -812,15 +827,18 @@ export default function EquipmentsManager({
                             >
                               <Copy className="h-3.5 w-3.5" />
                             </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteClick(eq.code);
-                              }}
-                              className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-chery-red transition-all cursor-pointer"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            {currentUserRole === "admin" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteClick(eq.code);
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-red-50 text-neutral-400 hover:text-chery-red transition-all cursor-pointer"
+                                title="Supprimer l'équipement (Admin uniquement)"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         )}
                         <ChevronRight className="h-4 w-4 text-neutral-300 hidden sm:block" />
@@ -1339,15 +1357,17 @@ export default function EquipmentsManager({
                                 />
                               </label>
 
-                              {/* Delete photo */}
-                              <button
-                                type="button"
-                                onClick={() => handleDeletePhoto(index)}
-                                className="p-1.5 rounded-lg bg-chery-red text-white hover:bg-red-700 transition-all cursor-pointer shadow-md"
-                                title="Supprimer la photo"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              {/* Delete photo (Admin only) */}
+                              {currentUserRole === "admin" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePhoto(index)}
+                                  className="p-1.5 rounded-lg bg-chery-red text-white hover:bg-red-700 transition-all cursor-pointer shadow-md"
+                                  title="Supprimer la photo (Admin uniquement)"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                             <span className="absolute bottom-1 left-1 bg-slate-900/80 text-white text-[9px] font-mono px-1.5 py-0.5 rounded">
                               #{index + 1}

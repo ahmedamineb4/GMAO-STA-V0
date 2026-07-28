@@ -49,11 +49,13 @@ export interface GmaoDocument {
 interface DocumentationManagerProps {
   equipments: Equipment[];
   isReadOnly?: boolean;
+  currentUserRole?: string;
 }
 
 export default function DocumentationManager({
   equipments,
-  isReadOnly = false
+  isReadOnly = false,
+  currentUserRole = "atelier"
 }: DocumentationManagerProps) {
   // 1. Initial documents to seed the demo mode
   const INITIAL_DOCUMENTS: GmaoDocument[] = [
@@ -319,8 +321,12 @@ export default function DocumentationManager({
     setNewVerComment("");
   };
 
-  // Delete document
+  // Delete document (Admin only)
   const handleDeleteDoc = (id: string) => {
+    if (currentUserRole !== "admin") {
+      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer un document technique.");
+      return;
+    }
     if (confirm("Êtes-vous sûr de vouloir archiver/supprimer ce document ?")) {
       setDocuments(documents.filter((d) => d.id !== id));
       if (selectedDocId === id) setSelectedDocId(null);
@@ -561,14 +567,14 @@ ${doc.versions.map((v) => `- Version ${v.version} (${v.date}) par ${v.author} : 
                           >
                             <Download className="h-3.5 w-3.5" />
                           </button>
-                          {!isReadOnly && (
+                          {!isReadOnly && currentUserRole === "admin" && (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteDoc(doc.id);
                               }}
-                              title="Supprimer"
+                              title="Supprimer (Admin uniquement)"
                               className="p-1.5 rounded-lg bg-neutral-50 text-neutral-400 hover:text-red-600 hover:bg-red-50 border border-neutral-200 transition-colors cursor-pointer"
                             >
                               <Trash2 className="h-3.5 w-3.5" />

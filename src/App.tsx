@@ -372,6 +372,10 @@ export default function App() {
   };
 
   const handleDeleteRoleProfile = (profileId: string) => {
+    if (currentUserRole !== "admin") {
+      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer un profil d'accès.");
+      return;
+    }
     const target = userProfiles.find((p) => p.id === profileId);
     if (target?.isSystem) {
       alert("Ce profil système ne peut pas être supprimé car il est essentiel au fonctionnement de l'application.");
@@ -769,6 +773,10 @@ export default function App() {
 
   // A2. Delete an Equipment Asset
   const handleDeleteEquipment = (code: string) => {
+    if (currentUserRole !== "admin") {
+      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer un équipement.");
+      return;
+    }
     setEquipments((prev) => prev.filter((eq) => eq.code !== code));
     logActivity(
       "Suppression Équipement",
@@ -973,6 +981,10 @@ export default function App() {
   };
 
   const handleDeleteVendor = (vendorId: string) => {
+    if (currentUserRole !== "admin") {
+      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer un prestataire.");
+      return;
+    }
     const v = vendors.find((x) => x.id === vendorId);
     setVendors((prev) => prev.filter((x) => x.id !== vendorId));
     if (v) {
@@ -2149,6 +2161,7 @@ export default function App() {
               isReadOnly={isEquipmentsReadOnly}
               allowedWorkshop={allowedWorkshop}
               onResetDemoData={handleResetDemoData}
+              currentUserRole={currentUserRole}
             />
           )}
 
@@ -2188,6 +2201,7 @@ export default function App() {
             <DocumentationManager
               equipments={equipments}
               isReadOnly={isEquipmentsReadOnly}
+              currentUserRole={currentUserRole}
             />
           )}
 
