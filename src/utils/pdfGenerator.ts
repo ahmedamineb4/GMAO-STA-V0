@@ -1,5 +1,9 @@
-import { jsPDF } from "jspdf";
+import jsPDFDefault, { jsPDF as jsPDFNamed } from "jspdf";
 import { Equipment, Intervention } from "../types";
+
+// Flexible fallback for ESM / CommonJS bundlers (Vite local dev server)
+const jsPDF = jsPDFNamed || jsPDFDefault;
+type jsPDF = InstanceType<typeof jsPDFDefault>;
 
 /**
  * Draws a professional header with STA Chery branding on a jsPDF instance
