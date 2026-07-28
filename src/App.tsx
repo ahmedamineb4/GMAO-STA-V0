@@ -79,6 +79,7 @@ import DocumentationManager from "./components/DocumentationManager";
 import { FinancialManager } from "./components/FinancialManager";
 import CommandPaletteModal from "./components/CommandPaletteModal";
 import ToastNotification from "./components/ToastNotification";
+import CheryStaLogo from "./components/CheryStaLogo";
 
 export default function App() {
   // Navigation State
@@ -759,14 +760,30 @@ export default function App() {
     );
   };
 
-  // A1. Update an existing Equipment Asset
-  const handleUpdateEquipment = (updatedEq: Equipment) => {
+  // A1. Update an existing Equipment Asset (supports code modification by Admin)
+  const handleUpdateEquipment = (updatedEq: Equipment, oldCode?: string) => {
+    const targetCode = oldCode || updatedEq.code;
     setEquipments((prev) =>
-      prev.map((eq) => (eq.code === updatedEq.code ? updatedEq : eq))
+      prev.map((eq) => (eq.code === targetCode ? updatedEq : eq))
     );
+
+    // If equipment code was updated by admin, cascade code change to related interventions and purchase requests
+    if (oldCode && oldCode !== updatedEq.code) {
+      setInterventions((prev) =>
+        prev.map((int) =>
+          int.equipmentCode === oldCode ? { ...int, equipmentCode: updatedEq.code } : int
+        )
+      );
+      setPurchaseRequests((prev) =>
+        prev.map((pr) =>
+          pr.equipmentCode === oldCode ? { ...pr, equipmentCode: updatedEq.code } : pr
+        )
+      );
+    }
+
     logActivity(
       "Modification Équipement",
-      `Mise à jour des informations de l'équipement : ${updatedEq.name} (${updatedEq.code}) - Statut: ${updatedEq.status}`,
+      `Mise à jour des informations de l'équipement : ${updatedEq.name} (${oldCode && oldCode !== updatedEq.code ? `${oldCode} ➔ ${updatedEq.code}` : updatedEq.code}) - Statut: ${updatedEq.status}`,
       "equipment"
     );
   };
@@ -960,6 +977,75 @@ export default function App() {
       `Demande d'achat #${id} mise à jour vers le statut : ${nextStatus}`,
       "purchase"
     );
+  };
+
+  const handleUpdatePurchaseRequest = (updatedReq: PurchaseRequest) => {
+    setPurchaseRequests((prev) =>
+      prev.map((req) => (req.id === updatedReq.id ? updatedReq : req))
+    );
+    logActivity(
+      "Modification DA",
+      `Mise à jour de la demande d'achat ${updatedReq.id} (${updatedReq.equipmentName}) - Montant: ${updatedReq.estimatedCost} TND - Statut: ${updatedReq.status}`,
+      "purchase"
+    );
+    showToast(`Demande d'achat ${updatedReq.id} mise à jour`, "success");
+  };
+
+  const handleDeletePurchaseRequest = (id: string) => {
+    if (currentUserRole !== "admin") {
+      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer une demande d'achat.");
+      return;
+    }
+    const target = purchaseRequests.find((p) => p.id === id);
+    setPurchaseRequests((prev) => prev.filter((p) => p.id !== id));
+    if (target) {
+      logActivity(
+        "Suppression DA",
+        `Suppression de la demande d'achat ${target.id} (${target.equipmentName})`,
+        "purchase"
+      );
+      showToast(`Demande d'achat ${id} supprimée`, "info");
+    }
+  };
+
+  // H2. Maintenance Contract Operations
+  const handleAddContract = (newContract: MaintenanceContract) => {
+    setContracts((prev) => [newContract, ...prev]);
+    logActivity(
+      "Nouveau Contrat",
+      `Création du contrat de maintenance : ${newContract.title} (${newContract.id}) - Montant: ${newContract.costAnnual} TND/an`,
+      "compliance"
+    );
+    showToast(`Contrat ${newContract.title} créé avec succès`, "success");
+  };
+
+  const handleUpdateContract = (updatedContract: MaintenanceContract) => {
+    setContracts((prev) =>
+      prev.map((c) => (c.id === updatedContract.id ? updatedContract : c))
+    );
+    logActivity(
+      "Modification Contrat",
+      `Mise à jour du contrat de maintenance : ${updatedContract.title} (${updatedContract.id}) - Statut: ${updatedContract.status}`,
+      "compliance"
+    );
+    showToast(`Contrat ${updatedContract.title} mis à jour`, "success");
+  };
+
+  const handleDeleteContract = (id: string) => {
+    if (currentUserRole !== "admin") {
+      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer un contrat de maintenance.");
+      return;
+    }
+    const target = contracts.find((c) => c.id === id);
+    setContracts((prev) => prev.filter((c) => c.id !== id));
+    if (target) {
+      logActivity(
+        "Suppression Contrat",
+        `Suppression du contrat de maintenance : ${target.title} (${target.id})`,
+        "compliance"
+      );
+      showToast(`Contrat ${target.title} supprimé`, "info");
+    }
   };
 
   const handleAddVendor = (newVendor: Vendor) => {
@@ -1157,21 +1243,18 @@ export default function App() {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30 pointer-events-none"></div>
 
         {/* Corporate header branding with premium styling */}
-        <header className="border-b border-white/5 bg-neutral-900/40 backdrop-blur-md shrink-0 py-5 z-10">
+        <header className="border-b border-white/5 bg-neutral-900/40 backdrop-blur-md shrink-0 py-4 z-10">
           <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-            <div className="flex items-center gap-3 select-none mx-auto sm:mx-0">
-              <div className="bg-chery-red text-white text-xs font-black px-3 py-1.5 rounded-lg tracking-widest flex items-center justify-center shadow-lg shadow-chery-red/20 border border-red-500/20">
-                STA
+            <div className="flex items-center gap-4 select-none mx-auto sm:mx-0">
+              <div className="bg-white px-4 py-2 rounded-xl shadow-lg border border-slate-200 flex items-center">
+                <CheryStaLogo className="h-9 w-auto" />
               </div>
-              <span className="font-sans font-black text-xl tracking-wider text-white">
-                CHERY
-              </span>
-              <div className="border-l border-white/10 pl-3.5 ml-1.5">
+              <div className="border-l border-white/10 pl-3.5 hidden sm:block">
                 <span className="font-display font-black text-sm tracking-tight text-white block leading-tight">
                   STA TUNISIE
                 </span>
                 <span className="text-[10px] text-neutral-400 font-bold tracking-wider block uppercase mt-0.5">
-                  Concessionnaire Officiel • Portail GMAO 2.0
+                  Concessionnaire Officiel Chery • Portail GMAO 2.0
                 </span>
               </div>
             </div>
@@ -1608,19 +1691,16 @@ export default function App() {
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
 
-            {/* Simple & Premium STA Chery Logo */}
-            <div className="flex items-center gap-2 select-none">
-              <div className="bg-chery-red text-white text-xs font-black px-2.5 py-1.5 rounded-md tracking-wider flex items-center justify-center shadow-glow-red border border-red-500/30">
-                STA
+            {/* Official STA Chery Logo */}
+            <div className="flex items-center gap-3 select-none">
+              <div className="bg-white px-3.5 py-1.5 rounded-xl shadow-md border border-slate-200 flex items-center">
+                <CheryStaLogo className="h-7 w-auto" />
               </div>
-              <span className="font-sans font-black text-xl tracking-widest text-white drop-shadow-xs">
-                CHERY
-              </span>
-              <div className="hidden sm:block border-l border-white/20 pl-3 ml-1">
-                <span className="font-display font-black text-sm tracking-tight text-white block leading-tight">
+              <div className="hidden lg:block border-l border-white/20 pl-3">
+                <span className="font-display font-black text-xs tracking-tight text-white block leading-tight">
                   STA TUNISIE
                 </span>
-                <span className="text-[10px] text-red-300 font-bold tracking-wider block uppercase -mt-0.5">
+                <span className="text-[9px] text-red-300 font-bold tracking-wider block uppercase -mt-0.5">
                   Concessionnaire Officiel Chery
                 </span>
               </div>
@@ -2211,6 +2291,8 @@ export default function App() {
               vendors={vendors}
               onAddPurchaseRequest={handleAddPurchaseRequest}
               onUpdatePurchaseRequestStatus={handleUpdatePurchaseRequestStatus}
+              onUpdatePurchaseRequest={handleUpdatePurchaseRequest}
+              onDeletePurchaseRequest={handleDeletePurchaseRequest}
               onAddVendor={handleAddVendor}
               isReadOnly={isPurchasesReadOnly}
               currentRole={currentUserRole}
@@ -2224,6 +2306,10 @@ export default function App() {
               compliance={compliance}
               equipments={equipments}
               onAddComplianceCheck={handleAddComplianceCheck}
+              onAddContract={handleAddContract}
+              onUpdateContract={handleUpdateContract}
+              onDeleteContract={handleDeleteContract}
+              currentRole={currentUserRole}
             />
           )}
 

@@ -65,7 +65,7 @@ interface EquipmentsManagerProps {
   vendors?: Vendor[];
   onAddEquipment: (newEq: Equipment) => void;
   onUpdateStatus: (code: string, status: EquipmentStatus) => void;
-  onUpdateEquipment: (updatedEq: Equipment) => void;
+  onUpdateEquipment: (updatedEq: Equipment, oldCode?: string) => void;
   onDeleteEquipment: (code: string) => void;
   onAddIntervention?: (newInt: Intervention) => void;
   initialWorkshop?: string;
@@ -312,12 +312,27 @@ export default function EquipmentsManager({
     };
 
     if (editingEquipment) {
-      onUpdateEquipment({
-        ...editingEquipment,
-        ...eqData,
-        documents: editingEquipment.documents,
-        photos: editingEquipment.photos
-      });
+      if (editingEquipment.code !== eqData.code) {
+        if (currentUserRole !== "admin") {
+          alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à modifier le code d'un équipement.");
+          return;
+        }
+        const exists = equipments.some((eq) => eq.code === eqData.code);
+        if (exists) {
+          alert(`⛔ Le code d'équipement ${eqData.code} existe déjà pour un autre équipement.`);
+          return;
+        }
+      }
+
+      onUpdateEquipment(
+        {
+          ...editingEquipment,
+          ...eqData,
+          documents: editingEquipment.documents,
+          photos: editingEquipment.photos
+        },
+        editingEquipment.code
+      );
     } else {
       // Check if code already exists
       const exists = equipments.some((eq) => eq.code === eqData.code);
@@ -1494,15 +1509,32 @@ export default function EquipmentsManager({
             <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-neutral-600 mb-1">Code Équipement *</label>
+                  <label className="block font-bold text-neutral-600 mb-1 flex items-center justify-between">
+                    <span>Code Équipement *</span>
+                    {editingEquipment && (
+                      currentUserRole === "admin" ? (
+                        <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-bold">
+                          🔓 Modifiable (Admin)
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded font-normal">
+                          🔒 Verrouillé
+                        </span>
+                      )
+                    )}
+                  </label>
                   <input
                     type="text"
                     required
-                    disabled={!!editingEquipment}
+                    disabled={!!editingEquipment && currentUserRole !== "admin"}
                     placeholder="ex: EQ-SR-03"
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value)}
-                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-neutral-50/50 uppercase outline-none focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:text-neutral-500 disabled:cursor-not-allowed"
+                    className={`w-full border rounded-lg p-2.5 uppercase outline-none focus:ring-1 focus:ring-chery-red ${
+                      editingEquipment && currentUserRole === "admin"
+                        ? "border-emerald-300 bg-emerald-50/30 text-emerald-900 font-bold focus:ring-emerald-500"
+                        : "border-neutral-200 bg-neutral-50/50 disabled:bg-neutral-100 disabled:text-neutral-500 disabled:cursor-not-allowed"
+                    }`}
                   />
                 </div>
                 <div>

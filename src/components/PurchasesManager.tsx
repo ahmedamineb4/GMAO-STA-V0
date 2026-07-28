@@ -19,7 +19,9 @@ import {
   ArrowRight,
   TrendingUp,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Edit2,
+  Trash2
 } from "lucide-react";
 import { Vendor, PurchaseRequest } from "../types";
 
@@ -28,6 +30,8 @@ interface PurchasesManagerProps {
   purchaseRequests: PurchaseRequest[];
   onAddPurchaseRequest: (req: PurchaseRequest) => void;
   onUpdatePurchaseRequestStatus: (id: string, status: PurchaseRequest["status"]) => void;
+  onUpdatePurchaseRequest?: (req: PurchaseRequest) => void;
+  onDeletePurchaseRequest?: (id: string) => void;
   onAddVendor: (vendor: Vendor) => void;
   isReadOnly?: boolean;
   currentRole?: string;
@@ -38,12 +42,70 @@ export default function PurchasesManager({
   purchaseRequests,
   onAddPurchaseRequest,
   onUpdatePurchaseRequestStatus,
+  onUpdatePurchaseRequest,
+  onDeletePurchaseRequest,
   onAddVendor,
   isReadOnly = false,
   currentRole = "admin"
 }: PurchasesManagerProps) {
   // Navigation tabs inside Purchases Manager
   const [activeSubTab, setActiveSubTab] = useState<"requests" | "vendors">("requests");
+
+  // Edit Request State
+  const [editingRequest, setEditingRequest] = useState<PurchaseRequest | null>(null);
+  const [editEqName, setEditEqName] = useState("");
+  const [editNeedReason, setEditNeedReason] = useState("");
+  const [editUrgency, setEditUrgency] = useState<"Faible" | "Moyenne" | "Critique">("Moyenne");
+  const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editEstimatedCost, setEditEstimatedCost] = useState<number>(0);
+  const [editVendorId, setEditVendorId] = useState("");
+  const [editCategory, setEditCategory] = useState<"Équipement" | "Infrastructure" | "Service">("Équipement");
+  const [editStatus, setEditStatus] = useState<PurchaseRequest["status"]>("En attente");
+  const [editRequestedBy, setEditRequestedBy] = useState("");
+
+  const handleStartEdit = (req: PurchaseRequest) => {
+    setEditingRequest(req);
+    setEditEqName(req.equipmentName);
+    setEditNeedReason(req.needReason);
+    setEditUrgency(req.urgency);
+    setEditQuantity(req.quantity);
+    setEditEstimatedCost(req.estimatedCost);
+    setEditVendorId(req.vendorId || "");
+    setEditCategory(req.category || "Équipement");
+    setEditStatus(req.status);
+    setEditRequestedBy(req.requestedBy);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRequest || !onUpdatePurchaseRequest) return;
+    const updated: PurchaseRequest = {
+      ...editingRequest,
+      equipmentName: editEqName,
+      needReason: editNeedReason,
+      urgency: editUrgency,
+      quantity: editQuantity,
+      estimatedCost: editEstimatedCost,
+      vendorId: editVendorId,
+      category: editCategory,
+      status: editStatus,
+      requestedBy: editRequestedBy
+    };
+    onUpdatePurchaseRequest(updated);
+    setEditingRequest(null);
+  };
+
+  const handleDelete = (req: PurchaseRequest) => {
+    if (currentRole !== "admin") {
+      alert("⛔ Seul l'Administrateur peut supprimer une demande d'achat.");
+      return;
+    }
+    if (confirm(`Êtes-vous sûr de vouloir supprimer la demande d'achat ${req.id} (${req.equipmentName}) ?`)) {
+      if (onDeletePurchaseRequest) {
+        onDeletePurchaseRequest(req.id);
+      }
+    }
+  };
 
   // Auth/Role rules
   const canManageWorkflow = !isReadOnly && (currentRole === "admin" || currentRole === "magasin");
@@ -454,11 +516,7 @@ export default function PurchasesManager({
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {!canManageWorkflow ? (
-                              <span className="text-[10px] text-neutral-400 font-bold italic">
-                                Lecture Seule
-                              </span>
-                            ) : (
+                            {canManageWorkflow && (
                               <>
                                 {req.status === "En attente" && (
                                   <>
@@ -498,13 +556,29 @@ export default function PurchasesManager({
                                     Réceptionner
                                   </button>
                                 )}
-
-                                {(req.status === "Reçu" || req.status === "Refusé") && (
-                                  <span className="text-[10px] text-neutral-400 font-bold italic">
-                                    Verrouillé
-                                  </span>
-                                )}
                               </>
+                            )}
+
+                            {/* Edit Button (Admin or Workflow managers) */}
+                            {(currentRole === "admin" || canManageWorkflow) && onUpdatePurchaseRequest && (
+                              <button
+                                onClick={() => handleStartEdit(req)}
+                                className="bg-neutral-100 hover:bg-neutral-200 text-neutral-700 p-1.5 rounded text-[10px] border border-neutral-200 cursor-pointer transition-colors flex items-center gap-1"
+                                title="Modifier la demande d'achat"
+                              >
+                                <Edit2 className="h-3 w-3 text-neutral-600" />
+                              </button>
+                            )}
+
+                            {/* Delete Button (Admin Only) */}
+                            {currentRole === "admin" && onDeletePurchaseRequest && (
+                              <button
+                                onClick={() => handleDelete(req)}
+                                className="bg-red-50 hover:bg-red-100 text-chery-red p-1.5 rounded text-[10px] border border-red-200 cursor-pointer transition-colors flex items-center gap-1"
+                                title="Supprimer la demande d'achat (Admin)"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
                             )}
                           </div>
                         </td>
@@ -867,6 +941,164 @@ export default function PurchasesManager({
                   className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white py-2.5 rounded-lg font-bold text-center cursor-pointer transition-colors"
                 >
                   Enregistrer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT PURCHASE REQUEST DIALOG */}
+      {editingRequest && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-neutral-100 bg-neutral-50/50">
+              <div className="flex items-center gap-2">
+                <Edit2 className="h-5 w-5 text-chery-red" />
+                <h3 className="text-base font-bold text-neutral-800">
+                  Modifier la Demande d'Achat ({editingRequest.id})
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingRequest(null)}
+                className="p-1 rounded-full hover:bg-neutral-100 text-neutral-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Catégorie *</label>
+                <select
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value as any)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red cursor-pointer"
+                >
+                  <option value="Équipement">⚙️ Équipement de Garage</option>
+                  <option value="Infrastructure">🏢 Infrastructure & Bâtiment</option>
+                  <option value="Service">🛠️ Service & Prestation Externe</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Désignation de l'Équipement / Service *</label>
+                <input
+                  type="text"
+                  required
+                  value={editEqName}
+                  onChange={(e) => setEditEqName(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Motif du Besoin *</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={editNeedReason}
+                  onChange={(e) => setEditNeedReason(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Niveau d'Urgence</label>
+                  <select
+                    value={editUrgency}
+                    onChange={(e) => setEditUrgency(e.target.value as any)}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red cursor-pointer"
+                  >
+                    <option value="Faible">Faible (Planifiable)</option>
+                    <option value="Moyenne">Moyenne (Standard)</option>
+                    <option value="Critique">Critique (Bloquant Atelier)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Quantité *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={editQuantity}
+                    onChange={(e) => setEditQuantity(Math.max(1, Number(e.target.value)))}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none font-mono font-bold focus:ring-1 focus:ring-chery-red"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Coût Estimé Total (TND) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editEstimatedCost}
+                    onChange={(e) => setEditEstimatedCost(Math.max(0, Number(e.target.value)))}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white font-mono font-bold outline-none focus:ring-1 focus:ring-chery-red"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Statut du Workflow</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none font-bold focus:ring-1 focus:ring-chery-red cursor-pointer"
+                  >
+                    <option value="En attente">En attente</option>
+                    <option value="Approuvé">Approuvé</option>
+                    <option value="Commandé">Commandé</option>
+                    <option value="Reçu">Reçu</option>
+                    <option value="Refusé">Refusé</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Fournisseur Présenti</label>
+                <select
+                  value={editVendorId}
+                  onChange={(e) => setEditVendorId(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red cursor-pointer"
+                >
+                  <option value="">Sélectionner un fournisseur... (Non spécifié)</option>
+                  {vendors.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name} ({v.serviceType})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Demandeur</label>
+                <input
+                  type="text"
+                  required
+                  value={editRequestedBy}
+                  onChange={(e) => setEditRequestedBy(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white text-neutral-800 outline-none font-semibold focus:ring-1 focus:ring-chery-red"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-neutral-100 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingRequest(null)}
+                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-lg font-medium text-center cursor-pointer transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-chery-red hover:bg-chery-dark text-white py-2.5 rounded-lg font-bold text-center cursor-pointer transition-colors shadow-sm"
+                >
+                  Enregistrer les Modifications
                 </button>
               </div>
             </form>
