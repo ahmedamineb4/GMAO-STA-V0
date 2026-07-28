@@ -210,19 +210,19 @@ async function startServer() {
 
   <h1>4. Formulation d'une Demande d'Achat (DA)</h1>
   <p>
-    En cas de besoin de nouvel outillage ou de travaux d'aménagement de l'atelier, le Chef d'Atelier ou le Magasinier formule une Demande d'Achat (DA) numérique.
+    En cas de besoin de nouvel outillage, de travaux d'aménagement de l'atelier, ou de prestations externes, le Chef d'Atelier ou le Magasinier formule une Demande d'Achat (DA) numérique.
   </p>
   <div class="note">
     <strong>💡 Nouveautés majeures :</strong>
     <ul>
-      <li><strong>Choix Catégorie :</strong> Vous devez spécifier s'il s'agit d'un <strong>Équipement</strong> (machines, outils) ou d'une <strong>Infrastructure</strong> (réseau d'air, raccordement électrique, sols, bâtiment, etc. non inclus dans les machines).</li>
+      <li><strong>Choix Catégorie :</strong> Vous devez spécifier s'il s'agit d'un <strong>Équipement</strong> (machines, outils), d'une <strong>Infrastructure</strong> (réseau d'air, électricité, bâtiment) ou d'un <strong>Service</strong> (prestations, contrats d'entretien, calibrations, contrôles réglementaires).</li>
       <li><strong>Fournisseur Optionnel :</strong> Le champ "Fournisseur Suggéré" est facultatif. Vous pouvez sélectionner <strong>"Non spécifié"</strong> si vous n'avez pas de devis. L'Admin, M. Ahmed Amine, se chargera d'associer le fournisseur agréé officiel lors de la validation technique.</li>
     </ul>
   </div>
   <h3>Procédure de soumission :</h3>
   <ol>
     <li>Dans l'onglet <strong>"Achats"</strong>, cliquez sur <strong>"+ Nouvelle Demande d'Achat (DA)"</strong>.</li>
-    <li>Sélectionnez la catégorie (Équipement ou Infrastructure).</li>
+    <li>Sélectionnez la catégorie (Équipement, Infrastructure ou Service).</li>
     <li>Saisissez l'intitulé, le motif précis du besoin, la quantité demandée, le coût estimé et le niveau d'urgence.</li>
     <li>Indiquez votre nom de demandeur et cliquez sur <strong>"Soumettre la Demande d'Achat"</strong>.</li>
   </ol>

@@ -22,9 +22,22 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  CalendarRange
+  CalendarRange,
+  ClipboardList,
+  PenTool,
+  Image as ImageIcon,
+  CheckSquare,
+  Square,
+  FileCheck,
+  ShieldAlert,
+  Bell,
+  CheckCircle2,
+  Lock,
+  ThumbsUp,
+  Download
 } from "lucide-react";
 import { Equipment, Intervention, InterventionStatus, InterventionType, SparePart, PartUsed } from "../types";
+import { generateInterventionReportPDF } from "../utils/pdfGenerator";
 
 interface InterventionsManagerProps {
   interventions: Intervention[];
@@ -32,6 +45,7 @@ interface InterventionsManagerProps {
   spareParts: SparePart[];
   onAddIntervention: (newInt: Intervention) => void;
   onUpdateInterventionStatus: (id: string, status: InterventionStatus) => void;
+  onUpdateIntervention?: (updatedInt: Intervention) => void;
   initialType?: string;
   initialStatus?: string;
   showCalendarByDefault?: boolean;
@@ -45,6 +59,7 @@ export default function InterventionsManager({
   spareParts,
   onAddIntervention,
   onUpdateInterventionStatus,
+  onUpdateIntervention,
   initialType = "All",
   initialStatus = "All",
   showCalendarByDefault = false,
@@ -63,18 +78,18 @@ export default function InterventionsManager({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>(initialType);
   const [selectedStatus, setSelectedStatus] = useState<string>(initialStatus);
+  const [selectedPriority, setSelectedPriority] = useState<string>("All");
+
+  // Detail drawer / inspector state
+  const [selectedIntId, setSelectedIntId] = useState<string | null>(null);
 
   // Sync initial filters
   useEffect(() => {
-    if (initialType) {
-      setSelectedType(initialType);
-    }
+    if (initialType) setSelectedType(initialType);
   }, [initialType]);
 
   useEffect(() => {
-    if (initialStatus) {
-      setSelectedStatus(initialStatus);
-    }
+    if (initialStatus) setSelectedStatus(initialStatus);
   }, [initialStatus]);
 
   // Calendar Year/Month (Defaults to July 2026 - Simulated current date)
@@ -94,25 +109,76 @@ export default function InterventionsManager({
     return day === 0 ? 6 : day - 1; // Align Monday as first day of week
   };
 
+  // Toast Notifications state (Simulated)
+  const [toastNotification, setToastNotification] = useState<{ id: string; text: string; type: "info" | "success" | "warning" } | null>(null);
+
+  const showToast = (text: string, type: "info" | "success" | "warning" = "info") => {
+    setToastNotification({ id: String(Date.now()), text, type });
+  };
+
+  useEffect(() => {
+    if (toastNotification) {
+      const timer = setTimeout(() => {
+        setToastNotification(null);
+      }, 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [toastNotification]);
+
   // Form states
   const [showForm, setShowForm] = useState(false);
   const [selectedEqCode, setSelectedEqCode] = useState("");
   const [newType, setNewType] = useState<InterventionType>("Correctif");
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
-  const [newDate, setNewDate] = useState("2026-07-01");
+  const [newDate, setNewDate] = useState("2026-07-21");
   const [newDuration, setNewDuration] = useState<number>(2.5);
   const [newCostLabor, setNewCostLabor] = useState<number>(150);
   const [newTechnician, setNewTechnician] = useState("");
-  const [newStatus, setNewStatus] = useState<InterventionStatus>("Planifié");
+  const [newStatus, setNewStatus] = useState<InterventionStatus>("Planifiée");
   const [newNotes, setNewNotes] = useState("");
   const [newExecutorType, setNewExecutorType] = useState<"Interne" | "Externe">("Interne");
   const [newExternalProvider, setNewExternalProvider] = useState("");
+  const [newPriority, setNewPriority] = useState<"Faible" | "Moyenne" | "Haute" | "Critique">("Moyenne");
 
   // Spare parts select list for form
   const [formPartsUsed, setFormPartsUsed] = useState<PartUsed[]>([]);
   const [selectedPartToAdd, setSelectedPartToAdd] = useState("");
   const [partQtyToAdd, setPartQtyToAdd] = useState<number>(1);
+
+  // Inspection sub-sheet checklist & signature controls
+  const [activeChecklist, setActiveChecklist] = useState<Record<string, boolean>>({});
+  const [signatureName, setSignatureName] = useState("");
+  const [realMinutesValue, setRealMinutesValue] = useState<number>(120);
+  const [inspectedPhotos, setInspectedPhotos] = useState<string[]>([]);
+
+  // Default technical checklists depending on type
+  const DEFAULT_CHECKLISTS = {
+    Correctif: [
+      "Consigner l'équipement électriquement & pneumatiquement",
+      "Diagnostiquer la source de défaillance / code d'erreur",
+      "Remplacer les composants défectueux par des pièces certifiées",
+      "Effectuer des tests de pression ou de rotation manuelle",
+      "Tester les organes de sécurité et d'arrêt d'urgence",
+      "Nettoyer la zone et enlever les consignations"
+    ],
+    Préventif: [
+      "Contrôler le niveau de fluide hydraulique / lubrifiant",
+      "Vérifier le serrage mécanique des fixations et ancrages",
+      "Nettoyer ou remplacer les filtres à air comprimé",
+      "Mesurer la tension électrique de l'alimentation phase-neutre",
+      "S'assurer du bon fonctionnement des capteurs de fin de course",
+      "Renseigner la fiche d'intervention"
+    ],
+    Réglementaire: [
+      "Vérifier la validité du certificat de conformité",
+      "Inspecter visuellement l'état des câbles et poulies de levage",
+      "Tester la redondance des systèmes de blocage antichute",
+      "Faire un essai en charge nominale maximale",
+      "Vérifier la signalétique de danger et capacité de charge",
+      "Enregistrer les observations pour le rapport officiel Apave"
+    ]
+  };
 
   // Filtered interventions
   const filteredInterventions = useMemo(() => {
@@ -125,10 +191,42 @@ export default function InterventionsManager({
 
       const matchesType = selectedType === "All" || int.type === selectedType;
       const matchesStatus = selectedStatus === "All" || int.status === selectedStatus;
+      
+      const pLevel = int.priority || "Moyenne";
+      const matchesPriority = selectedPriority === "All" || pLevel === selectedPriority;
 
-      return matchesSearch && matchesType && matchesStatus;
+      return matchesSearch && matchesType && matchesStatus && matchesPriority;
     });
-  }, [interventions, searchQuery, selectedType, selectedStatus]);
+  }, [interventions, searchQuery, selectedType, selectedStatus, selectedPriority]);
+
+  const selectedIntervention = useMemo(() => {
+    return interventions.find((i) => i.id === selectedIntId) || null;
+  }, [interventions, selectedIntId]);
+
+  // Load checklist, photos, and real duration when selectedIntervention changes
+  useEffect(() => {
+    if (selectedIntervention) {
+      // Setup checklist
+      const initial: Record<string, boolean> = {};
+      const items = selectedIntervention.checklist || (DEFAULT_CHECKLISTS[selectedIntervention.type as keyof typeof DEFAULT_CHECKLISTS] || DEFAULT_CHECKLISTS.Correctif).map(t => ({ task: t, done: false }));
+      items.forEach((item) => {
+        const taskName = typeof item === "string" ? item : (item as any).task;
+        const isDone = typeof item === "string" 
+          ? (selectedIntervention.status === "Terminée" || selectedIntervention.status === "Clôturée")
+          : (item as any).done;
+        initial[taskName] = isDone;
+      });
+      setActiveChecklist(initial);
+
+      // Setup other details
+      const sigName = typeof selectedIntervention.signature === "string" 
+        ? selectedIntervention.signature 
+        : selectedIntervention.signature?.name || "";
+      setSignatureName(sigName);
+      setRealMinutesValue(selectedIntervention.realDurationMinutes || (selectedIntervention.durationHours * 60));
+      setInspectedPhotos(selectedIntervention.photos || []);
+    }
+  }, [selectedIntervention]);
 
   // Total Intervention Costs in historical view
   const aggregateCosts = useMemo(() => {
@@ -177,17 +275,6 @@ export default function InterventionsManager({
       return;
     }
 
-    // Verify stock availability for each part used
-    for (const pUsed of formPartsUsed) {
-      const partInStock = spareParts.find((sp) => sp.code === pUsed.partCode);
-      if (partInStock && partInStock.currentStock < pUsed.quantity) {
-        alert(
-          `Quantité insuffisante pour la pièce ${partInStock.name} (Stock actuel: ${partInStock.currentStock}, Demandé: ${pUsed.quantity})`
-        );
-        return;
-      }
-    }
-
     const created: Intervention = {
       id: `INT-2026-${String(interventions.length + 1).padStart(3, "0")}`,
       equipmentCode: selectedEqCode,
@@ -196,18 +283,22 @@ export default function InterventionsManager({
       description: newDesc,
       dateIntervention: newDate,
       durationHours: Number(newDuration),
-      costParts: calculatedPartsCost,
+      costParts: 0,
       costLabor: Number(newCostLabor),
       technician: newTechnician,
       status: newStatus,
-      partsUsed: formPartsUsed,
+      partsUsed: [],
       notes: newNotes,
       executorType: newExecutorType,
-      externalProvider: newExecutorType === "Externe" ? newExternalProvider : undefined
+      externalProvider: newExecutorType === "Externe" ? newExternalProvider : undefined,
+      priority: newPriority,
+      checklist: (DEFAULT_CHECKLISTS[newType as keyof typeof DEFAULT_CHECKLISTS] || DEFAULT_CHECKLISTS.Correctif).map(t => ({ task: t, done: false }))
     };
 
     onAddIntervention(created);
     setShowForm(false);
+    
+    showToast(`Bon de travail ${created.id} émis pour ${created.equipmentCode}.`, "success");
 
     // Reset Form
     setSelectedEqCode("");
@@ -218,12 +309,87 @@ export default function InterventionsManager({
     setFormPartsUsed([]);
     setNewExecutorType("Interne");
     setNewExternalProvider("");
+    setNewPriority("Moyenne");
+  };
+
+  // Change Status of Intervention
+  const handleStatusTransition = (id: string, st: InterventionStatus) => {
+    onUpdateInterventionStatus(id, st);
+    showToast(`Bon d'intervention ${id} passé en état : ${st}`, "info");
+  };
+
+  // Save the full checklist, signature, and real minutes inside the details sheet
+  const handleSaveInspectionReport = (isValidationAndClosure = false) => {
+    if (!selectedIntervention || !onUpdateIntervention) return;
+
+    // Build list of checklist items with their done status
+    const formattedChecklist = Object.entries(activeChecklist).map(([task, done]) => ({
+      task,
+      done
+    }));
+
+    // Auto-fill signature name with assigned technician if blank for rapid closure
+    const finalSigName = signatureName.trim() || selectedIntervention.technician || "Ahmed Amine";
+
+    const updatedInt: Intervention = {
+      ...selectedIntervention,
+      status: isValidationAndClosure ? "Clôturée" : selectedIntervention.status,
+      realDurationMinutes: realMinutesValue,
+      signature: {
+        name: finalSigName,
+        date: new Date().toLocaleDateString("fr-FR"),
+        dataUrl: undefined
+      } as any,
+      validationBy: isValidationAndClosure ? finalSigName : selectedIntervention.validationBy,
+      photos: inspectedPhotos,
+      checklist: formattedChecklist
+    };
+
+    onUpdateIntervention(updatedInt);
+    showToast(
+      isValidationAndClosure
+        ? `Bon ${selectedIntervention.id} validé & clôturé réglementairement.`
+        : "Fiche d'intervention enregistrée temporairement.",
+      "success"
+    );
+
+    if (isValidationAndClosure) {
+      setSelectedIntId(null);
+    }
+  };
+
+  const handleUploadPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const url = event.target.result as string;
+        setInspectedPhotos([url, ...inspectedPhotos]);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast simulated notifications center */}
+      {toastNotification && (
+        <div className="fixed top-4 right-4 z-50 p-4 bg-neutral-900 text-white rounded-xl shadow-2xl flex items-center gap-3 max-w-sm border border-neutral-700/60 animate-bounce">
+          <div className="h-2 w-2 rounded-full bg-chery-red animate-ping shrink-0" />
+          <Bell className="h-4 w-4 text-chery-red shrink-0" />
+          <div className="text-xs">
+            <span className="font-bold block">Notification GMAO</span>
+            <p className="text-[11px] text-neutral-300 mt-0.5">{toastNotification.text}</p>
+          </div>
+          <button onClick={() => setToastNotification(null)} className="p-0.5 rounded-full hover:bg-neutral-800 text-neutral-400 cursor-pointer shrink-0">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Top statistics summary panel */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded-xl border border-neutral-100 shadow-xs">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-xl border border-neutral-100 shadow-xs">
         <div className="p-3 bg-neutral-50 rounded-lg text-xs">
           <span className="text-neutral-400 block font-semibold uppercase">Total Bons de Travail</span>
           <span className="text-xl font-extrabold text-neutral-800 font-mono mt-0.5">
@@ -237,7 +403,7 @@ export default function InterventionsManager({
         <div className="p-3 bg-neutral-50 rounded-lg text-xs">
           <span className="text-neutral-400 block font-semibold uppercase">Coût cumulé M.O.</span>
           <span className="text-xl font-extrabold text-neutral-800 font-mono mt-0.5">
-            {aggregateCosts.labor.toLocaleString()} TND
+            {(aggregateCosts.labor ?? 0).toLocaleString()} TND
           </span>
           <span className="text-[10px] text-neutral-400 block mt-0.5">
             Temps de travail facturé
@@ -247,10 +413,20 @@ export default function InterventionsManager({
         <div className="p-3 bg-neutral-50 rounded-lg text-xs">
           <span className="text-neutral-400 block font-semibold uppercase">Dépenses Pièces Détachées</span>
           <span className="text-xl font-extrabold text-neutral-800 font-mono mt-0.5">
-            {aggregateCosts.parts.toLocaleString()} TND
+            {(aggregateCosts.parts ?? 0).toLocaleString()} TND
           </span>
           <span className="text-[10px] text-neutral-400 block mt-0.5">
             Consommation réelle du magasin
+          </span>
+        </div>
+
+        <div className="p-3 bg-neutral-50 rounded-lg text-xs">
+          <span className="text-neutral-400 block font-semibold uppercase">Clôturées / En cours</span>
+          <span className="text-xl font-extrabold text-neutral-800 font-mono mt-0.5">
+            {interventions.filter((i) => i.status === "Clôturée").length} / {interventions.filter((i) => i.status === "En cours").length}
+          </span>
+          <span className="text-[10px] text-neutral-400 block mt-0.5">
+            Taux de résolution global de la STA
           </span>
         </div>
       </div>
@@ -268,12 +444,11 @@ export default function InterventionsManager({
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          {/* Type Filter */}
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
           <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
-            className="border border-neutral-200 rounded-lg text-xs py-2 px-3 bg-white outline-none font-medium cursor-pointer"
+            className="border border-neutral-200 rounded-lg text-xs py-2 px-2 bg-white outline-none font-medium cursor-pointer"
           >
             <option value="All">Tous les Types</option>
             <option value="Préventif">Préventif</option>
@@ -281,20 +456,33 @@ export default function InterventionsManager({
             <option value="Réglementaire">Réglementaire</option>
           </select>
 
-          {/* Status Filter */}
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="border border-neutral-200 rounded-lg text-xs py-2 px-3 bg-white outline-none font-medium cursor-pointer"
+            className="border border-neutral-200 rounded-lg text-xs py-2 px-2 bg-white outline-none font-medium cursor-pointer"
           >
             <option value="All">Tous les Statuts</option>
-            <option value="Planifié">Planifié</option>
+            <option value="Nouvelle">Nouvelle</option>
+            <option value="Planifiée">Planifiée</option>
             <option value="En cours">En cours</option>
-            <option value="Terminé">Terminé</option>
-            <option value="Annulé">Annulé</option>
+            <option value="En attente">En attente</option>
+            <option value="Terminée">Terminée</option>
+            <option value="Clôturée">Clôturée</option>
+            <option value="Annulée">Annulée</option>
           </select>
 
-          {/* View Toggle */}
+          <select
+            value={selectedPriority}
+            onChange={(e) => setSelectedPriority(e.target.value)}
+            className="border border-neutral-200 rounded-lg text-xs py-2 px-2 bg-white outline-none font-medium cursor-pointer font-bold"
+          >
+            <option value="All">Toutes Priorités</option>
+            <option value="Faible">Faible</option>
+            <option value="Moyenne">Moyenne</option>
+            <option value="Haute">Haute</option>
+            <option value="Critique">Critique</option>
+          </select>
+
           <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg border border-neutral-200/50">
             <button
               type="button"
@@ -321,7 +509,7 @@ export default function InterventionsManager({
           {!isReadOnly && (
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer ml-auto md:ml-0"
+              className="flex items-center gap-1.5 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2 px-4 rounded-lg shadow-sm cursor-pointer whitespace-nowrap"
             >
               <Plus className="h-3.5 w-3.5" />
               Nouveau Bon
@@ -330,370 +518,544 @@ export default function InterventionsManager({
         </div>
       </div>
 
-      {/* Interventions Content Toggle */}
-      {viewMode === "list" ? (
-        <div className="bg-white rounded-xl border border-neutral-100 shadow-xs overflow-hidden">
-          <div className="p-4 bg-neutral-50 border-b border-neutral-100">
-            <h3 className="text-sm font-bold text-neutral-700">Registre Historique des Interventions</h3>
-          </div>
-
-          <div className="overflow-x-auto">
-            {filteredInterventions.length === 0 ? (
-              <div className="p-12 text-center text-neutral-400 flex flex-col items-center">
-                <FileText className="h-10 w-10 text-neutral-300 mb-2" />
-                <p className="text-sm font-bold">Aucune intervention</p>
-                <p className="text-xs">Aucune fiche de maintenance ne correspond aux critères de filtres.</p>
+      {/* Main Grid: Left Side Interventions List / Calendar + Right Side Inspector */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2 Columns */}
+        <div className="lg:col-span-2 space-y-4">
+          {viewMode === "list" ? (
+            <div className="bg-white rounded-xl border border-neutral-100 shadow-xs overflow-hidden">
+              <div className="p-4 bg-neutral-50 border-b border-neutral-100 flex justify-between items-center">
+                <h3 className="text-sm font-bold text-neutral-700">Registre Historique des Interventions</h3>
+                <span className="text-[10px] text-neutral-400">Cliquez sur une ligne pour l'inspecter et la signer</span>
               </div>
-            ) : (
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-neutral-100 text-neutral-400 font-semibold uppercase bg-neutral-50/20">
-                    <th className="py-3 px-4">Intervention ID</th>
-                    <th className="py-3 px-4">Équipement</th>
-                    <th className="py-3 px-4">Désignation / Titre</th>
-                    <th className="py-3 px-4">Type</th>
-                    <th className="py-3 px-4 text-center">Date</th>
-                    <th className="py-3 px-4 text-center">Durée</th>
-                    <th className="py-3 px-4 text-right">Pièces (TND)</th>
-                    <th className="py-3 px-4 text-right">Labor (TND)</th>
-                    <th className="py-3 px-4 text-right font-bold">Total (TND)</th>
-                    <th className="py-3 px-4">Intervenant</th>
-                    <th className="py-3 px-4 text-center">Statut</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-50 font-medium">
-                  {filteredInterventions.map((int) => {
-                    const eqName = equipments.find((e) => e.code === int.equipmentCode)?.name || "N/A";
 
-                    return (
-                      <tr key={int.id} className="hover:bg-neutral-50/50 transition-all">
-                        <td className="py-3 px-4 font-mono font-bold text-neutral-400">{int.id}</td>
-                        <td className="py-3 px-4">
-                          <span className="font-bold text-neutral-700 block font-mono">{int.equipmentCode}</span>
-                          <span className="text-[10px] text-neutral-400 truncate max-w-[150px] block">
-                            {eqName}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 max-w-xs">
-                          <span className="font-bold text-neutral-800 block text-[13px]">{int.title}</span>
-                          <span className="text-[10px] text-neutral-400 block mt-0.5 line-clamp-1">
-                            {int.description}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${
-                              int.type === "Correctif"
-                                ? "bg-red-50 text-chery-red"
-                                : int.type === "Préventif"
-                                ? "bg-blue-50 text-blue-600"
-                                : "bg-amber-50 text-amber-700"
-                            }`}
-                          >
-                            {int.type}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center font-mono text-neutral-500">
-                          {int.dateIntervention}
-                        </td>
-                        <td className="py-3 px-4 text-center font-mono text-neutral-500">
-                          {int.durationHours} h
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono text-neutral-600">
-                          {int.costParts.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono text-neutral-600">
-                          {int.costLabor.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-neutral-800">
-                          {(int.costParts + int.costLabor).toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1 text-neutral-800 font-bold">
-                              <User className="h-3 w-3 text-neutral-400" />
-                              <span>{int.technician}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {int.executorType === "Externe" ? (
-                                <span className="px-1.5 py-0.5 rounded-sm text-[8px] font-extrabold uppercase bg-purple-50 text-purple-700 border border-purple-200">
-                                  Externe {int.externalProvider ? `(${int.externalProvider})` : ""}
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.5 rounded-sm text-[8px] font-extrabold uppercase bg-teal-50 text-teal-700 border border-teal-200">
-                                  Interne (STA)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <select
-                            disabled={isReadOnly}
-                            value={int.status}
-                            onChange={(e) =>
-                              onUpdateInterventionStatus(int.id, e.target.value as InterventionStatus)
-                            }
-                            className={`text-[11px] font-bold py-1 px-1.5 rounded-md border cursor-pointer outline-none disabled:cursor-not-allowed disabled:opacity-80 ${
-                              int.status === "Terminé"
-                                ? "bg-green-50 border-green-200 text-green-700"
-                                : int.status === "En cours"
-                                ? "bg-blue-50 border-blue-200 text-blue-700"
-                                : int.status === "Planifié"
-                                ? "bg-amber-50 border-amber-200 text-amber-700"
-                                : "bg-neutral-50 border-neutral-200 text-neutral-400"
-                            }`}
-                          >
-                            <option value="Planifié">Planifié</option>
-                            <option value="En cours">En cours</option>
-                            <option value="Terminé">Terminé</option>
-                            <option value="Annulé">Annulé</option>
-                          </select>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      ) : (
-        /* Calendar View container with interactive list on click */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left 2 columns: The beautiful Monthly Calendar grid */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-neutral-100 shadow-xs p-5 space-y-4">
-            <div className="flex justify-between items-center border-b border-neutral-100 pb-3">
-              <div className="flex items-center gap-2">
-                <CalendarRange className="h-4 w-4 text-chery-red" />
-                <h3 className="text-sm font-bold text-neutral-800">
-                  Planification Mensuelle : {MONTHS_FR[calMonth]} {calYear}
-                </h3>
-              </div>
-              {/* Nav Controls */}
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (calMonth === 0) {
-                      setCalMonth(11);
-                      setCalYear((y) => y - 1);
-                    } else {
-                      setCalMonth((m) => m - 1);
-                    }
-                  }}
-                  className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-500 hover:text-neutral-800 cursor-pointer"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCalYear(2026);
-                    setCalMonth(6); // Return to default July 2026
-                    setSelectedCalDate("2026-07-01");
-                  }}
-                  className="text-[10px] font-bold px-2 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded cursor-pointer"
-                >
-                  Aujourd'hui
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (calMonth === 11) {
-                      setCalMonth(0);
-                      setCalYear((y) => y + 1);
-                    } else {
-                      setCalMonth((m) => m + 1);
-                    }
-                  }}
-                  className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-500 hover:text-neutral-800 cursor-pointer"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Calendar Day grid */}
-            <div className="grid grid-cols-7 gap-1.5 text-center text-xs">
-              {/* Days headers */}
-              {DAYS_OF_WEEK.map((day) => (
-                <div key={day} className="py-1 font-bold text-neutral-400 uppercase text-[10px]">
-                  {day}
-                </div>
-              ))}
-
-              {/* Grid cells */}
-              {(() => {
-                const totalDays = getDaysInMonth(calYear, calMonth);
-                const firstDayIdx = getFirstDayOfMonth(calYear, calMonth);
-                const blanks = Array(firstDayIdx).fill(null);
-                const days = Array.from({ length: totalDays }, (_, i) => i + 1);
-                const cells = [...blanks, ...days];
-
-                return cells.map((cell, idx) => {
-                  if (cell === null) {
-                    return <div key={`blank-${idx}`} className="bg-neutral-50/20 rounded-lg h-20" />;
-                  }
-
-                  const dayNum = cell;
-                  const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-                  const dayInts = filteredInterventions.filter((i) => i.dateIntervention === dateStr);
-                  const isSelected = selectedCalDate === dateStr;
-                  const isToday = dateStr === "2026-07-01"; // simulated current date
-
-                  return (
-                    <div
-                      key={`day-${dayNum}`}
-                      onClick={() => setSelectedCalDate(dateStr)}
-                      className={`h-20 p-1.5 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden select-none ${
-                        isSelected
-                          ? "border-chery-red bg-red-50/10 shadow-xs"
-                          : isToday
-                          ? "border-neutral-800 bg-neutral-50 font-bold"
-                          : "border-neutral-100 hover:border-neutral-300 bg-white"
-                      }`}
-                    >
-                      {/* Day number */}
-                      <div className="flex justify-between items-center">
-                        <span className={`text-[11px] font-mono ${isToday ? "text-neutral-900 font-extrabold" : "text-neutral-500 font-semibold"}`}>
-                          {dayNum}
-                        </span>
-                        {isToday && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-chery-red block" title="Aujourd'hui" />
-                        )}
-                      </div>
-
-                      {/* Miniature tags or indicator dots */}
-                      <div className="space-y-0.5 max-h-[48px] overflow-hidden">
-                        {dayInts.slice(0, 2).map((int) => (
-                          <div
-                            key={int.id}
-                            className={`text-[8px] px-1 py-0.5 rounded-xs font-bold truncate leading-tight ${
-                              int.type === "Préventif"
-                                ? "bg-green-100 text-green-800"
-                                : int.type === "Correctif"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                            title={`${int.id}: ${int.title}`}
-                          >
-                            {int.type === "Préventif" ? "PRV" : int.type === "Correctif" ? "COR" : "REG"}: {int.title}
-                          </div>
-                        ))}
-                        {dayInts.length > 2 && (
-                          <div className="text-[7px] font-extrabold text-neutral-400 text-center uppercase">
-                            + {dayInts.length - 2} travaux
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </div>
-
-          {/* Right 1 column: Selected day's task list & details */}
-          <div className="bg-white rounded-xl border border-neutral-100 p-5 shadow-xs space-y-4">
-            <div className="border-b border-neutral-100 pb-3">
-              <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">
-                Plan du Jour sélectionné
-              </h3>
-              <span className="text-sm font-extrabold text-neutral-800 font-mono mt-0.5 block">
-                {selectedCalDate.split("-").reverse().join("/")}
-              </span>
-            </div>
-
-            {/* List of interventions on selected day */}
-            {(() => {
-              const dayInts = filteredInterventions.filter((i) => i.dateIntervention === selectedCalDate);
-
-              if (dayInts.length === 0) {
-                return (
-                  <div className="py-12 text-center text-neutral-400 flex flex-col items-center">
-                    <CheckCircle className="h-8 w-8 text-neutral-300 mb-1.5" />
-                    <p className="text-xs font-bold">Aucune maintenance</p>
-                    <p className="text-[10px]">Aucun travail planifié pour cette date.</p>
+              <div className="overflow-x-auto">
+                {filteredInterventions.length === 0 ? (
+                  <div className="p-12 text-center text-neutral-400 flex flex-col items-center">
+                    <FileText className="h-10 w-10 text-neutral-300 mb-2" />
+                    <p className="text-sm font-bold">Aucune intervention</p>
+                    <p className="text-xs">Aucune fiche de maintenance ne correspond aux critères de filtres.</p>
                   </div>
-                );
-              }
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-neutral-100 text-neutral-400 font-semibold uppercase bg-neutral-50/20 text-[10px]">
+                        <th className="py-3 px-4">ID</th>
+                        <th className="py-3 px-4">Équipement</th>
+                        <th className="py-3 px-4">Désignation / Titre</th>
+                        <th className="py-3 px-4">Prio.</th>
+                        <th className="py-3 px-4">Type</th>
+                        <th className="py-3 px-4 text-center">Date</th>
+                        <th className="py-3 px-4 text-right font-bold">Total (TND)</th>
+                        <th className="py-3 px-4">Intervenant</th>
+                        <th className="py-3 px-4 text-center">Statut</th>
+                        <th className="py-3 px-4 text-center">PDF</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-50 font-medium">
+                      {filteredInterventions.map((int) => {
+                        const eqName = equipments.find((e) => e.code === int.equipmentCode)?.name || "N/A";
+                        const isSelected = selectedIntId === int.id;
+                        const pLevel = int.priority || "Moyenne";
 
-              return (
-                <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
-                  {dayInts.map((int) => {
-                    const eq = equipments.find((e) => e.code === int.equipmentCode);
+                        return (
+                          <tr
+                            key={int.id}
+                            onClick={() => setSelectedIntId(int.id)}
+                            className={`hover:bg-neutral-50/50 transition-all cursor-pointer ${
+                              isSelected ? "bg-red-50/10 border-l-2 border-l-chery-red" : ""
+                            }`}
+                          >
+                            <td className="py-3 px-4 font-mono font-bold text-neutral-400">{int.id}</td>
+                            <td className="py-3 px-4">
+                              <span className="font-bold text-neutral-700 block font-mono">{int.equipmentCode}</span>
+                              <span className="text-[10px] text-neutral-400 truncate max-w-[150px] block">
+                                {eqName}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 max-w-xs">
+                              <span className="font-bold text-neutral-800 block text-[13px]">{int.title}</span>
+                              <span className="text-[10px] text-neutral-400 block mt-0.5 line-clamp-1">
+                                {int.description}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${
+                                  pLevel === "Critique"
+                                    ? "bg-red-100 text-chery-red animate-pulse"
+                                    : pLevel === "Haute"
+                                    ? "bg-orange-50 text-orange-600"
+                                    : pLevel === "Faible"
+                                    ? "bg-neutral-100 text-neutral-500"
+                                    : "bg-amber-50 text-amber-700"
+                                }`}
+                              >
+                                {pLevel}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${
+                                  int.type === "Correctif"
+                                    ? "bg-red-50 text-chery-red"
+                                    : int.type === "Préventif"
+                                    ? "bg-blue-50 text-blue-600"
+                                    : "bg-purple-50 text-purple-700"
+                                }`}
+                              >
+                                {int.type}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center font-mono text-neutral-500">
+                              {int.dateIntervention}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-neutral-800">
+                              {((int.costParts || 0) + (int.costLabor || 0)).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1 text-neutral-800 font-bold">
+                                  <User className="h-3 w-3 text-neutral-400" />
+                                  <span>{int.technician}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span
+                                className={`text-[10px] font-bold py-1 px-2 rounded-full border ${
+                                  int.status === "Clôturée"
+                                    ? "bg-green-100 border-green-200 text-green-800"
+                                    : int.status === "Terminée"
+                                    ? "bg-teal-50 border-teal-200 text-teal-700"
+                                    : int.status === "En cours"
+                                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                                    : int.status === "Planifiée" || int.status === "Planifié"
+                                    ? "bg-amber-50 border-amber-200 text-amber-700"
+                                    : "bg-neutral-50 border-neutral-200 text-neutral-400"
+                                }`}
+                              >
+                                {int.status}
+                              </span>
+                            </td>
+                            <td className="py-2 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => {
+                                  const associatedEquipment = equipments.find((eq) => eq.code === int.equipmentCode) || {
+                                    code: int.equipmentCode,
+                                    name: "Équipement Non Référencé",
+                                    workshop: "Atelier Diagnostic",
+                                    status: "Opérationnel",
+                                    purchaseDate: "2026-01-01",
+                                    warrantyEnd: "2028-12-31",
+                                    purchasePrice: 15000,
+                                    location: "Ligne A",
+                                    serialNumber: "SN-999-TEMP",
+                                    critical: false,
+                                    mtbfTargetHours: 250,
+                                    mttrTargetHours: 4
+                                  };
+                                  generateInterventionReportPDF(int, associatedEquipment as any);
+                                }}
+                                title="Télécharger le bon en PDF"
+                                className="p-1 hover:bg-red-50 text-neutral-400 hover:text-chery-red rounded transition-colors cursor-pointer inline-flex items-center justify-center"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Calendar Grid view */
+            <div className="bg-white rounded-xl border border-neutral-100 p-5 space-y-4">
+              <div className="flex justify-between items-center border-b border-neutral-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <CalendarRange className="h-4 w-4 text-chery-red" />
+                  <h3 className="text-sm font-bold text-neutral-800">
+                    Planification Mensuelle : {MONTHS_FR[calMonth]} {calYear}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (calMonth === 0) {
+                        setCalMonth(11);
+                        setCalYear((y) => y - 1);
+                      } else {
+                        setCalMonth((m) => m - 1);
+                      }
+                    }}
+                    className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-500 hover:text-neutral-800 cursor-pointer"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCalYear(2026);
+                      setCalMonth(6);
+                      setSelectedCalDate("2026-07-21");
+                    }}
+                    className="text-[10px] font-bold px-2 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded cursor-pointer"
+                  >
+                    Aujourd'hui
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (calMonth === 11) {
+                        setCalMonth(0);
+                        setCalYear((y) => y + 1);
+                      } else {
+                        setCalMonth((m) => m + 1);
+                      }
+                    }}
+                    className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-500 hover:text-neutral-800 cursor-pointer"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Day grids */}
+              <div className="grid grid-cols-7 gap-1.5 text-center text-xs">
+                {DAYS_OF_WEEK.map((day) => (
+                  <div key={day} className="py-1 font-bold text-neutral-400 uppercase text-[10px]">
+                    {day}
+                  </div>
+                ))}
+
+                {(() => {
+                  const totalDays = getDaysInMonth(calYear, calMonth);
+                  const firstDayIdx = getFirstDayOfMonth(calYear, calMonth);
+                  const blanks = Array(firstDayIdx).fill(null);
+                  const days = Array.from({ length: totalDays }, (_, i) => i + 1);
+                  const cells = [...blanks, ...days];
+
+                  return cells.map((cell, idx) => {
+                    if (cell === null) return <div key={`blank-${idx}`} className="bg-neutral-50/20 rounded-lg h-20" />;
+
+                    const dayNum = cell;
+                    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                    const dayInts = filteredInterventions.filter((i) => i.dateIntervention === dateStr);
+                    const isSelected = selectedCalDate === dateStr;
+                    const isToday = dateStr === "2026-07-21";
+
                     return (
                       <div
-                        key={int.id}
-                        className="p-3.5 rounded-xl border border-neutral-100 bg-neutral-50/50 space-y-2.5 relative hover:border-neutral-200 transition-all text-xs"
+                        key={`day-${dayNum}`}
+                        onClick={() => {
+                          setSelectedCalDate(dateStr);
+                          if (dayInts.length > 0) {
+                            setSelectedIntId(dayInts[0].id);
+                          }
+                        }}
+                        className={`h-20 p-1.5 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden select-none ${
+                          isSelected
+                            ? "border-chery-red bg-red-50/10 shadow-xs"
+                            : isToday
+                            ? "border-neutral-800 bg-neutral-50 font-bold"
+                            : "border-neutral-100 hover:border-neutral-300 bg-white"
+                        }`}
                       >
-                        <div className="flex justify-between items-start">
-                          <span className="font-mono font-bold text-neutral-400 text-[10px]">{int.id}</span>
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
-                              int.type === "Préventif"
-                                ? "bg-green-100 text-green-800"
-                                : int.type === "Correctif"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {int.type}
+                        <div className="flex justify-between items-center">
+                          <span className={`text-[11px] font-mono ${isToday ? "text-neutral-900 font-extrabold" : "text-neutral-500 font-semibold"}`}>
+                            {dayNum}
                           </span>
+                          {isToday && <span className="h-1.5 w-1.5 rounded-full bg-chery-red block" />}
                         </div>
 
-                        <div className="space-y-0.5">
-                          <h4 className="font-bold text-neutral-800 text-xs leading-tight">
-                            {int.title}
-                          </h4>
-                          <span className="text-[10px] text-neutral-500 block font-semibold">
-                            Équipement : {eq ? eq.name : int.equipmentCode} ({eq?.workshop})
-                          </span>
+                        <div className="space-y-0.5 max-h-[48px] overflow-hidden">
+                          {dayInts.slice(0, 2).map((int) => (
+                            <div
+                              key={int.id}
+                              className={`text-[8px] px-1 py-0.5 rounded-xs font-bold truncate leading-tight ${
+                                int.type === "Préventif"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : int.type === "Correctif"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-purple-100 text-purple-800"
+                              }`}
+                              title={`${int.id}: ${int.title}`}
+                            >
+                              {int.type === "Préventif" ? "PRV" : int.type === "Correctif" ? "COR" : "REG"}: {int.title}
+                            </div>
+                          ))}
+                          {dayInts.length > 2 && (
+                            <div className="text-[7px] font-extrabold text-neutral-400 text-center uppercase">
+                              + {dayInts.length - 2} travaux
+                            </div>
+                          )}
                         </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
+        </div>
 
-                        <p className="text-[10px] text-neutral-400 leading-normal line-clamp-2">
-                          {int.description}
-                        </p>
+        {/* Right Column: High Fidelity Intervention & Signature Inspector Sheet */}
+        <div className="lg:col-span-1">
+          {selectedIntervention ? (
+            <div className="bg-white rounded-xl border border-neutral-100 p-5 shadow-sm space-y-4 sticky top-6">
+              {/* Header block */}
+              <div className="flex justify-between items-start pb-3 border-b border-neutral-100">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 font-mono">
+                    <span>{selectedIntervention.id}</span>
+                    <span>•</span>
+                    <span className="font-bold text-neutral-600 uppercase bg-neutral-100 px-1 rounded">{selectedIntervention.type}</span>
+                  </div>
+                  <h3 className="text-base font-black text-neutral-800 mt-1 leading-tight">
+                    {selectedIntervention.title}
+                  </h3>
+                  <span className="text-xs text-neutral-400 font-semibold block mt-1 font-mono">
+                    Équipement: {selectedIntervention.equipmentCode}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelectedIntId(null)}
+                  className="p-1.5 rounded-full hover:bg-neutral-100 text-neutral-400 shrink-0 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
 
-                        <div className="flex justify-between items-center text-[10px] font-bold text-neutral-500 pt-2 border-t border-neutral-100">
-                          <span className="flex flex-col gap-0.5">
-                            <span className="flex items-center gap-1">
-                              <User className="h-3 w-3 text-neutral-400" />
-                              {int.technician}
-                            </span>
-                            <span className="text-[8px] uppercase tracking-wider font-extrabold text-neutral-400">
-                              {int.executorType === "Externe" ? `Ext (${int.externalProvider || "Prestataire"})` : "Int (STA)"}
-                            </span>
-                          </span>
-                          <select
-                            disabled={isReadOnly}
-                            value={int.status}
-                            onChange={(e) =>
-                              onUpdateInterventionStatus(int.id, e.target.value as InterventionStatus)
-                            }
-                            className={`text-[10px] font-bold py-0.5 px-1 rounded cursor-pointer outline-none border disabled:cursor-not-allowed disabled:opacity-80 ${
-                              int.status === "Terminé"
-                                ? "bg-green-50 border-green-200 text-green-700"
-                                : int.status === "En cours"
-                                ? "bg-blue-50 border-blue-200 text-blue-700"
-                                : "bg-amber-50 border-amber-200 text-amber-700"
-                            }`}
-                          >
-                            <option value="Planifié">Planifié</option>
-                            <option value="En cours">En cours</option>
-                            <option value="Terminé">Terminé</option>
-                          </select>
-                        </div>
+              {/* PDF Download Button */}
+              <button
+                onClick={() => {
+                  const associatedEquipment = equipments.find((eq) => eq.code === selectedIntervention.equipmentCode) || {
+                    code: selectedIntervention.equipmentCode,
+                    name: "Équipement Non Référencé",
+                    workshop: "Atelier Diagnostic",
+                    status: "Opérationnel",
+                    purchaseDate: "2026-01-01",
+                    warrantyEnd: "2028-12-31",
+                    purchasePrice: 15000,
+                    location: "Ligne A",
+                    serialNumber: "SN-999-TEMP",
+                    critical: false,
+                    mtbfTargetHours: 250,
+                    mttrTargetHours: 4
+                  };
+                  generateInterventionReportPDF(selectedIntervention, associatedEquipment as any);
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-neutral-900 hover:bg-neutral-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-xs cursor-pointer transition-all border border-neutral-800"
+              >
+                <Download className="h-4 w-4 text-chery-red" />
+                Télécharger le Rapport PDF
+              </button>
+
+              {/* Live Status Control inside details */}
+              <div className="space-y-1 bg-neutral-50 p-3 rounded-lg border border-neutral-100">
+                <span className="text-[9px] text-neutral-400 uppercase tracking-wider block font-bold">Flux de Statut Actuel</span>
+                <div className="grid grid-cols-3 gap-1 pt-1 text-[10px]">
+                  {["Nouvelle", "Planifiée", "En cours", "En attente", "Terminée", "Clôturée"].map((st) => {
+                    const isActive = selectedIntervention.status === st;
+                    return (
+                      <button
+                        key={st}
+                        onClick={() => handleStatusTransition(selectedIntervention.id, st as any)}
+                        disabled={isReadOnly || selectedIntervention.status === "Clôturée"}
+                        className={`py-1 px-1.5 rounded font-bold border text-center transition-all cursor-pointer ${
+                          isActive
+                            ? "bg-chery-red border-chery-red text-white"
+                            : "bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Description and Technician Specs */}
+              <div className="text-xs space-y-2">
+                <div className="bg-neutral-50 p-3 rounded-lg">
+                  <span className="font-bold text-neutral-500 block">Symptômes & Consignes :</span>
+                  <p className="text-neutral-600 mt-0.5 leading-relaxed text-[11px]">{selectedIntervention.description}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 p-3 border border-neutral-100 rounded-lg">
+                  <div>
+                    <span className="text-[10px] text-neutral-400 block">Technicien</span>
+                    <span className="font-bold text-neutral-700 flex items-center gap-1 mt-0.5">
+                      <User className="h-3 w-3 text-neutral-400" />
+                      {selectedIntervention.technician}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-neutral-400 block">Exécuteur</span>
+                    <span className="font-bold text-neutral-700 uppercase block mt-0.5">
+                      {selectedIntervention.executorType || "Interne"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Technical Checklist (Check-list optionnelle) */}
+              <div className="space-y-2.5 bg-neutral-50/50 p-3.5 rounded-xl border border-neutral-100">
+                <div className="flex justify-between items-center border-b border-neutral-200/50 pb-1.5">
+                  <h4 className="font-bold text-neutral-700 flex items-center gap-1.5 text-xs">
+                    <ClipboardList className="h-4 w-4 text-chery-red" />
+                    Check-list Technique de Contrôle
+                  </h4>
+                  <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider">Optionnel</span>
+                </div>
+                
+                <div className="space-y-2 max-h-44 overflow-y-auto">
+                  {Object.keys(activeChecklist).map((item) => {
+                    const checked = activeChecklist[item];
+                    return (
+                      <div
+                        key={item}
+                        onClick={() => {
+                          if (selectedIntervention.status === "Clôturée") return;
+                          setActiveChecklist({ ...activeChecklist, [item]: !checked });
+                        }}
+                        className={`flex items-start gap-2.5 text-xs cursor-pointer select-none py-1 px-1 rounded hover:bg-white transition-colors ${
+                          checked ? "text-neutral-800" : "text-neutral-400"
+                        }`}
+                      >
+                        {checked ? (
+                          <CheckSquare className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <Square className="h-4 w-4 text-neutral-300 shrink-0 mt-0.5" />
+                        )}
+                        <span className="leading-snug text-[11px]">{item}</span>
                       </div>
                     );
                   })}
                 </div>
-              );
-            })()}
-          </div>
+              </div>
+
+              {/* Real duration settings & photos upload */}
+              <div className="space-y-2 border border-neutral-100 p-3 rounded-lg text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-neutral-500">Durée Réelle (Minutes)</span>
+                  <input
+                    type="number"
+                    value={realMinutesValue}
+                    disabled={selectedIntervention.status === "Clôturée"}
+                    onChange={(e) => setRealMinutesValue(Number(e.target.value))}
+                    className="w-16 border border-neutral-200 rounded p-1 text-center font-mono font-bold"
+                  />
+                </div>
+
+                {/* Photo attachment board */}
+                <div className="space-y-1.5 pt-2 border-t border-neutral-50">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-neutral-500 text-[11px]">Photos Après Travaux ({inspectedPhotos.length})</span>
+                    {selectedIntervention.status !== "Clôturée" && (
+                      <label className="text-[9px] font-black text-chery-red bg-red-50 hover:bg-red-100 px-1.5 py-0.5 rounded cursor-pointer transition-colors">
+                        Ajouter
+                        <input type="file" accept="image/*" className="hidden" onChange={handleUploadPhoto} />
+                      </label>
+                    )}
+                  </div>
+                  
+                  {inspectedPhotos.length > 0 && (
+                    <div className="flex gap-1 overflow-x-auto py-1">
+                      {inspectedPhotos.map((ph, i) => (
+                        <img
+                          key={i}
+                          src={ph}
+                          alt="Preuve"
+                          referrerPolicy="no-referrer"
+                          className="h-10 w-16 object-cover rounded border border-neutral-200 shrink-0 bg-neutral-50"
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Digital validation & Approval (Signature block) */}
+              <div className="space-y-2 bg-neutral-50 p-3.5 rounded-xl border border-neutral-200">
+                <span className="font-bold text-neutral-700 flex items-center gap-1.5 text-xs">
+                  <PenTool className="h-3.5 w-3.5 text-green-600" />
+                  Signer et Clôturer le Bon de Travail
+                </span>
+                
+                {selectedIntervention.status === "Clôturée" ? (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs space-y-1.5">
+                    <div className="flex items-center gap-1 font-bold text-green-800">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                      <span>BON CLÔTURÉ & SIGNÉ</span>
+                    </div>
+                    <p className="text-[10px] text-green-700 font-mono italic">
+                      Approuvé par: <strong>{selectedIntervention.validationBy || "Ahmed Amine"}</strong>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder={`Valideur (par défaut : ${selectedIntervention.technician || "Ahmed Amine"})`}
+                      value={signatureName}
+                      onChange={(e) => setSignatureName(e.target.value)}
+                      className="w-full bg-white border border-neutral-300 rounded p-1.5 text-xs outline-none focus:ring-1 focus:ring-chery-red"
+                    />
+                    
+                    {/* Mock Signature Line */}
+                    <div className="h-12 bg-white border border-dashed border-neutral-300 rounded flex items-center justify-center text-neutral-400 italic text-[10px] relative overflow-hidden select-none">
+                      {signatureName ? (
+                        <span className="font-cursive text-neutral-700 text-sm font-black rotate-[-3deg] uppercase tracking-widest block select-none">
+                          {signatureName}
+                        </span>
+                      ) : (
+                        <span className="text-neutral-500 font-semibold">
+                          ✍️ Signature par défaut : <strong className="text-neutral-700">{selectedIntervention.technician || "Ahmed Amine"}</strong>
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-[10px] text-neutral-400 leading-normal italic">
+                      💡 La check-list est désormais facultative. Laissez le champ vide pour valider au nom du technicien et clôturer en un seul clic !
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveInspectionReport(false)}
+                        className="bg-neutral-200 hover:bg-neutral-300 text-neutral-700 font-semibold py-1.5 rounded text-xs cursor-pointer transition-colors"
+                      >
+                        Sauvegarder Brouillon
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveInspectionReport(true)}
+                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 rounded text-xs cursor-pointer transition-colors flex items-center justify-center gap-1 shadow-sm"
+                      >
+                        <FileCheck className="h-3.5 w-3.5" />
+                        Valider & Clôturer
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-neutral-50 rounded-xl border-2 border-dashed border-neutral-200 p-8 text-center text-neutral-400 flex flex-col items-center justify-center h-full min-h-[350px]">
+              <ClipboardList className="h-8 w-8 text-neutral-300 mb-2" />
+              <p className="text-sm font-bold">Aucune intervention inspectée</p>
+              <p className="text-xs max-w-[200px] mt-1 leading-relaxed">
+                Sélectionnez n'importe quelle intervention à gauche pour afficher sa check-list, ses pièces consommées, et procéder à la signature électronique de clôture.
+              </p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Create Work Order Modal */}
       {showForm && (
@@ -706,7 +1068,7 @@ export default function InterventionsManager({
               </h3>
               <button
                 onClick={() => setShowForm(false)}
-                className="p-1 rounded-full hover:bg-neutral-100 text-neutral-400"
+                className="p-1 rounded-full hover:bg-neutral-100 text-neutral-400 cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -721,7 +1083,7 @@ export default function InterventionsManager({
                     required
                     value={selectedEqCode}
                     onChange={(e) => setSelectedEqCode(e.target.value)}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
                   >
                     <option value="">Sélectionner l'Équipement</option>
                     {equipments.map((eq) => (
@@ -737,7 +1099,7 @@ export default function InterventionsManager({
                   <select
                     value={newType}
                     onChange={(e) => setNewType(e.target.value as InterventionType)}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
                   >
                     <option value="Correctif">Correctif (Panne)</option>
                     <option value="Préventif">Préventif (Planifié)</option>
@@ -747,16 +1109,31 @@ export default function InterventionsManager({
               </div>
 
               {/* Row 2: Title */}
-              <div>
-                <label className="block font-bold text-neutral-600 mb-1">Désignation du Problème / Titre *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ex: Remplacement électrovanne ou Réglage capteur"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-neutral-50/50 outline-none focus:ring-1 focus:ring-chery-red"
-                />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <label className="block font-bold text-neutral-600 mb-1">Désignation du Problème / Titre *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ex: Remplacement électrovanne ou Réglage capteur"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-neutral-50/50 outline-none focus:ring-1 focus:ring-chery-red"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Niveau de Priorité *</label>
+                  <select
+                    value={newPriority}
+                    onChange={(e) => setNewPriority(e.target.value as any)}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none font-bold"
+                  >
+                    <option value="Faible">Faible (Niveau 3)</option>
+                    <option value="Moyenne">Moyenne (Niveau 2)</option>
+                    <option value="Haute">Haute (Crucial)</option>
+                    <option value="Critique">Critique (Bloquant)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Description */}
@@ -767,7 +1144,7 @@ export default function InterventionsManager({
                   placeholder="Expliquez ici ce qui nécessite réparation ou la méthode préventive appliquée"
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-neutral-50/50 outline-none"
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-neutral-50/50 outline-none"
                 />
               </div>
 
@@ -779,7 +1156,7 @@ export default function InterventionsManager({
                     type="date"
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
                   />
                 </div>
                 <div>
@@ -789,7 +1166,7 @@ export default function InterventionsManager({
                     step="0.5"
                     value={newDuration}
                     onChange={(e) => setNewDuration(Number(e.target.value))}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
                   />
                 </div>
                 <div>
@@ -798,7 +1175,7 @@ export default function InterventionsManager({
                     type="number"
                     value={newCostLabor}
                     onChange={(e) => setNewCostLabor(Number(e.target.value))}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
                   />
                 </div>
               </div>
@@ -810,7 +1187,7 @@ export default function InterventionsManager({
                   <select
                     value={newExecutorType}
                     onChange={(e) => setNewExecutorType(e.target.value as "Interne" | "Externe")}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-semibold text-neutral-800"
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none font-semibold text-neutral-800"
                   >
                     <option value="Interne">Nos techniciens (Interne STA)</option>
                     <option value="Externe">Prestataire (Externe)</option>
@@ -826,7 +1203,7 @@ export default function InterventionsManager({
                       placeholder="ex: Weinmann, ABAC, Sotradies..."
                       value={newExternalProvider}
                       onChange={(e) => setNewExternalProvider(e.target.value)}
-                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-medium focus:ring-1 focus:ring-chery-red"
+                      className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none font-medium focus:ring-1 focus:ring-chery-red"
                     />
                   </div>
                 ) : (
@@ -848,7 +1225,7 @@ export default function InterventionsManager({
                     placeholder="ex: Ridha Ben Abdallah ou Agent Technique"
                     value={newTechnician}
                     onChange={(e) => setNewTechnician(e.target.value)}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
                   />
                 </div>
                 <div>
@@ -856,95 +1233,20 @@ export default function InterventionsManager({
                   <select
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value as InterventionStatus)}
-                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
                   >
-                    <option value="Planifié">Planifié</option>
+                    <option value="Nouvelle">Nouvelle</option>
+                    <option value="Planifiée">Planifiée</option>
                     <option value="En cours">En cours</option>
-                    <option value="Terminé">Terminé</option>
                   </select>
                 </div>
               </div>
 
-              {/* Spare Parts Allocator Integration (The cool integration!) */}
-              <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-100 space-y-3">
-                <h4 className="font-bold text-neutral-700 flex items-center gap-1.5 border-b border-neutral-200 pb-1.5">
-                  <Package className="h-3.5 w-3.5 text-neutral-500" />
-                  Prélèvement Pièces du Stock Magasin
-                </h4>
-
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-neutral-500 mb-1">Sélectionner la Pièce</label>
-                    <select
-                      value={selectedPartToAdd}
-                      onChange={(e) => setSelectedPartToAdd(e.target.value)}
-                      className="w-full border border-neutral-200 rounded-lg p-1.5 bg-white outline-none text-xs"
-                    >
-                      <option value="">Sélectionner...</option>
-                      {spareParts.map((sp) => (
-                        <option key={sp.code} value={sp.code}>
-                          [{sp.code}] {sp.name} - Stock: {sp.currentStock} (Prix: {sp.unitPrice} TND)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-20">
-                    <label className="block text-[10px] font-bold text-neutral-500 mb-1">Qté</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={partQtyToAdd}
-                      onChange={(e) => setPartQtyToAdd(Number(e.target.value))}
-                      className="w-full border border-neutral-200 rounded-lg p-1.5 bg-white outline-none text-xs text-center font-mono"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddPartToForm}
-                    disabled={!selectedPartToAdd}
-                    className="bg-neutral-800 text-white font-bold py-1.5 px-3 rounded-lg text-xs hover:bg-neutral-700 disabled:opacity-50 cursor-pointer"
-                  >
-                    Ajouter
-                  </button>
-                </div>
-
-                {formPartsUsed.length > 0 && (
-                  <div className="space-y-1.5 pt-2 max-h-32 overflow-y-auto">
-                    {formPartsUsed.map((pUsed) => {
-                      const spInfo = spareParts.find((s) => s.code === pUsed.partCode);
-                      return (
-                        <div key={pUsed.partCode} className="flex justify-between items-center bg-white p-2 rounded-lg border border-neutral-100 text-xs">
-                          <span className="font-semibold text-neutral-700">
-                            {spInfo ? spInfo.name : pUsed.partCode}
-                          </span>
-                          <div className="flex items-center gap-4">
-                            <span className="font-mono text-neutral-500">
-                              {pUsed.quantity} u x {spInfo ? spInfo.unitPrice : 0} TND ={" "}
-                              {pUsed.quantity * (spInfo ? spInfo.unitPrice : 0)} TND
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemovePartFromForm(pUsed.partCode)}
-                              className="text-red-600 font-bold hover:text-red-800 cursor-pointer"
-                            >
-                              Supprimer
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div className="text-right font-bold text-neutral-800 pr-2 pt-1 border-t border-neutral-100">
-                      Coût total estimé des pièces: {calculatedPartsCost.toLocaleString()} TND
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <div>
-                <label className="block font-bold text-neutral-600 mb-1">Rapport de clôture (Clôturé uniquement)</label>
+                <label className="block font-bold text-neutral-600 mb-1">Rapport de diagnostic initial</label>
                 <input
                   type="text"
-                  placeholder="Notes finales de diagnostic ou observations de réparation"
+                  placeholder="Notes de diagnostic ou observations de réparation initiales"
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
                   className="w-full border border-neutral-200 rounded-lg p-2 bg-neutral-50/50 outline-none"

@@ -116,7 +116,7 @@ export default function ContractsManager({
               Engagements Annuels
             </span>
             <span className="text-2xl font-bold font-mono tracking-tight text-neutral-800">
-              {activeContractsCost.toLocaleString()} TND / an
+              {(activeContractsCost ?? 0).toLocaleString()} TND / an
             </span>
             <span className="text-xs text-neutral-500 font-medium block mt-0.5">
               Maintenance contractuelle externe
@@ -184,7 +184,7 @@ export default function ContractsManager({
                       <div>
                         <span className="block text-neutral-400">Coût Annuel</span>
                         <span className="font-bold font-mono text-neutral-700">
-                          {c.costAnnual.toLocaleString()} TND
+                          {(c.costAnnual ?? 0).toLocaleString()} TND
                         </span>
                       </div>
                       <div>

@@ -60,7 +60,7 @@ function setProfessionalRowHeights(ws: XLSX.WorkSheet, headerRowsCount = 4) {
 export function generateSTAExcelFile(
   equipments: Equipment[],
   interventions: Intervention[],
-  spareParts: SparePart[],
+  spareParts: SparePart[] | undefined,
   contracts: MaintenanceContract[],
   vendors: Vendor[],
   compliance: ComplianceCheck[],
@@ -80,8 +80,6 @@ export function generateSTAExcelFile(
     ["INDICATEURS CLÉS DU PARC (SYNTHÈSE)", ""],
     ["Total Équipements Référencés", { v: equipments.length, t: "n", z: '#,##0" unités"' }],
     ["Total Fiches d'Intervention", { v: interventions.length, t: "n", z: '#,##0" fiches"' }],
-    ["Articles Pièces de Rechange (Magasin)", { v: spareParts.length, t: "n", z: '#,##0" articles"' }],
-    ["Valeur Totale du Stock Pièces", { v: spareParts.reduce((acc, p) => acc + (p.currentStock * p.unitPrice), 0), t: "n", z: '#,##0.00" TND"' }],
     ["Total Contrats Actifs", { v: contracts.length, t: "n", z: '#,##0" contrats"' }],
     ["Vérifications Réglementaires Périodiques", { v: compliance.length, t: "n", z: '#,##0" contrôles"' }],
     ["Budget Annuel Global Alloué (2026)", { v: Object.values(budget.allocatedByWorkshop).reduce((a, b) => a + b, 0), t: "n", z: '#,##0.00" TND"' }],
@@ -91,8 +89,7 @@ export function generateSTAExcelFile(
     ["Nom de l'onglet", "Description du contenu et usage opérationnel"],
     ["SOMMAIRE", "Tableau de bord général de synthèse et index des données exportées"],
     ["EQUIPEMENTS", "Registre exhaustif du parc d'équipements, ateliers, criticité et état de garantie"],
-    ["INTERVENTIONS", "Historique de maintenance corrective et préventive avec calcul des coûts de pièces et M.O."],
-    ["PIECES_RECHANGE", "État du stock, valeurs d'inventaire, seuils critiques et alertes réapprovisionnement"],
+    ["INTERVENTIONS", "Historique de maintenance corrective et préventive avec calcul des coûts M.O."],
     ["FOURNISSEURS_CONTRATS", "Fiche des prestataires externes agréés et suivi des abonnements contractuels"],
     ["CONTROLES_REGLEMENTAIRES", "Suivi des visites obligatoires de sécurité, organismes agréés et échéances à venir"],
     ["SUIVI_BUDGETAIRE", "Consommation budgétaire par atelier avec indicateurs de dépassement automatique"]
@@ -208,47 +205,6 @@ export function generateSTAExcelFile(
   autoFitColumns(wsInterventions, 12);
   setProfessionalRowHeights(wsInterventions, 4);
   XLSX.utils.book_append_sheet(wb, wsInterventions, "INTERVENTIONS");
-
-  // =========================================================================
-  // SHEET 3: PIECES_RECHANGE (INVENTAIRE)
-  // =========================================================================
-  const partHeaders = [
-    "Code Pièce",
-    "Désignation de la Pièce",
-    "Stock Actuel",
-    "Seuil d'Alerte (Min)",
-    "Prix Unitaire (TND)",
-    "Alerte Réappro",
-    "Valeur Estimée Stock (TND)",
-    "Emplacement",
-    "Catégorie"
-  ];
-
-  const partRows = spareParts.map((part, index) => {
-    const rowNum = index + 5; // Rows 1-3 are title band, Row 4 is Header
-    return [
-      { v: part.code, t: "s" },
-      { v: part.name, t: "s" },
-      { v: part.currentStock, t: "n", z: '#,##0' },
-      { v: part.reorderPoint, t: "n", z: '#,##0' },
-      { v: part.unitPrice, t: "n", z: '#,##0.00" TND"' },
-      { f: `IF(C${rowNum}<=D${rowNum},"⚠️ Réapprovisionnement Requis","Stock Conforme")`, t: "s" },
-      { f: `C${rowNum}*E${rowNum}`, t: "n", z: '#,##0.00" TND"' },
-      { v: part.location, t: "s" },
-      { v: part.category, t: "s" }
-    ];
-  });
-
-  const wsSpareParts = XLSX.utils.aoa_to_sheet([
-    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", ""],
-    ["ÉTAT DES STOCKS & INVENTAIRE VALORISÉ DU MAGASIN", ""],
-    ["", ""],
-    partHeaders,
-    ...partRows
-  ]);
-  autoFitColumns(wsSpareParts, 14);
-  setProfessionalRowHeights(wsSpareParts, 4);
-  XLSX.utils.book_append_sheet(wb, wsSpareParts, "PIECES_RECHANGE");
 
   // =========================================================================
   // SHEET 4: FOURNISSEURS_CONTRATS
@@ -394,4 +350,238 @@ export function generateSTAExcelFile(
   document.body.appendChild(tempLink);
   tempLink.click();
   document.body.removeChild(tempLink);
+}
+
+/**
+ * Generates and downloads a standardized Excel template (.xlsx) for batch equipment import.
+ */
+export function generateEquipmentImportTemplate(): void {
+  const wb = XLSX.utils.book_new();
+
+  const headers = [
+    "Code_Equipement*",
+    "Nom_Equipement*",
+    "Atelier*",
+    "Marque_Modele",
+    "Numero_Serie",
+    "Emplacement",
+    "Statut",
+    "Criticite",
+    "Prix_Achat_TND",
+    "Date_Achat",
+    "Duree_Garantie_Mois",
+    "Intervalle_Inspect_Mois",
+    "Responsable"
+  ];
+
+  const sampleRows = [
+    [
+      "EQ-SR-06",
+      "Pont Élevateur Ciseaux N°3",
+      "Service Rapide",
+      "RAVAGLIOLI RAV300",
+      "SN-2026-9812",
+      "Travée 4 - Zone Levage",
+      "Opérationnel",
+      "A - Critique",
+      14500,
+      "2025-06-15",
+      24,
+      6,
+      "Technicien Senior SR"
+    ],
+    [
+      "EQ-MEC-05",
+      "Banc d'Équilibrage Électronique",
+      "Atelier Mécanique",
+      "CORGHI EM9280",
+      "SN-2025-7741",
+      "Zone Équilibrage",
+      "Opérationnel",
+      "B - Moyen",
+      8200,
+      "2025-03-10",
+      12,
+      12,
+      "Responsable Atelier"
+    ],
+    [
+      "EQ-DIAG-04",
+      "Valise de Diagnostic Chery iAuto",
+      "Atelier Diagnostic",
+      "CHERY DIAG V3.2",
+      "SN-2026-0033",
+      "Poste Électronique 2",
+      "Opérationnel",
+      "A - Critique",
+      12000,
+      "2026-01-10",
+      36,
+      3,
+      "Expert Diagnostic"
+    ]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["MODÈLE OFFICIEL D'IMPORTATION MASSIVE DES ÉQUIPEMENTS & MACHINES GMAO", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["Instructions : Remplissez les lignes à partir de la ligne 5. Les champs suivis d'une * sont obligatoires. Conservez la structure des colonnes.", "", "", "", "", "", "", "", "", "", "", "", ""],
+    headers,
+    ...sampleRows
+  ]);
+
+  autoFitColumns(ws, 16);
+  setProfessionalRowHeights(ws, 4);
+
+  XLSX.utils.book_append_sheet(wb, ws, "MODELE_IMPORT_EQUIPEMENTS");
+
+  const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([buffer], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", `MODELE_IMPORT_EQUIPEMENTS_STA_CHERY.xlsx`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Parses an Excel or CSV file containing equipment records and converts them to Equipment array.
+ */
+export async function parseEquipmentExcelFile(file: File): Promise<Equipment[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert worksheet to JSON rows
+        const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (!rawJson || rawJson.length === 0) {
+          return resolve([]);
+        }
+
+        // Find header row (search for row containing "code" or "nom")
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(rawJson.length, 10); i++) {
+          const rowStr = (rawJson[i] || []).join(" ").toLowerCase();
+          if (rowStr.includes("code") || rowStr.includes("nom") || rowStr.includes("atelier")) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+
+        if (headerRowIdx === -1) {
+          headerRowIdx = 0;
+        }
+
+        const headers = (rawJson[headerRowIdx] || []).map((h: any) =>
+          String(h || "").trim().toLowerCase().replace(/\*/g, "").replace(/\s+/g, "_")
+        );
+
+        const dataRows = rawJson.slice(headerRowIdx + 1);
+        const parsedEquipments: Equipment[] = [];
+
+        dataRows.forEach((row, idx) => {
+          if (!row || row.length === 0) return;
+
+          // Helper to get value by matching header alias
+          const getVal = (aliases: string[]): string => {
+            for (const alias of aliases) {
+              const colIdx = headers.findIndex((h: string) => h.includes(alias));
+              if (colIdx !== -1 && row[colIdx] !== undefined && row[colIdx] !== null) {
+                return String(row[colIdx]).trim();
+              }
+            }
+            return "";
+          };
+
+          const code = getVal(["code_equipement", "code", "ref", "id"]) || `EQ-IMP-${Date.now()}-${idx + 1}`;
+          const name = getVal(["nom_equipement", "nom", "designation", "equipement", "libelle"]) || `Équipement Importé N°${idx + 1}`;
+          const workshopRaw = getVal(["atelier", "service", "zone", "departement"]) || "Service Rapide";
+          const brandModel = getVal(["marque_modele", "marque", "modele"]) || "Non spécifié";
+          const serialNumber = getVal(["numero_serie", "serie", "sn", "n_serie"]) || `SN-IMP-${idx + 100}`;
+          const location = getVal(["emplacement", "localisation", "site"]) || "Atelier Principal";
+          const statusRaw = getVal(["statut", "etat"]) || "Opérationnel";
+          const criticiteRaw = getVal(["criticite", "critical"]) || "B - Moyen";
+          const priceRaw = parseFloat(getVal(["prix_achat_tnd", "prix", "cout", "montant"])) || 10000;
+          const purchaseDate = getVal(["date_achat", "date"]) || new Date().toISOString().split("T")[0];
+          const guaranteeMonths = parseInt(getVal(["duree_garantie_mois", "garantie"])) || 24;
+          const intervalMonths = parseInt(getVal(["intervalle_inspect_mois", "intervalle"])) || 6;
+          const responsable = getVal(["responsable", "technicien"]) || "Responsable Atelier";
+
+          // Calculate warranty end date
+          const pDate = new Date(purchaseDate);
+          if (!isNaN(pDate.getTime())) {
+            pDate.setMonth(pDate.getMonth() + guaranteeMonths);
+          }
+          const warrantyEnd = !isNaN(pDate.getTime())
+            ? pDate.toISOString().split("T")[0]
+            : "2027-12-31";
+
+          // Map workshop
+          let workshop = "Service Rapide" as any;
+          const wsLower = workshopRaw.toLowerCase();
+          if (wsLower.includes("mecan")) workshop = "Atelier Mécanique";
+          else if (wsLower.includes("diag")) workshop = "Atelier Diagnostic";
+          else if (wsLower.includes("carros")) workshop = "Carrosserie";
+          else if (wsLower.includes("lav")) workshop = "Lavage";
+          else if (wsLower.includes("recept") || wsLower.includes("vente")) workshop = "Réception Après-Vente";
+          else if (wsLower.includes("magasin") || wsLower.includes("piec")) workshop = "Magasin Pièces de Rechange";
+          else if (wsLower.includes("batiment") || wsLower.includes("infra")) workshop = "Maintenance Bâtiment";
+
+          // Map status
+          let status = "Opérationnel" as any;
+          const stLower = statusRaw.toLowerCase();
+          if (stLower.includes("panne")) status = "En Panne";
+          else if (stLower.includes("maint")) status = "En Maintenance";
+          else if (stLower.includes("degrad")) status = "Dégradé";
+          else if (stLower.includes("hors")) status = "Hors Service";
+
+          // Map criticite
+          let criticite = "B - Moyen" as any;
+          let critical = false;
+          if (criticiteRaw.toLowerCase().includes("a") || criticiteRaw.toLowerCase().includes("crit")) {
+            criticite = "A - Critique";
+            critical = true;
+          } else if (criticiteRaw.toLowerCase().includes("c") || criticiteRaw.toLowerCase().includes("faibl")) {
+            criticite = "C - Faible";
+            critical = false;
+          }
+
+          parsedEquipments.push({
+            code: code.toUpperCase(),
+            name,
+            workshop,
+            status,
+            purchaseDate,
+            warrantyEnd,
+            purchasePrice: priceRaw,
+            location,
+            serialNumber,
+            critical,
+            criticite,
+            inspectionIntervalMonths: intervalMonths,
+            mtbfTargetHours: 1200,
+            mttrTargetHours: 4,
+            responsableName: responsable,
+            warrantyDetails: `Garantie constructeur ${guaranteeMonths} mois`
+          });
+        });
+
+        resolve(parsedEquipments);
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    reader.onerror = (err) => reject(err);
+    reader.readAsArrayBuffer(file);
+  });
 }

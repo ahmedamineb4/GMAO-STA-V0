@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Settings,
   DollarSign,
@@ -18,9 +18,28 @@ import {
   UserCheck,
   Download,
   Upload,
-  Trash2
+  Trash2,
+  Users,
+  FileText,
+  Phone,
+  Mail,
+  Plus,
+  Search,
+  Bell,
+  History,
+  ShieldAlert,
+  FileCheck,
+  CheckCircle2,
+  Send,
+  Eye,
+  Pencil,
+  Edit3,
+  UserPlus,
+  X,
+  Check,
+  Star
 } from "lucide-react";
-import { BudgetYear, Workshop } from "../types";
+import { BudgetYear, Workshop, Vendor, ActivityLog, UserRoleProfile } from "../types";
 import { WORKSHOPS } from "../data";
 
 interface SettingsManagerProps {
@@ -28,8 +47,8 @@ interface SettingsManagerProps {
   onUpdateBudgetAllocation: (workshop: Workshop, amount: number) => void;
   equipments: any[];
   interventions: any[];
-  spareParts: any[];
-  vendors: any[];
+  spareParts?: any[];
+  vendors: Vendor[];
   purchaseRequests: any[];
   compliance: any[];
   onImportAllData: (data: any) => void;
@@ -40,6 +59,15 @@ interface SettingsManagerProps {
   dbMode?: "demo" | "vierge";
   onResetDemoData?: () => void;
   onClearAllData?: () => void;
+  activityLogs?: ActivityLog[];
+  onClearLogs?: () => void;
+  onAddVendor?: (newVendor: Vendor) => void;
+  onUpdateVendor?: (updatedVendor: Vendor) => void;
+  onDeleteVendor?: (vendorId: string) => void;
+  userProfiles?: UserRoleProfile[];
+  onAddRoleProfile?: (profile: UserRoleProfile) => void;
+  onUpdateRoleProfile?: (profile: UserRoleProfile) => void;
+  onDeleteRoleProfile?: (profileId: string) => void;
 }
 
 export default function SettingsManager({
@@ -48,7 +76,7 @@ export default function SettingsManager({
   equipments,
   interventions,
   spareParts,
-  vendors,
+  vendors = [],
   purchaseRequests,
   compliance,
   onImportAllData,
@@ -58,14 +86,199 @@ export default function SettingsManager({
   onUpdatePasswords,
   dbMode = "demo",
   onResetDemoData,
-  onClearAllData
+  onClearAllData,
+  activityLogs = [],
+  onClearLogs,
+  onAddVendor,
+  onUpdateVendor,
+  onDeleteVendor,
+  userProfiles = [],
+  onAddRoleProfile,
+  onUpdateRoleProfile,
+  onDeleteRoleProfile
 }: SettingsManagerProps) {
   const isAdmin = currentRole === "admin";
   const isWritable = !isReadOnly && isAdmin;
-  // Labor Rate (Local state or mock config)
-  const [hourlyRate, setHourlyRate] = useState<number>(60); // default TND/hour
-  const [vatRate, setVatRate] = useState<number>(19); // default VAT % in Tunisia
-  const [currency, setCurrency] = useState<string>("TND");
+
+  // Active Sub-Tab State
+  const [activeSubTab, setActiveSubTab] = useState<"parameters" | "users" | "docs" | "vendors" | "notifications" | "audit">("parameters");
+
+  // General parameters states
+  const [hourlyRate, setHourlyRate] = useState<number>(() => {
+    const saved = localStorage.getItem("chery_gmao_hourly_rate");
+    return saved ? Number(saved) : 60;
+  });
+  const [vatRate, setVatRate] = useState<number>(() => {
+    const saved = localStorage.getItem("chery_gmao_vat_rate");
+    return saved ? Number(saved) : 19;
+  });
+  const [currency, setCurrency] = useState<string>(() => {
+    return localStorage.getItem("chery_gmao_currency") || "TND";
+  });
+
+  // Save general parameters locally
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_hourly_rate", String(hourlyRate));
+    localStorage.setItem("chery_gmao_vat_rate", String(vatRate));
+    localStorage.setItem("chery_gmao_currency", currency);
+  }, [hourlyRate, vatRate, currency]);
+
+  // Default User Profiles fallback if empty
+  const defaultProfiles: UserRoleProfile[] = useMemo(() => [
+    { id: "admin", label: "M. Ahmed Amine (Admin)", userFullName: "Ahmed Amine", rights: "Accès total, modifications budget, mots de passe", badge: "Administrateur", pin: passwords.admin || "1924", isSystem: true },
+    { id: "supervisor", label: "Direction / Superviseur", userFullName: "Direction STA", rights: "Lecture seule sur tous les modules", badge: "Superviseur", pin: passwords.supervisor || "1234", isSystem: true },
+    { id: "magasin", label: "Responsable Achats & Appro", userFullName: "Sami Ben Ali", rights: "Gestion des commandes de travaux, fournitures et achats", badge: "Achats", pin: passwords.magasin || "2026", isSystem: true },
+    { id: "service_rapide", label: "Chef d'Atelier : Service Rapide", userFullName: "Mohamed Ben Amor", rights: "Interventions et pannes sur Service Rapide", badge: "Atelier", pin: passwords.service_rapide || "0000", workshop: "Service Rapide" },
+    { id: "atelier_mecanique", label: "Chef d'Atelier : Mécanique & Élec", userFullName: "Karim Gharbi", rights: "Interventions et pannes sur Mécanique", badge: "Atelier", pin: passwords.atelier_mecanique || "0000", workshop: "Atelier Mécanique" },
+    { id: "atelier_diagnostic", label: "Chef d'Atelier : Diagnostic", userFullName: "Youssef Tounsi", rights: "Interventions et pannes sur Diagnostic", badge: "Atelier", pin: passwords.atelier_diagnostic || "0000", workshop: "Atelier Diagnostic" },
+    { id: "carrosserie", label: "Chef d'Atelier : Carrosserie", userFullName: "Khaled Khelifi", rights: "Interventions et pannes sur Carrosserie", badge: "Atelier", pin: passwords.carrosserie || "0000", workshop: "Carrosserie" },
+    { id: "lavage", label: "Chef d'Atelier : Lavage", userFullName: "Hassen Jlassi", rights: "Interventions et pannes sur Lavage", badge: "Atelier", pin: passwords.lavage || "0000", workshop: "Lavage" },
+    { id: "batiment", label: "Chef d'Atelier : Maintenance Bâtiment", userFullName: "Ali Trabelsi", rights: "Interventions et pannes sur Bâtiment", badge: "Atelier", pin: passwords.batiment || "0000", workshop: "Maintenance Bâtiment" }
+  ], [passwords]);
+
+  const activeProfiles = userProfiles.length > 0 ? userProfiles : defaultProfiles;
+
+  // State for Editing User Role / Profile
+  const [editingRoleProfile, setEditingRoleProfile] = useState<UserRoleProfile | null>(null);
+  const [epLabel, setEpLabel] = useState("");
+  const [epUserFullName, setEpUserFullName] = useState("");
+  const [epBadge, setEpBadge] = useState("");
+  const [epRights, setEpRights] = useState("");
+  const [epPin, setEpPin] = useState("");
+  const [epWorkshop, setEpWorkshop] = useState("");
+
+  // State for Adding New User Role / Profile
+  const [showAddProfileModal, setShowAddProfileModal] = useState(false);
+  const [npId, setNpId] = useState("");
+  const [npLabel, setNpLabel] = useState("");
+  const [npUserFullName, setNpUserFullName] = useState("");
+  const [npBadge, setNpBadge] = useState("Atelier");
+  const [npRights, setNpRights] = useState("");
+  const [npPin, setNpPin] = useState("0000");
+  const [npWorkshop, setNpWorkshop] = useState("");
+
+  const handleOpenEditProfile = (profile: UserRoleProfile) => {
+    setEditingRoleProfile(profile);
+    setEpLabel(profile.label);
+    setEpUserFullName(profile.userFullName || "");
+    setEpBadge(profile.badge);
+    setEpRights(profile.rights);
+    setEpPin(profile.pin || passwords[profile.id] || "0000");
+    setEpWorkshop(profile.workshop || "");
+  };
+
+  const handleSaveEditProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRoleProfile) return;
+    const updated: UserRoleProfile = {
+      ...editingRoleProfile,
+      label: epLabel,
+      userFullName: epUserFullName,
+      badge: epBadge,
+      rights: epRights,
+      pin: epPin,
+      workshop: epWorkshop || undefined
+    };
+    if (onUpdateRoleProfile) {
+      onUpdateRoleProfile(updated);
+    }
+    // Also update local passwords map
+    if (onUpdatePasswords) {
+      onUpdatePasswords({ ...passwords, [editingRoleProfile.id]: epPin });
+    }
+    setEditingRoleProfile(null);
+  };
+
+  const handleSaveNewProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!npLabel) return;
+    const cleanId = npId.trim() ? npId.toLowerCase().replace(/[^a-z0-9_]/g, "_") : `role_${Date.now()}`;
+    const newProfile: UserRoleProfile = {
+      id: cleanId,
+      label: npLabel,
+      userFullName: npUserFullName || "Utilisateur Atelier",
+      badge: npBadge,
+      rights: npRights || "Accès aux modules d'intervention et pannes de l'atelier rattaché.",
+      pin: npPin || "0000",
+      workshop: npWorkshop || undefined,
+      isSystem: false
+    };
+    if (onAddRoleProfile) {
+      onAddRoleProfile(newProfile);
+    }
+    if (onUpdatePasswords) {
+      onUpdatePasswords({ ...passwords, [cleanId]: npPin || "0000" });
+    }
+    setShowAddProfileModal(false);
+    // Reset form
+    setNpId("");
+    setNpLabel("");
+    setNpUserFullName("");
+    setNpBadge("Atelier");
+    setNpRights("");
+    setNpPin("0000");
+    setNpWorkshop("");
+  };
+
+  // State for Editing Vendor / Prestataire
+  const VENDOR_SPECIALTY_OPTIONS = [
+    "Contrôles réglementaires (Apave/Sotrap)",
+    "Pièces détachées constructeur",
+    "Fluides & Gaz climatisation (R134a)",
+    "Maintenance Bâtiment & Génie civil",
+    "Étalonnage et Métrologie laser"
+  ];
+
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [evName, setEvName] = useState("");
+  const [evContact, setEvContact] = useState("");
+  const [evPhone, setEvPhone] = useState("");
+  const [evEmail, setEvEmail] = useState("");
+  const [evSpecialty, setEvSpecialty] = useState("");
+  const [evCustomSpecialty, setEvCustomSpecialty] = useState("");
+  const [evRating, setEvRating] = useState(5);
+
+  const handleOpenEditVendor = (vendor: Vendor) => {
+    setEditingVendor(vendor);
+    setEvName(vendor.name);
+    setEvContact(vendor.contactPerson);
+    setEvPhone(vendor.phone);
+    setEvEmail(vendor.email);
+    if (VENDOR_SPECIALTY_OPTIONS.includes(vendor.serviceType)) {
+      setEvSpecialty(vendor.serviceType);
+      setEvCustomSpecialty("");
+    } else if (!vendor.serviceType || vendor.serviceType === "Non spécifié") {
+      setEvSpecialty("");
+      setEvCustomSpecialty("");
+    } else {
+      setEvSpecialty("Autre");
+      setEvCustomSpecialty(vendor.serviceType);
+    }
+    setEvRating(vendor.rating || 5);
+  };
+
+  const handleSaveEditVendor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVendor) return;
+
+    const finalServiceType = evSpecialty === "Autre"
+      ? (evCustomSpecialty.trim() || "Autre prestation externe")
+      : (evSpecialty.trim() || "Non spécifié");
+
+    const updated: Vendor = {
+      ...editingVendor,
+      name: evName,
+      contactPerson: evContact,
+      phone: evPhone,
+      email: evEmail,
+      serviceType: finalServiceType,
+      rating: evRating
+    };
+    if (onUpdateVendor) {
+      onUpdateVendor(updated);
+    }
+    setEditingVendor(null);
+  };
 
   // Passwords editing state (initialized with current passwords)
   const [localPasswords, setLocalPasswords] = useState<Record<string, string>>(() => {
@@ -73,22 +286,26 @@ export default function SettingsManager({
   });
   const [passwordSaveFeedback, setPasswordSaveFeedback] = useState<string | null>(null);
 
+  useEffect(() => {
+    setLocalPasswords(passwords || {});
+  }, [passwords]);
+
   const handleSavePasswords = (e: React.FormEvent) => {
     e.preventDefault();
     if (onUpdatePasswords) {
       onUpdatePasswords(localPasswords);
     }
-    setPasswordSaveFeedback("Mots de passe mis à jour avec succès !");
+    setPasswordSaveFeedback("🔑 Mots de passe mis à jour avec succès !");
     setTimeout(() => setPasswordSaveFeedback(null), 3000);
   };
 
-  // Success message feedback
+  // Feedback states
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [backupFeedback, setBackupFeedback] = useState<string | null>(null);
 
   const handleSaveParameters = (e: React.FormEvent) => {
     e.preventDefault();
-    setSaveFeedback("Paramètres généraux sauvegardés avec succès !");
+    setSaveFeedback("✅ Paramètres de facturation enregistrés !");
     setTimeout(() => setSaveFeedback(null), 3000);
   };
 
@@ -114,10 +331,10 @@ export default function SettingsManager({
       downloadAnchor.click();
       downloadAnchor.remove();
 
-      setBackupFeedback("Export réussi ! Fichier téléchargé.");
+      setBackupFeedback("💾 Export réussi ! Fichier téléchargé.");
       setTimeout(() => setBackupFeedback(null), 4000);
     } catch (err) {
-      setBackupFeedback("Erreur lors de l'export des données.");
+      setBackupFeedback("❌ Erreur lors de l'export des données.");
       setTimeout(() => setBackupFeedback(null), 4000);
     }
   };
@@ -133,373 +350,1358 @@ export default function SettingsManager({
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed && (parsed.equipments || parsed.interventions)) {
           onImportAllData(parsed);
-          setBackupFeedback("Base de données importée et restaurée avec succès !");
+          setBackupFeedback("✅ Base de données importée et restaurée avec succès !");
           setTimeout(() => setBackupFeedback(null), 5000);
         } else {
-          setBackupFeedback("Fichier invalide ou vide.");
+          setBackupFeedback("⚠️ Fichier invalide ou vide.");
           setTimeout(() => setBackupFeedback(null), 4000);
         }
       } catch (err) {
-        setBackupFeedback("Erreur de lecture du fichier de sauvegarde.");
+        setBackupFeedback("❌ Erreur de lecture du fichier de sauvegarde.");
         setTimeout(() => setBackupFeedback(null), 4000);
       }
     };
   };
 
+  // --- 3. GESTION DOCUMENTAIRE STATE ---
+  const [docsSearch, setDocsSearch] = useState("");
+  const localDocs = useMemo(() => {
+    try {
+      const saved = localStorage.getItem("chery_gmao_documents");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  }, [equipments]); // Reload on equipment change as documents can be bound
+
+  const filteredDocsSummary = useMemo(() => {
+    if (!docsSearch) return localDocs;
+    return localDocs.filter((d: any) => 
+      d.name.toLowerCase().includes(docsSearch.toLowerCase()) ||
+      d.id.toLowerCase().includes(docsSearch.toLowerCase()) ||
+      d.type.toLowerCase().includes(docsSearch.toLowerCase())
+    );
+  }, [localDocs, docsSearch]);
+
+  const docsStats = useMemo(() => {
+    const counts = { procedures: 0, instructions: 0, manuals: 0, plans: 0, regulatory: 0 };
+    localDocs.forEach((d: any) => {
+      if (d.type === "Procédure") counts.procedures++;
+      else if (d.type === "Instruction de travail" || d.type === "Instruction") counts.instructions++;
+      else if (d.type === "Manuel") counts.manuals++;
+      else if (d.type === "Plan") counts.plans++;
+      else if (d.type === "Réglementaire") counts.regulatory++;
+    });
+    return counts;
+  }, [localDocs]);
+
+  // --- 4. PRESTATAIRES (VENDORS) STATE & FORM ---
+  const [showAddVendorForm, setShowAddVendorForm] = useState(false);
+  const [vName, setVName] = useState("");
+  const [vContact, setVContact] = useState("");
+  const [vPhone, setVPhone] = useState("");
+  const [vEmail, setVEmail] = useState("");
+  const [vSpecialty, setVSpecialty] = useState("");
+  const [vCustomSpecialty, setVCustomSpecialty] = useState("");
+  const [vRating, setVRating] = useState(5);
+
+  const handleRegisterVendor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vName) return;
+
+    const finalServiceType = vSpecialty === "Autre"
+      ? (vCustomSpecialty.trim() || "Autre prestation externe")
+      : (vSpecialty.trim() || "Non spécifié");
+
+    const newV: Vendor = {
+      id: `VEND-${Date.now()}`,
+      name: vName,
+      contactPerson: vContact || "Responsable Technique",
+      phone: vPhone || "+216 71 000 000",
+      email: vEmail || "contact@partenaire.tn",
+      serviceType: finalServiceType,
+      rating: vRating
+    };
+
+    if (onAddVendor) {
+      onAddVendor(newV);
+      alert(`🎉 Prestataire "${vName}" enregistré avec succès !`);
+      setShowAddVendorForm(false);
+      // Reset
+      setVName("");
+      setVContact("");
+      setVPhone("");
+      setVEmail("");
+      setVSpecialty("");
+      setVCustomSpecialty("");
+    } else {
+      alert("La méthode d'enregistrement des fournisseurs n'est pas encore connectée.");
+    }
+  };
+
+  // --- 5. NOTIFICATIONS STATE & SIMULATOR ---
+  const [notifSound, setNotifSound] = useState(true);
+  const [notifEmailThreshold, setNotifEmailThreshold] = useState(true);
+  const [notifSMSThreshold, setNotifSMSThreshold] = useState(false);
+  const [simulatedDispatch, setSimulatedDispatch] = useState<string | null>(null);
+
+  const handleSimulateAlert = () => {
+    setSimulatedDispatch("Envoi en cours...");
+    setTimeout(() => {
+      setSimulatedDispatch(
+        `📬 SMS & Email envoyé à l'Astreinte Technique ! "Alerte : Le Pont Élévateur à ciseaux (EQ-SR-05) est signalé en PANNE CRITIQUE dans l'atelier Service Rapide. Intervention requise immédiatement."`
+      );
+      setTimeout(() => setSimulatedDispatch(null), 8000);
+    }, 1500);
+  };
+
+  // --- 6. HISTORIQUE DES MODIFICATIONS (AUDIT) STATE ---
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditTypeFilter, setAuditTypeFilter] = useState("All");
+
+  const filteredAuditLogs = useMemo(() => {
+    return activityLogs.filter((log) => {
+      const matchesSearch =
+        log.action.toLowerCase().includes(auditSearch.toLowerCase()) ||
+        log.details.toLowerCase().includes(auditSearch.toLowerCase()) ||
+        log.userRole.toLowerCase().includes(auditSearch.toLowerCase());
+
+      const matchesType = auditTypeFilter === "All" || log.type === auditTypeFilter;
+      return matchesSearch && matchesType;
+    });
+  }, [activityLogs, auditSearch, auditTypeFilter]);
+
+  // Quick stats computed on the fly
+  const activeAlertsCount = useMemo(() => {
+    let count = 0;
+    equipments.forEach(eq => { if (eq.status === "En Panne") count++; });
+    interventions.forEach(int => {
+      if ((int.status === "Nouvelle" || int.status === "Planifiée") && int.dateIntervention < "2026-07-21") count++;
+    });
+    return count;
+  }, [equipments, interventions]);
+
   return (
     <div className="space-y-6">
-      {/* Intro header */}
-      <div className="bg-white p-6 rounded-2xl border border-neutral-100 shadow-xs">
+      {/* Upper header action area */}
+      <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 bg-neutral-100 rounded-xl flex items-center justify-center text-neutral-700">
+          <div className="h-10 w-10 bg-neutral-100 rounded-xl flex items-center justify-center text-chery-red shrink-0">
             <Settings className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-neutral-800">Paramètres Généraux de l'Application</h2>
-            <p className="text-xs text-neutral-400">
-              Configurez les seuils financiers, les taux de facturation et gérez l'état de la base de données.
+            <h2 className="text-base font-black text-neutral-800 flex items-center gap-2">
+              🛠️ Administration Système STA
+            </h2>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Supervisez les rôles d'utilisateurs, gérez la documentation légale, configurez les prestataires extérieurs, et inspectez l'historique d'audit.
             </p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase font-mono px-2.5 py-1 bg-neutral-100 rounded-lg text-neutral-600">
+            Profil actif : {currentRole === "admin" ? "M. Ahmed Amine (Admin)" : currentRole}
+          </span>
+          {activeAlertsCount > 0 && (
+            <span className="text-[10px] font-black uppercase font-mono px-2.5 py-1 bg-red-50 rounded-lg text-chery-red animate-pulse">
+              ⚠️ {activeAlertsCount} Alertes actives
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column: general parameters */}
-        <div className="lg:col-span-1 space-y-6">
-          <form onSubmit={handleSaveParameters} className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2">
-              🔧 Facturation & Taux Horaires
-            </h3>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-neutral-600 mb-1">Devise par défaut</label>
-                <select
-                  disabled={!isWritable}
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                >
-                  <option value="TND">TND (Dinar Tunisien)</option>
-                  <option value="EUR">EUR (€ Euro)</option>
-                  <option value="USD">USD ($ Dollar)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-neutral-600 mb-1">Taux Horaire Main d'Œuvre ({currency}/h)</label>
-                <input
-                  type="number"
-                  disabled={!isWritable}
-                  value={hourlyRate}
-                  onChange={(e) => setHourlyRate(Number(e.target.value))}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-neutral-600 mb-1">Taux de TVA (%)</label>
-                <input
-                  type="number"
-                  disabled={!isWritable}
-                  value={vatRate}
-                  onChange={(e) => setVatRate(Number(e.target.value))}
-                  className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-
-            {saveFeedback && (
-              <div className="p-2.5 bg-green-50 border border-green-100 text-green-700 rounded-lg text-xs font-semibold text-center">
-                {saveFeedback}
-              </div>
-            )}
-
-            {isWritable && (
+      {/* Main Grid: 1 Column on Mobile, Sidebar + Content on Desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        {/* Left Hand Navigation Rail */}
+        <div className="lg:col-span-1 bg-white p-4 rounded-2xl border border-neutral-100 shadow-xs space-y-1">
+          <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-3 block mb-2">
+            Modules d'Administration
+          </span>
+          {[
+            { id: "parameters", label: "⚙️ Paramètres généraux", icon: Sliders },
+            { id: "users", label: "👥 Gestion des utilisateurs", icon: Users },
+            { id: "docs", label: "📚 Gestion documentaire", icon: FileText },
+            { id: "vendors", label: "🏢 Prestataires & Partenaires", icon: Building2 },
+            { id: "notifications", label: "🔔 Alertes & Notifications", icon: Bell },
+            { id: "audit", label: "📜 Historique des modifications", icon: History }
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
               <button
-                type="submit"
-                className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer text-center"
+                key={item.id}
+                onClick={() => setActiveSubTab(item.id as any)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-left ${
+                  activeSubTab === item.id
+                    ? "bg-chery-red text-white"
+                    : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800"
+                }`}
               >
-                Enregistrer les taux
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{item.label}</span>
+                </div>
               </button>
-            )}
-          </form>
-
-          {/* Backup & Restore Card */}
-          <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 text-neutral-700">
-              💾 Sauvegarde & Restauration
-            </h3>
-
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              L'application s'exécute localement dans votre navigateur. Exportez régulièrement vos données sous forme de fichier pour les sécuriser contre les nettoyages de cache.
-            </p>
-
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={handleExportBackup}
-                className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Sauvegarder la base (JSON)
-              </button>
-
-              {isWritable ? (
-                <div className="relative border border-dashed border-neutral-200 rounded-xl p-3 bg-neutral-50 hover:bg-neutral-100 transition-colors cursor-pointer text-center">
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportBackup}
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                  />
-                  <div className="flex flex-col items-center gap-1">
-                    <Upload className="h-4 w-4 text-neutral-500" />
-                    <span className="text-[10px] font-bold text-neutral-600">
-                      Restaurer une sauvegarde (JSON)
-                    </span>
-                    <span className="text-[9px] text-neutral-400">
-                      Glissez ou cliquez pour charger votre fichier
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3.5 border border-dashed border-neutral-200 bg-neutral-50 rounded-xl text-center text-[10px] text-neutral-400 font-medium">
-                  🔒 Importation verrouillée (Admin uniquement)
-                </div>
-              )}
-            </div>
-
-            {backupFeedback && (
-              <div className="p-2 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-xs font-semibold text-center leading-tight">
-                {backupFeedback}
-              </div>
-            )}
-          </div>
-
-          {/* Profile Passwords Management Card */}
-          {isAdmin && (
-            <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
-              <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 text-neutral-700 flex items-center gap-1.5">
-                <Lock className="h-4.5 w-4.5 text-neutral-500" />
-                Mots de Passe des Profils
-              </h3>
-
-              <p className="text-xs text-neutral-400 leading-relaxed">
-                Définissez les codes PIN d'accès pour chaque profil utilisateur afin de limiter les privilèges sur la GMAO.
-              </p>
-
-              <form onSubmit={handleSavePasswords} className="space-y-3">
-                <div className="space-y-2.5 text-xs">
-                  <div>
-                    <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
-                      <span>M. Ahmed Amine (Admin) :</span>
-                      <span className="text-[9px] bg-red-50 text-chery-red px-1.5 py-0.2 rounded font-mono font-semibold">Privilèges Totaux</span>
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isWritable}
-                      value={localPasswords.admin || ""}
-                      onChange={(e) => setLocalPasswords({ ...localPasswords, admin: e.target.value })}
-                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                      placeholder="PIN Code"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
-                      <span>Superviseur (Lecture Seule) :</span>
-                      <span className="text-[9px] bg-neutral-100 text-neutral-500 px-1.5 py-0.2 rounded font-mono font-semibold">Lecture Totale</span>
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isWritable}
-                      value={localPasswords.supervisor || ""}
-                      onChange={(e) => setLocalPasswords({ ...localPasswords, supervisor: e.target.value })}
-                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                      placeholder="PIN Code"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center justify-between font-bold text-neutral-600 mb-1">
-                      <span>Magasinier (Pièces & Stocks) :</span>
-                      <span className="text-[9px] bg-neutral-100 text-neutral-500 px-1.5 py-0.2 rounded font-mono font-semibold">Gestion Pièces</span>
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isWritable}
-                      value={localPasswords.magasin || ""}
-                      onChange={(e) => setLocalPasswords({ ...localPasswords, magasin: e.target.value })}
-                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                      placeholder="PIN Code"
-                    />
-                  </div>
-
-                  <div className="border-t border-neutral-100 pt-3 mt-3 space-y-3">
-                    <span className="text-[11px] font-black text-neutral-500 uppercase tracking-wider block">
-                      👤 Codes PIN Individuels des Chefs d'Atelier
-                    </span>
-                    <div className="grid grid-cols-1 gap-2.5 bg-neutral-50 p-3 rounded-xl border border-neutral-200/40">
-                      <div>
-                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">⚡ Service Rapide</label>
-                        <input
-                          type="text"
-                          disabled={!isWritable}
-                          value={localPasswords.service_rapide || ""}
-                          onChange={(e) => setLocalPasswords({ ...localPasswords, service_rapide: e.target.value })}
-                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                          placeholder="0000"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">⚙️ Mécanique / Élec</label>
-                        <input
-                          type="text"
-                          disabled={!isWritable}
-                          value={localPasswords.atelier_mecanique || ""}
-                          onChange={(e) => setLocalPasswords({ ...localPasswords, atelier_mecanique: e.target.value })}
-                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                          placeholder="0000"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">🔬 Diagnostic</label>
-                        <input
-                          type="text"
-                          disabled={!isWritable}
-                          value={localPasswords.atelier_diagnostic || ""}
-                          onChange={(e) => setLocalPasswords({ ...localPasswords, atelier_diagnostic: e.target.value })}
-                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                          placeholder="0000"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">🎨 Carrosserie</label>
-                        <input
-                          type="text"
-                          disabled={!isWritable}
-                          value={localPasswords.carrosserie || ""}
-                          onChange={(e) => setLocalPasswords({ ...localPasswords, carrosserie: e.target.value })}
-                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                          placeholder="0000"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">🧼 Lavage</label>
-                        <input
-                          type="text"
-                          disabled={!isWritable}
-                          value={localPasswords.lavage || ""}
-                          onChange={(e) => setLocalPasswords({ ...localPasswords, lavage: e.target.value })}
-                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                          placeholder="0000"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-neutral-600 mb-0.5">🏢 Maintenance Bâtiment</label>
-                        <input
-                          type="text"
-                          disabled={!isWritable}
-                          value={localPasswords.batiment || ""}
-                          onChange={(e) => setLocalPasswords({ ...localPasswords, batiment: e.target.value })}
-                          className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold text-neutral-700 focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                          placeholder="0000"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {passwordSaveFeedback && (
-                  <div className="p-2 bg-green-50 border border-green-100 text-green-700 rounded-lg text-[11px] font-semibold text-center leading-tight">
-                    {passwordSaveFeedback}
-                  </div>
-                )}
-
-                {isWritable ? (
-                  <button
-                    type="submit"
-                    className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer text-center"
-                  >
-                    Sauvegarder les codes d'accès
-                  </button>
-                ) : (
-                  <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] text-neutral-400 font-medium text-center">
-                    🔒 Modification des PINs réservée à l'Administrateur
-                  </div>
-                )}
-              </form>
-            </div>
-          )}
+            );
+          })}
         </div>
 
-        {/* Right column: Budget allocation */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-6 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
-            <div className="flex justify-between items-center border-b border-neutral-100 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-neutral-800">
-                  Allocations Budgétaires {budget.year} par Atelier
-                </h3>
-                <p className="text-xs text-neutral-400">
-                  Modifiez l'enveloppe allouée à chaque atelier. Le graphique global s'ajustera instantanément.
-                </p>
-              </div>
-              <span className="text-xs font-mono font-bold bg-neutral-100 px-3 py-1 rounded-full text-neutral-700">
-                Budget Total : {budget.totalBudget.toLocaleString()} TND
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {WORKSHOPS.map((workshop) => {
-                const allocated = budget.allocatedByWorkshop[workshop] || 0;
-                const spent = budget.spentByWorkshop[workshop] || 0;
-                const percentSpent = Math.min(100, (spent / allocated) * 100);
-                const isOverBudget = spent > allocated;
-
-                return (
-                  <div
-                    key={workshop}
-                    className="p-3.5 rounded-xl border border-neutral-100 bg-neutral-50/50 space-y-2.5"
-                  >
-                    <div className="flex justify-between items-start">
-                      <span className="font-bold text-xs text-neutral-800">{workshop}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${isOverBudget ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
-                        Dépensé : {spent.toLocaleString()} TND
-                      </span>
+        {/* Right Hand Working Pane */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* TAB 1: PARAMETERS & BUDGET */}
+          {activeSubTab === "parameters" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* General Billing Config Form */}
+                <div className="md:col-span-1 bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                  <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 flex items-center gap-1.5">
+                    <DollarSign className="h-4 w-4 text-chery-red" />
+                    Facturation & Devis
+                  </h3>
+                  <form onSubmit={handleSaveParameters} className="space-y-4 text-xs">
+                    <div>
+                      <label className="block font-bold text-neutral-600 mb-1">Devise de l'Atelier</label>
+                      <select
+                        disabled={!isWritable}
+                        value={currency}
+                        onChange={(e) => setCurrency(e.target.value)}
+                        className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none disabled:bg-neutral-50"
+                      >
+                        <option value="TND">TND (Dinar Tunisien)</option>
+                        <option value="EUR">EUR (€ Euro)</option>
+                        <option value="USD">USD ($ Dollar)</option>
+                      </select>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 block font-semibold">Budget Alloué (TND)</label>
+                    <div>
+                      <label className="block font-bold text-neutral-600 mb-1">Taux Horaire Main d'Œuvre ({currency}/h)</label>
                       <input
                         type="number"
                         disabled={!isWritable}
-                        value={allocated}
-                        step="1000"
-                        onChange={(e) => onUpdateBudgetAllocation(workshop, Number(e.target.value))}
-                        className="w-full bg-white border border-neutral-200 rounded-lg px-2.5 py-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                        value={hourlyRate}
+                        onChange={(e) => setHourlyRate(Number(e.target.value))}
+                        className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono disabled:bg-neutral-50"
                       />
                     </div>
 
-                    {/* Simple progress bar */}
-                    <div className="space-y-1">
-                      <div className="w-full bg-neutral-200 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          style={{ width: `${percentSpent}%` }}
-                          className={`h-full rounded-full ${isOverBudget ? "bg-red-600 animate-pulse-subtle" : percentSpent > 80 ? "bg-amber-500" : "bg-green-500"}`}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[9px] text-neutral-400">
-                        <span>Consommation : {percentSpent.toFixed(0)}%</span>
-                        {isOverBudget && <span className="text-red-600 font-bold">Alerte : Budget Dépassé !</span>}
+                    <div>
+                      <label className="block font-bold text-neutral-600 mb-1">TVA Applicable (%)</label>
+                      <input
+                        type="number"
+                        disabled={!isWritable}
+                        value={vatRate}
+                        onChange={(e) => setVatRate(Number(e.target.value))}
+                        className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono disabled:bg-neutral-50"
+                      />
+                    </div>
+
+                    {saveFeedback && (
+                      <p className="text-[11px] text-green-700 bg-green-50 p-2 rounded-lg font-bold text-center border border-green-100">
+                        {saveFeedback}
+                      </p>
+                    )}
+
+                    {isWritable && (
+                      <button
+                        type="submit"
+                        className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer"
+                      >
+                        Enregistrer les taux
+                      </button>
+                    )}
+                  </form>
+                </div>
+
+                {/* Database Actions & Backups */}
+                <div className="md:col-span-2 bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                  <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 flex items-center gap-1.5">
+                    <Download className="h-4 w-4 text-neutral-500" />
+                    Base de données & Sauvegardes
+                  </h3>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Les données sont synchronisées automatiquement sur le conteneur Cloud Run toutes les minutes. Téléchargez un point de restauration physique ou videz la base de données de démonstration pour démarrer l'exploitation réelle "STA Chery Tunisie".
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleExportBackup}
+                        className="w-full flex items-center justify-center gap-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold p-2.5 rounded-xl cursor-pointer transition-colors"
+                      >
+                        <Download className="h-4 w-4" />
+                        Exporter les données (.json)
+                      </button>
+
+                      {isWritable ? (
+                        <div className="relative border border-dashed border-neutral-200 rounded-xl p-3 bg-neutral-50 hover:bg-neutral-100 transition-colors cursor-pointer text-center">
+                          <input
+                            type="file"
+                            accept=".json"
+                            onChange={handleImportBackup}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                          <div className="flex flex-col items-center gap-1">
+                            <Upload className="h-4 w-4 text-neutral-500" />
+                            <span className="text-[10px] font-bold text-neutral-600">Restaurer un point (.json)</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3.5 border border-dashed border-neutral-200 bg-neutral-50 rounded-xl text-center text-[10px] text-neutral-400 font-bold">
+                          🔒 Restauration réservée à l'Admin
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 bg-neutral-50 p-4 rounded-xl border border-neutral-200/50">
+                      <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">Zone de Danger</span>
+                      <p className="text-[10px] text-neutral-400">Ces actions affectent l'intégralité du stockage local.</p>
+                      
+                      <div className="flex flex-col gap-1.5">
+                        {onResetDemoData && (
+                          <button
+                            onClick={onResetDemoData}
+                            className="w-full text-left font-bold text-chery-red bg-white hover:bg-red-50 border border-neutral-200 hover:border-red-200 rounded-lg p-2 text-[11px] cursor-pointer transition-all flex items-center gap-1"
+                          >
+                            <RefreshCw className="h-3 w-3 shrink-0" />
+                            Recharger le parc d'usine STA
+                          </button>
+                        )}
+                        {onClearAllData && (
+                          <button
+                            onClick={onClearAllData}
+                            className="w-full text-left font-bold text-neutral-600 bg-white hover:bg-neutral-100 border border-neutral-200 rounded-lg p-2 text-[11px] cursor-pointer transition-all flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3 w-3 shrink-0 text-neutral-400" />
+                            Vider et créer un espace vierge
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
-                );
-              })}
+
+                  {backupFeedback && (
+                    <div className="p-2 bg-blue-50 border border-blue-100 text-blue-800 font-bold text-xs rounded-lg text-center leading-tight">
+                      {backupFeedback}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Budget Allocation Panel */}
+              <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                <div className="flex justify-between items-center border-b border-neutral-100 pb-3 flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-black text-neutral-800">
+                      Allocations Budgétaires {budget.year} par Atelier
+                    </h3>
+                    <p className="text-xs text-neutral-400">
+                      Réglez l'enveloppe autorisée pour chaque service. L'application bloque ou prévient en cas de dépassement.
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono font-black bg-neutral-100 px-3 py-1.5 rounded-full text-neutral-700 border border-neutral-200">
+                    Budget Total Annuel : {(budget.totalBudget ?? 0).toLocaleString()} TND
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {WORKSHOPS.map((workshop) => {
+                    const allocated = budget.allocatedByWorkshop[workshop] || 0;
+                    const spent = budget.spentByWorkshop[workshop] || 0;
+                    const percentSpent = Math.min(100, (spent / (allocated || 1)) * 100);
+                    const isOverBudget = spent > allocated;
+
+                    return (
+                      <div key={workshop} className="p-3.5 rounded-xl border border-neutral-100 bg-neutral-50/50 space-y-2.5">
+                        <div className="flex justify-between items-start">
+                          <span className="font-extrabold text-xs text-neutral-800">{workshop}</span>
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-sm ${isOverBudget ? "bg-red-50 text-chery-red" : "bg-green-50 text-green-700"}`}>
+                            Dépensé : {(spent ?? 0).toLocaleString()} TND
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-neutral-400 block font-bold uppercase">Enveloppe Allouée (TND)</label>
+                          <input
+                            type="number"
+                            disabled={!isWritable}
+                            value={allocated}
+                            step="1000"
+                            onChange={(e) => onUpdateBudgetAllocation(workshop, Number(e.target.value))}
+                            className="w-full bg-white border border-neutral-200 rounded-lg px-2.5 py-1 text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-chery-red disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                          />
+                        </div>
+
+                        {/* Progress meter */}
+                        <div className="space-y-1">
+                          <div className="w-full bg-neutral-200 h-1.5 rounded-full overflow-hidden">
+                            <div
+                              style={{ width: `${percentSpent}%` }}
+                              className={`h-full rounded-full ${isOverBudget ? "bg-chery-red" : percentSpent > 80 ? "bg-amber-500" : "bg-green-500"}`}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[9px] text-neutral-400 font-semibold">
+                            <span>Consommé : {percentSpent.toFixed(0)}%</span>
+                            {isOverBudget && <span className="text-chery-red font-black">Alerte : Dépassement !</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* TAB 2: USER MANAGEMENT */}
+          {activeSubTab === "users" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Users Role List */}
+                <div className="md:col-span-2 bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                  <div className="flex justify-between items-center border-b border-neutral-100 pb-2">
+                    <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="h-4 w-4 text-chery-red" />
+                      Rôles & Profils d'Atelier Connectés ({activeProfiles.length})
+                    </h3>
+                    {isWritable && (
+                      <button
+                        onClick={() => setShowAddProfileModal(true)}
+                        className="text-[10px] font-black text-white bg-chery-red hover:bg-chery-dark px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <UserPlus className="h-3 w-3" />
+                        Nouveau Profil / Rôle
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-neutral-400">
+                    Ces comptes d'accès pré-configurés ou personnalisés permettent aux équipes de la STA d'utiliser la GMAO simultanément sur tablette ou terminal d'atelier.
+                  </p>
+
+                  <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+                    {activeProfiles.map((role) => {
+                      const activePin = passwords[role.id] || role.pin || "0000";
+                      return (
+                        <div key={role.id} className="p-3.5 border border-neutral-100 hover:bg-neutral-50/80 rounded-xl flex items-center justify-between gap-3 text-xs transition-colors bg-white">
+                          <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-extrabold text-neutral-800 text-sm">{role.label}</span>
+                              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${
+                                role.id === "admin" ? "bg-red-50 text-chery-red" : role.id === "supervisor" ? "bg-neutral-100 text-neutral-600" : "bg-blue-50 text-blue-700"
+                              }`}>
+                                {role.badge}
+                              </span>
+                              {role.userFullName && (
+                                <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded">
+                                  👤 {role.userFullName}
+                                </span>
+                              )}
+                              {role.workshop && (
+                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                                  🛠️ {role.workshop}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-neutral-400 leading-normal">{role.rights}</p>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <span className="text-[9px] text-neutral-400 block font-bold uppercase">CODE PIN</span>
+                              <span className="font-mono font-bold text-neutral-800 text-xs bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded block mt-0.5">
+                                {activePin}
+                              </span>
+                            </div>
+
+                            {isWritable && (
+                              <div className="flex items-center gap-1 border-l border-neutral-100 pl-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditProfile(role)}
+                                  title="Modifier ce profil"
+                                  className="p-1.5 text-neutral-500 hover:text-chery-red hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                {!role.isSystem && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (confirm(`Voulez-vous vraiment supprimer le profil "${role.label}" ?`)) {
+                                        if (onDeleteRoleProfile) onDeleteRoleProfile(role.id);
+                                      }
+                                    }}
+                                    title="Supprimer ce profil"
+                                    className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Password Update Form */}
+                <div className="md:col-span-1 bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                  <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 flex items-center gap-1.5">
+                    <Lock className="h-4.5 w-4.5 text-neutral-500" />
+                    Modification des PINs d'Accès
+                  </h3>
+                  <p className="text-xs text-neutral-400">
+                    Saisissez de nouveaux codes d'accès numériques sécurisés pour verrouiller ou déverrouiller les comptes.
+                  </p>
+
+                  <form onSubmit={handleSavePasswords} className="space-y-3 text-xs max-h-[450px] overflow-y-auto pr-1">
+                    <div className="space-y-3">
+                      {activeProfiles.map((prof) => (
+                        <div key={prof.id}>
+                          <label className="block font-bold text-neutral-600 mb-0.5 text-[11px] flex justify-between">
+                            <span>{prof.label}</span>
+                            <span className="text-[9px] text-neutral-400 font-mono">({prof.id})</span>
+                          </label>
+                          <input
+                            type="text"
+                            disabled={!isWritable}
+                            value={localPasswords[prof.id] !== undefined ? localPasswords[prof.id] : (prof.pin || "0000")}
+                            onChange={(e) => setLocalPasswords({ ...localPasswords, [prof.id]: e.target.value })}
+                            className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-mono font-bold focus:ring-1 focus:ring-chery-red disabled:bg-neutral-50"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {passwordSaveFeedback && (
+                      <p className="text-[10px] text-green-700 bg-green-50 p-2 rounded-lg text-center font-bold">
+                        {passwordSaveFeedback}
+                      </p>
+                    )}
+
+                    {isWritable ? (
+                      <button
+                        type="submit"
+                        className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer text-center mt-2"
+                      >
+                        Enregistrer tous les PINs
+                      </button>
+                    ) : (
+                      <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-[10px] text-neutral-400 font-bold text-center">
+                        🔒 Modification réservée à l'Admin
+                      </div>
+                    )}
+                  </form>
+                </div>
+              </div>
+
+              {/* MODAL EDIT ROLE PROFILE */}
+              {editingRoleProfile && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-neutral-100">
+                    <div className="flex justify-between items-center border-b border-neutral-100 pb-3">
+                      <h3 className="font-extrabold text-neutral-800 text-sm flex items-center gap-2">
+                        <Pencil className="h-4 w-4 text-chery-red" />
+                        Modifier le Profil : {editingRoleProfile.label}
+                      </h3>
+                      <button
+                        onClick={() => setEditingRoleProfile(null)}
+                        className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer text-neutral-400 hover:text-neutral-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveEditProfile} className="space-y-3 text-xs">
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Intitulé du Rôle / Compte *</label>
+                        <input
+                          type="text"
+                          required
+                          value={epLabel}
+                          onChange={(e) => setEpLabel(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none focus:border-chery-red"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Nom Complet du Titulaire</label>
+                        <input
+                          type="text"
+                          placeholder="ex: M. Ahmed Amine"
+                          value={epUserFullName}
+                          onChange={(e) => setEpUserFullName(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none focus:border-chery-red"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-bold text-neutral-600 mb-1">Type de Badge</label>
+                          <select
+                            value={epBadge}
+                            onChange={(e) => setEpBadge(e.target.value)}
+                            className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none bg-white"
+                          >
+                            <option value="Administrateur">Administrateur</option>
+                            <option value="Superviseur">Superviseur</option>
+                            <option value="Magasin">Magasin</option>
+                            <option value="Atelier">Atelier</option>
+                            <option value="Technicien">Technicien</option>
+                            <option value="Contrôleur">Contrôleur</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block font-bold text-neutral-600 mb-1">Code PIN (4 chiffres)</label>
+                          <input
+                            type="text"
+                            required
+                            maxLength={8}
+                            value={epPin}
+                            onChange={(e) => setEpPin(e.target.value)}
+                            className="w-full border border-neutral-200 rounded-lg p-2 font-mono font-bold outline-none focus:border-chery-red"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Atelier Rattaché (Optionnel)</label>
+                        <select
+                          value={epWorkshop}
+                          onChange={(e) => setEpWorkshop(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none bg-white"
+                        >
+                          <option value="">-- Tous les ateliers / Non rattaché --</option>
+                          {WORKSHOPS.map((w) => (
+                            <option key={w} value={w}>{w}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Droits & Habilitations</label>
+                        <textarea
+                          rows={2}
+                          value={epRights}
+                          onChange={(e) => setEpRights(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 outline-none focus:border-chery-red font-medium text-neutral-700"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+                        <button
+                          type="button"
+                          onClick={() => setEditingRoleProfile(null)}
+                          className="px-4 py-2 border border-neutral-200 rounded-xl font-bold text-neutral-600 hover:bg-neutral-50 cursor-pointer"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-chery-red hover:bg-chery-dark text-white rounded-xl font-bold cursor-pointer"
+                        >
+                          Enregistrer Modifications
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* MODAL ADD NEW ROLE PROFILE */}
+              {showAddProfileModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-neutral-100">
+                    <div className="flex justify-between items-center border-b border-neutral-100 pb-3">
+                      <h3 className="font-extrabold text-neutral-800 text-sm flex items-center gap-2">
+                        <UserPlus className="h-4 w-4 text-chery-red" />
+                        Créer un Nouveau Profil Utilisateur / Rôle
+                      </h3>
+                      <button
+                        onClick={() => setShowAddProfileModal(false)}
+                        className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer text-neutral-400 hover:text-neutral-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveNewProfile} className="space-y-3 text-xs">
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Intitulé du Rôle / Compte *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="ex: Chef Réception & Diagnostic"
+                          value={npLabel}
+                          onChange={(e) => setNpLabel(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none focus:border-chery-red"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-bold text-neutral-600 mb-1">Identifiant Système (ID)</label>
+                          <input
+                            type="text"
+                            placeholder="ex: chef_reception"
+                            value={npId}
+                            onChange={(e) => setNpId(e.target.value)}
+                            className="w-full border border-neutral-200 rounded-lg p-2 font-mono font-bold outline-none focus:border-chery-red"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-neutral-600 mb-1">Nom du Titulaire</label>
+                          <input
+                            type="text"
+                            placeholder="ex: Sami Laroussi"
+                            value={npUserFullName}
+                            onChange={(e) => setNpUserFullName(e.target.value)}
+                            className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none focus:border-chery-red"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-bold text-neutral-600 mb-1">Type de Badge</label>
+                          <select
+                            value={npBadge}
+                            onChange={(e) => setNpBadge(e.target.value)}
+                            className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none bg-white"
+                          >
+                            <option value="Atelier">Atelier</option>
+                            <option value="Technicien">Technicien</option>
+                            <option value="Magasin">Magasin</option>
+                            <option value="Superviseur">Superviseur</option>
+                            <option value="Contrôleur">Contrôleur</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block font-bold text-neutral-600 mb-1">Code PIN Initial</label>
+                          <input
+                            type="text"
+                            required
+                            maxLength={8}
+                            placeholder="0000"
+                            value={npPin}
+                            onChange={(e) => setNpPin(e.target.value)}
+                            className="w-full border border-neutral-200 rounded-lg p-2 font-mono font-bold outline-none focus:border-chery-red"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Atelier Rattaché</label>
+                        <select
+                          value={npWorkshop}
+                          onChange={(e) => setNpWorkshop(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none bg-white"
+                        >
+                          <option value="">-- Tous les ateliers / Polyvalent --</option>
+                          {WORKSHOPS.map((w) => (
+                            <option key={w} value={w}>{w}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Droits & Habilitations</label>
+                        <textarea
+                          rows={2}
+                          placeholder="Description des accès autorisés..."
+                          value={npRights}
+                          onChange={(e) => setNpRights(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 outline-none focus:border-chery-red font-medium text-neutral-700"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddProfileModal(false)}
+                          className="px-4 py-2 border border-neutral-200 rounded-xl font-bold text-neutral-600 hover:bg-neutral-50 cursor-pointer"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-chery-red hover:bg-chery-dark text-white rounded-xl font-bold cursor-pointer"
+                        >
+                          Créer le Profil
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: DOCUMENT CONTROL SUMMARY */}
+          {activeSubTab === "docs" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 flex items-center gap-1.5">
+                  <FileText className="h-4 w-4 text-chery-red" />
+                  État du Gestionnaire de Documents Techniques
+                </h3>
+
+                {/* Docs metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                  <div className="p-3 bg-neutral-50 border border-neutral-100 rounded-xl">
+                    <span className="text-[9px] text-neutral-400 block font-bold uppercase">Procédures</span>
+                    <span className="text-lg font-black text-neutral-800 font-mono block mt-1">{docsStats.procedures}</span>
+                  </div>
+                  <div className="p-3 bg-neutral-50 border border-neutral-100 rounded-xl">
+                    <span className="text-[9px] text-neutral-400 block font-bold uppercase">Instructions</span>
+                    <span className="text-lg font-black text-neutral-800 font-mono block mt-1">{docsStats.instructions}</span>
+                  </div>
+                  <div className="p-3 bg-neutral-50 border border-neutral-100 rounded-xl">
+                    <span className="text-[9px] text-neutral-400 block font-bold uppercase">Manuels</span>
+                    <span className="text-lg font-black text-neutral-800 font-mono block mt-1">{docsStats.manuals}</span>
+                  </div>
+                  <div className="p-3 bg-neutral-50 border border-neutral-100 rounded-xl">
+                    <span className="text-[9px] text-neutral-400 block font-bold uppercase">Plans</span>
+                    <span className="text-lg font-black text-neutral-800 font-mono block mt-1">{docsStats.plans}</span>
+                  </div>
+                  <div className="p-3 bg-neutral-50 border border-neutral-100 rounded-xl">
+                    <span className="text-[9px] text-neutral-400 block font-bold uppercase">Réglementaires</span>
+                    <span className="text-lg font-black text-neutral-800 font-mono block mt-1">{docsStats.regulatory}</span>
+                  </div>
+                </div>
+
+                {/* Summary Table list */}
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <span className="text-xs font-bold text-neutral-600">Recherche rapide de documents administratifs</span>
+                    <div className="relative w-full sm:w-64">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 h-3.5 w-3.5" />
+                      <input
+                        type="text"
+                        placeholder="Rechercher un document..."
+                        value={docsSearch}
+                        onChange={(e) => setDocsSearch(e.target.value)}
+                        className="w-full text-xs pl-8 pr-3 py-1.5 border border-neutral-200 bg-neutral-50 rounded-lg outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto text-xs border border-neutral-100 rounded-xl divide-y divide-neutral-50">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-neutral-50 font-bold text-neutral-400 text-[10px] uppercase border-b border-neutral-100">
+                          <th className="p-2.5">ID</th>
+                          <th className="p-2.5">Titre</th>
+                          <th className="p-2.5">Catégorie</th>
+                          <th className="p-2.5">Version</th>
+                          <th className="p-2.5 text-right">Taille</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-50 font-medium">
+                        {filteredDocsSummary.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-neutral-400 italic">
+                              Aucun document technique enregistré correspondant à la recherche.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredDocsSummary.map((doc: any) => (
+                            <tr key={doc.id} className="hover:bg-neutral-50/50">
+                              <td className="p-2.5 font-mono font-bold text-neutral-400">{doc.id}</td>
+                              <td className="p-2.5 font-bold text-neutral-700">{doc.name}</td>
+                              <td className="p-2.5">
+                                <span className="bg-neutral-100 text-neutral-600 text-[9px] font-black uppercase px-2 py-0.5 rounded">
+                                  {doc.type}
+                                </span>
+                              </td>
+                              <td className="p-2.5 font-mono text-neutral-600 font-bold">{doc.version || "V1.0"}</td>
+                              <td className="p-2.5 text-right font-mono text-neutral-400">{doc.size || "1.2 MB"}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: PRESTATAIRES & CONTRATS */}
+          {activeSubTab === "vendors" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Vendors List (2 cols) */}
+                <div className="md:col-span-2 bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                  <div className="flex justify-between items-center border-b border-neutral-100 pb-2">
+                    <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 className="h-4 w-4 text-chery-red" />
+                      Prestataires Externes Agréés ({vendors.length})
+                    </h3>
+                    <button
+                      onClick={() => setShowAddVendorForm(!showAddVendorForm)}
+                      className="text-[10px] font-black text-chery-red bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg cursor-pointer"
+                    >
+                      {showAddVendorForm ? "Annuler" : "Nouveau prestataire"}
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-neutral-400 leading-normal">
+                    Partenaires agréés assurant la conformité réglementaire Apave, la fourniture de fluides climatisation, ou l'entretien des cabines de peinture de la STA Tunisie.
+                  </p>
+
+                  <div className="space-y-2.5 max-h-[450px] overflow-y-auto pr-1">
+                    {vendors.map((vendor) => (
+                      <div key={vendor.id} className="p-3.5 border border-neutral-100 hover:bg-neutral-50 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-2 items-center text-xs transition-colors bg-white">
+                        <div className="sm:col-span-4">
+                          <span className="font-extrabold text-neutral-800 text-sm block">{vendor.name}</span>
+                          <span className="text-[9px] font-mono text-neutral-400 block mt-0.5 font-bold uppercase">{vendor.id}</span>
+                        </div>
+
+                        <div className="sm:col-span-4 space-y-0.5">
+                          <span className="text-neutral-600 font-bold block">{vendor.serviceType}</span>
+                          <span className="text-[10px] text-neutral-400 flex items-center gap-1">
+                            <Mail className="h-3 w-3 shrink-0" /> {vendor.email}
+                          </span>
+                        </div>
+
+                        <div className="sm:col-span-4 flex items-center justify-between sm:justify-end gap-3">
+                          <div className="text-left sm:text-right space-y-0.5">
+                            <span className="text-neutral-600 font-bold flex items-center sm:justify-end gap-1">
+                              <Phone className="h-3 w-3 shrink-0 text-neutral-400" /> {vendor.phone}
+                            </span>
+                            <span className="text-[10px] text-neutral-400 block">Contact : <strong>{vendor.contactPerson}</strong></span>
+                          </div>
+
+                          {isWritable && (
+                            <div className="flex items-center gap-1 border-l border-neutral-100 pl-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditVendor(vendor)}
+                                title="Modifier ce prestataire"
+                                className="p-1.5 text-neutral-500 hover:text-chery-red hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Voulez-vous vraiment supprimer le prestataire "${vendor.name}" ?`)) {
+                                    if (onDeleteVendor) onDeleteVendor(vendor.id);
+                                  }
+                                }}
+                                title="Supprimer ce prestataire"
+                                className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add Vendor Form (1 col) */}
+                <div className="md:col-span-1">
+                  {showAddVendorForm ? (
+                    <form onSubmit={handleRegisterVendor} className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4 text-xs animate-fade-in">
+                      <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 flex items-center gap-1.5">
+                        <Plus className="h-4 w-4 text-chery-red" />
+                        Nouveau Prestataire
+                      </h3>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Raison Sociale *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="ex: Apave Tunisie"
+                          value={vName}
+                          onChange={(e) => setVName(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 outline-none bg-white font-bold text-neutral-700"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Interlocuteur principal</label>
+                        <input
+                          type="text"
+                          placeholder="Nom du contact"
+                          value={vContact}
+                          onChange={(e) => setVContact(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 outline-none bg-white font-bold text-neutral-700"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Téléphone d'Assistance</label>
+                        <input
+                          type="text"
+                          placeholder="+216 71 123 456"
+                          value={vPhone}
+                          onChange={(e) => setVPhone(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 outline-none bg-white font-mono font-bold text-neutral-700"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Adresse Email</label>
+                        <input
+                          type="email"
+                          placeholder="contact@partenaire.tn"
+                          value={vEmail}
+                          onChange={(e) => setVEmail(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 outline-none bg-white font-bold text-neutral-700"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">
+                          Spécialité / Type de Service <span className="text-[10px] text-neutral-400 font-normal">(Optionnel)</span>
+                        </label>
+                        <select
+                          value={vSpecialty}
+                          onChange={(e) => setVSpecialty(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 outline-none bg-white font-bold text-neutral-700"
+                        >
+                          <option value="">-- Non spécifiée (Optionnel) --</option>
+                          <option value="Contrôles réglementaires (Apave/Sotrap)">Contrôles réglementaires (Apave/Sotrap)</option>
+                          <option value="Pièces détachées constructeur">Pièces détachées constructeur</option>
+                          <option value="Fluides & Gaz climatisation (R134a)">Fluides & Gaz climatisation (R134a)</option>
+                          <option value="Maintenance Bâtiment & Génie civil">Maintenance Bâtiment & Génie civil</option>
+                          <option value="Étalonnage et Métrologie laser">Étalonnage et Métrologie laser</option>
+                          <option value="Autre">Autre (Préciser ci-dessous...)</option>
+                        </select>
+
+                        {vSpecialty === "Autre" && (
+                          <input
+                            type="text"
+                            placeholder="Saisir la spécialité (ex: Peinture, Pneumatique, Outillage...)"
+                            value={vCustomSpecialty}
+                            onChange={(e) => setVCustomSpecialty(e.target.value)}
+                            className="w-full mt-2 border border-neutral-200 rounded-lg p-2 outline-none bg-white font-medium text-neutral-800 focus:border-chery-red"
+                          />
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-chery-red hover:bg-chery-dark text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer"
+                      >
+                        Enregistrer Partenaire
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="bg-neutral-50 rounded-2xl border-2 border-dashed border-neutral-200 p-8 text-center text-neutral-400 flex flex-col items-center justify-center">
+                      <Building2 className="h-6 w-6 text-neutral-300 mb-1" />
+                      <span className="font-bold text-xs">Aucun formulaire ouvert</span>
+                      <p className="text-[10px] mt-1 max-w-[150px] leading-relaxed">
+                        Cliquez sur "Nouveau prestataire" pour enregistrer un nouveau partenaire agréé.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* MODAL EDIT VENDOR */}
+              {editingVendor && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-neutral-100">
+                    <div className="flex justify-between items-center border-b border-neutral-100 pb-3">
+                      <h3 className="font-extrabold text-neutral-800 text-sm flex items-center gap-2">
+                        <Pencil className="h-4 w-4 text-chery-red" />
+                        Modifier le Prestataire : {editingVendor.name}
+                      </h3>
+                      <button
+                        onClick={() => setEditingVendor(null)}
+                        className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer text-neutral-400 hover:text-neutral-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveEditVendor} className="space-y-3 text-xs">
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Raison Sociale *</label>
+                        <input
+                          type="text"
+                          required
+                          value={evName}
+                          onChange={(e) => setEvName(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none focus:border-chery-red"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-bold text-neutral-600 mb-1">Interlocuteur Principal</label>
+                          <input
+                            type="text"
+                            value={evContact}
+                            onChange={(e) => setEvContact(e.target.value)}
+                            className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none focus:border-chery-red"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-neutral-600 mb-1">Téléphone d'Assistance</label>
+                          <input
+                            type="text"
+                            value={evPhone}
+                            onChange={(e) => setEvPhone(e.target.value)}
+                            className="w-full border border-neutral-200 rounded-lg p-2 font-mono font-bold outline-none focus:border-chery-red"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">Adresse Email</label>
+                        <input
+                          type="email"
+                          value={evEmail}
+                          onChange={(e) => setEvEmail(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none focus:border-chery-red"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-neutral-600 mb-1">
+                          Spécialité / Type de Service <span className="text-[10px] text-neutral-400 font-normal">(Optionnel)</span>
+                        </label>
+                        <select
+                          value={evSpecialty}
+                          onChange={(e) => setEvSpecialty(e.target.value)}
+                          className="w-full border border-neutral-200 rounded-lg p-2 font-bold outline-none bg-white"
+                        >
+                          <option value="">-- Non spécifiée (Optionnel) --</option>
+                          <option value="Contrôles réglementaires (Apave/Sotrap)">Contrôles réglementaires (Apave/Sotrap)</option>
+                          <option value="Pièces détachées constructeur">Pièces détachées constructeur</option>
+                          <option value="Fluides & Gaz climatisation (R134a)">Fluides & Gaz climatisation (R134a)</option>
+                          <option value="Maintenance Bâtiment & Génie civil">Maintenance Bâtiment & Génie civil</option>
+                          <option value="Étalonnage et Métrologie laser">Étalonnage et Métrologie laser</option>
+                          <option value="Autre">Autre (Préciser ci-dessous...)</option>
+                        </select>
+
+                        {evSpecialty === "Autre" && (
+                          <input
+                            type="text"
+                            placeholder="Saisir la spécialité personnalisée..."
+                            value={evCustomSpecialty}
+                            onChange={(e) => setEvCustomSpecialty(e.target.value)}
+                            className="w-full mt-2 border border-neutral-200 rounded-lg p-2 font-medium text-neutral-800 outline-none focus:border-chery-red"
+                          />
+                        )}
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+                        <button
+                          type="button"
+                          onClick={() => setEditingVendor(null)}
+                          className="px-4 py-2 border border-neutral-200 rounded-xl font-bold text-neutral-600 hover:bg-neutral-50 cursor-pointer"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-chery-red hover:bg-chery-dark text-white rounded-xl font-bold cursor-pointer"
+                        >
+                          Enregistrer Modifications
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: NOTIFICATIONS */}
+          {activeSubTab === "notifications" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Configuration parameters */}
+                <div className="md:col-span-1 bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                  <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 flex items-center gap-1.5">
+                    <Sliders className="h-4 w-4 text-chery-red" />
+                    Paramètres d'Alertes
+                  </h3>
+
+                  <div className="space-y-3 text-xs font-semibold text-neutral-600">
+                    <label className="flex items-center gap-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100 hover:bg-neutral-100/50 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={notifSound}
+                        onChange={(e) => setNotifSound(e.target.checked)}
+                        className="rounded border-neutral-300 text-chery-red focus:ring-chery-red"
+                      />
+                      <span>Signaux sonores d'alertes en temps réel</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100 hover:bg-neutral-100/50 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={notifEmailThreshold}
+                        onChange={(e) => setNotifEmailThreshold(e.target.checked)}
+                        className="rounded border-neutral-300 text-chery-red focus:ring-chery-red"
+                      />
+                      <span>Envoi automatique d'Emails pour les pannes</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100 hover:bg-neutral-100/50 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={notifSMSThreshold}
+                        onChange={(e) => setNotifSMSThreshold(e.target.checked)}
+                        className="rounded border-neutral-300 text-chery-red focus:ring-chery-red"
+                      />
+                      <span>Notifications SMS pour l'administrateur</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Alarm Board and simulator */}
+                <div className="md:col-span-2 bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                  <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 flex items-center gap-1.5">
+                    <Bell className="h-4.5 w-4.5 text-chery-red" />
+                    Simulateur d'Astreinte Technique
+                  </h3>
+                  <p className="text-xs text-neutral-400 leading-normal">
+                    La GMAO intègre un système d'alerte automatisé. Lors de la saisie d'un signalement de panne par un Chef d'Atelier, les ingénieurs d'astreinte reçoivent instantanément un message.
+                  </p>
+
+                  <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/50 space-y-3 text-xs">
+                    <span className="font-extrabold text-neutral-700 block">Dépêche d'Assistance Interactive</span>
+                    <p className="text-neutral-400 text-[11px] leading-relaxed">
+                      Cliquez sur le bouton ci-dessous pour lancer une simulation d'envoi d'alerte critique sur les serveurs d'assistance de la STA Chery Tunisie.
+                    </p>
+
+                    <button
+                      onClick={handleSimulateAlert}
+                      className="flex items-center justify-center gap-2 bg-chery-red hover:bg-chery-dark text-white font-bold px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      Simuler un SMS & Email de panne d'urgence
+                    </button>
+
+                    {simulatedDispatch && (
+                      <div className="p-3 bg-red-50 text-red-950 font-bold border border-red-100 rounded-xl text-[10px] leading-relaxed animate-pulse">
+                        {simulatedDispatch}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: AUDIT LOGGER */}
+          {activeSubTab === "audit" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                <div className="flex justify-between items-center border-b border-neutral-100 pb-3 flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <History className="h-4 w-4 text-chery-red" />
+                      Journal d'Audit - Historique des Modifications
+                    </h3>
+                    <p className="text-xs text-neutral-400">
+                      Registre légal traçant l'intégralité des créations d'équipements, validations d'achats, et saisies budgétaires.
+                    </p>
+                  </div>
+
+                  {isAdmin && onClearLogs && (
+                    <button
+                      onClick={() => {
+                        if (confirm("⚠️ Souhaitez-vous purger l'intégralité du journal d'audit de la STA ? Cette opération est irréversible.")) {
+                          onClearLogs();
+                        }
+                      }}
+                      className="text-[10px] font-black text-chery-red hover:underline border border-red-100 px-3 py-1 bg-red-50 rounded-lg cursor-pointer transition-colors"
+                    >
+                      Purger le journal
+                    </button>
+                  )}
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 h-3.5 w-3.5" />
+                    <input
+                      type="text"
+                      placeholder="Filtrer l'audit par action, utilisateur, matériel..."
+                      value={auditSearch}
+                      onChange={(e) => setAuditSearch(e.target.value)}
+                      className="w-full text-xs bg-neutral-50 border border-neutral-200 rounded-xl py-2 pl-9 pr-3 outline-none focus:border-neutral-300"
+                    />
+                  </div>
+
+                  <select
+                    value={auditTypeFilter}
+                    onChange={(e) => setAuditTypeFilter(e.target.value)}
+                    className="bg-neutral-50 border border-neutral-200 rounded-xl py-2 px-3 text-xs outline-none cursor-pointer"
+                  >
+                    <option value="All">Toutes les catégories</option>
+                    <option value="equipment">Équipements Parc</option>
+                    <option value="intervention">Bons d'Interventions</option>
+                    <option value="spare_part">Pièces & Inventaire</option>
+                    <option value="compliance">Contrôles de Conformité</option>
+                    <option value="purchase">Demandes d'Achats (DA)</option>
+                    <option value="budget">Allocations Budgétaires</option>
+                    <option value="other">Système & Initialisation</option>
+                  </select>
+                </div>
+
+                {/* Logs Listing Table */}
+                <div className="overflow-x-auto text-xs border border-neutral-100 rounded-xl max-h-[350px] overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-neutral-50 font-bold text-neutral-400 text-[10px] uppercase border-b border-neutral-100">
+                        <th className="p-2.5">Date & Heure</th>
+                        <th className="p-2.5">Auteur</th>
+                        <th className="p-2.5">Type</th>
+                        <th className="p-2.5">Action</th>
+                        <th className="p-2.5">Détail des modifications</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-50 font-medium">
+                      {filteredAuditLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-12 text-center text-neutral-400 italic">
+                            Aucun enregistrement d'audit trouvé pour les critères de recherche.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredAuditLogs.map((log) => (
+                          <tr key={log.id} className="hover:bg-neutral-50/50">
+                            <td className="p-2.5 font-mono text-neutral-400 whitespace-nowrap">{log.timestamp}</td>
+                            <td className="p-2.5">
+                              <span className="font-bold text-neutral-700">@{log.userRole}</span>
+                            </td>
+                            <td className="p-2.5 whitespace-nowrap">
+                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                log.type === "equipment" ? "bg-blue-50 text-blue-700" :
+                                log.type === "intervention" ? "bg-purple-50 text-purple-700" :
+                                log.type === "budget" ? "bg-amber-50 text-amber-700" :
+                                log.type === "compliance" ? "bg-green-50 text-green-700" :
+                                log.type === "purchase" ? "bg-red-50 text-chery-red" : "bg-neutral-100 text-neutral-600"
+                              }`}>
+                                {log.type}
+                              </span>
+                            </td>
+                            <td className="p-2.5 font-bold text-neutral-800 whitespace-nowrap">{log.action}</td>
+                            <td className="p-2.5 text-neutral-500 leading-normal">{log.details}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

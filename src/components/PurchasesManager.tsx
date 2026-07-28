@@ -63,7 +63,7 @@ export default function PurchasesManager({
   const [estimatedCost, setEstimatedCost] = useState<number>(1000);
   const [selectedVendorId, setSelectedVendorId] = useState("");
   const [requesterName, setRequesterName] = useState("M. Ahmed Amine Ben Salah");
-  const [purchaseCategory, setPurchaseCategory] = useState<"Équipement" | "Infrastructure">("Équipement");
+  const [purchaseCategory, setPurchaseCategory] = useState<"Équipement" | "Infrastructure" | "Service">("Équipement");
 
   // Add Vendor form state
   const [showVendorForm, setShowVendorForm] = useState(false);
@@ -236,14 +236,14 @@ export default function PurchasesManager({
             {purchaseRequests.filter((r) => r.status === "En attente" || r.status === "Approuvé").length} en cours
           </span>
           <span className="text-[10px] text-amber-600 font-semibold block mt-0.5">
-            Valeur : {pendingRequestsValue.toLocaleString()} TND
+            Valeur : {(pendingRequestsValue ?? 0).toLocaleString()} TND
           </span>
         </div>
 
         <div className="p-3 bg-neutral-50 rounded-lg text-xs">
           <span className="text-neutral-400 block font-semibold uppercase">Volume d'Engagements</span>
           <span className="text-xl font-extrabold text-neutral-800 font-mono mt-0.5">
-            {totalRequestsValue.toLocaleString()} TND
+            {(totalRequestsValue ?? 0).toLocaleString()} TND
           </span>
           <span className="text-[10px] text-neutral-400 block mt-0.5">
             Investissements d'équipement globaux
@@ -392,10 +392,12 @@ export default function PurchasesManager({
                               className={`px-1.5 py-0.2 rounded-sm text-[8px] font-extrabold uppercase shrink-0 border ${
                                 req.category === "Infrastructure"
                                   ? "bg-purple-50 border-purple-150 text-purple-700"
+                                  : req.category === "Service"
+                                  ? "bg-amber-50 border-amber-150 text-amber-700"
                                   : "bg-teal-50 border-teal-150 text-teal-700"
                               }`}
                             >
-                              {req.category === "Infrastructure" ? "🏢 Infrastructure" : "⚙️ Équipement"}
+                              {req.category === "Infrastructure" ? "🏢 Infrastructure" : req.category === "Service" ? "🛠️ Service" : "⚙️ Équipement"}
                             </span>
                           </div>
                           <span className="text-[11px] text-neutral-500 block leading-relaxed">
@@ -431,7 +433,7 @@ export default function PurchasesManager({
                           {req.dateRequested}
                         </td>
                         <td className="py-3 px-4 text-right font-mono font-bold text-neutral-800">
-                          {req.estimatedCost.toLocaleString()} TND
+                          {(req.estimatedCost ?? 0).toLocaleString()} TND
                         </td>
                         <td className="py-3 px-4 text-center">
                           <span
@@ -603,11 +605,11 @@ export default function PurchasesManager({
             <form onSubmit={handleRequestSubmit} className="p-6 space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-neutral-600 mb-1">Catégorie de la Demande d'Achat *</label>
-                <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200/50">
+                <div className="grid grid-cols-3 gap-2 p-1 bg-neutral-100 rounded-xl border border-neutral-200/50">
                   <button
                     type="button"
                     onClick={() => setPurchaseCategory("Équipement")}
-                    className={`py-2 px-3 rounded-lg text-center font-bold transition-all cursor-pointer text-[11px] ${
+                    className={`py-2 px-1 rounded-lg text-center font-bold transition-all cursor-pointer text-[10px] ${
                       purchaseCategory === "Équipement"
                         ? "bg-white text-neutral-800 shadow-sm"
                         : "text-neutral-500 hover:text-neutral-700"
@@ -618,30 +620,43 @@ export default function PurchasesManager({
                   <button
                     type="button"
                     onClick={() => setPurchaseCategory("Infrastructure")}
-                    className={`py-2 px-3 rounded-lg text-center font-bold transition-all cursor-pointer text-[11px] ${
+                    className={`py-2 px-1 rounded-lg text-center font-bold transition-all cursor-pointer text-[10px] ${
                       purchaseCategory === "Infrastructure"
                         ? "bg-white text-neutral-800 shadow-sm"
                         : "text-neutral-500 hover:text-neutral-700"
                     }`}
                   >
-                    🏢 Infrastructure
+                    🏢 Infra
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPurchaseCategory("Service")}
+                    className={`py-2 px-1 rounded-lg text-center font-bold transition-all cursor-pointer text-[10px] ${
+                      purchaseCategory === "Service"
+                        ? "bg-white text-neutral-800 shadow-sm"
+                        : "text-neutral-500 hover:text-neutral-700"
+                    }`}
+                  >
+                    🛠️ Service
                   </button>
                 </div>
                 <p className="text-[10px] text-neutral-400 mt-1 pl-1">
                   {purchaseCategory === "Infrastructure"
                     ? "Travaux, gros œuvre, raccordements d'air ou d'électricité, réfection de sol, etc."
+                    : purchaseCategory === "Service"
+                    ? "Prestations de service, contrats d'entretien, calibrations, contrôles, main-d'œuvre."
                     : "Machines d'atelier, ponts, compresseurs, démonte-pneus, outillage spécialisé."}
                 </p>
               </div>
 
               <div>
                 <label className="block font-bold text-neutral-600 mb-1">
-                  {purchaseCategory === "Infrastructure" ? "Nom des travaux / de l'infrastructure requis *" : "Nom de l'équipement requis *"}
+                  {purchaseCategory === "Infrastructure" ? "Nom des travaux / de l'infrastructure requis *" : purchaseCategory === "Service" ? "Nom du service / de la prestation requis *" : "Nom de l'équipement requis *"}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder={purchaseCategory === "Infrastructure" ? "ex: Réfection réseau d'air comprimé, Cablage triphasé..." : "ex: Pont élévateur 4T, Lustreuse pneumatique..."}
+                  placeholder={purchaseCategory === "Infrastructure" ? "ex: Réfection réseau d'air comprimé, Cablage triphasé..." : purchaseCategory === "Service" ? "ex: Contrat de maintenance, Réparation externe, Calibration..." : "ex: Pont élévateur 4T, Lustreuse pneumatique..."}
                   value={equipmentName}
                   onChange={(e) => setEquipmentName(e.target.value)}
                   className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red text-xs font-medium"

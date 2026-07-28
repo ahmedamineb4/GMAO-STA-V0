@@ -975,6 +975,78 @@ export const INITIAL_EQUIPMENTS: Equipment[] = [
     critical: false,
     mtbfTargetHours: 800,
     mttrTargetHours: 2
+  },
+
+  // --- Zone: Maintenance Bâtiment & Infrastructure ---
+  {
+    code: "EQ-BAT-ELEC",
+    name: "Armoires Électriques TGBT & Distribution Bâtiment",
+    workshop: "Maintenance Bâtiment",
+    status: "Opérationnel",
+    purchaseDate: "2020-01-15",
+    warrantyEnd: "2025-01-15",
+    purchasePrice: 45000,
+    location: "Local Technique TGBT",
+    serialNumber: "TGBT-STA-01",
+    critical: true,
+    mtbfTargetHours: 2500,
+    mttrTargetHours: 3
+  },
+  {
+    code: "EQ-BAT-CLIM",
+    name: "Système de Climatisation & VRV (Showroom & Bureaux)",
+    workshop: "Maintenance Bâtiment",
+    status: "Opérationnel",
+    purchaseDate: "2021-05-10",
+    warrantyEnd: "2026-05-10",
+    purchasePrice: 65000,
+    location: "Toiture & Locaux Climatisation",
+    serialNumber: "VRV-CLIM-STA",
+    critical: true,
+    mtbfTargetHours: 2000,
+    mttrTargetHours: 4
+  },
+  {
+    code: "EQ-BAT-PLOMB",
+    name: "Réseau de Plomberie, Sanitaires & Pompe Surpresseur",
+    workshop: "Maintenance Bâtiment",
+    status: "Opérationnel",
+    purchaseDate: "2020-01-15",
+    warrantyEnd: "2025-01-15",
+    purchasePrice: 18000,
+    location: "Bâtiment Principal & Sanitaires",
+    serialNumber: "PLOMB-STA-01",
+    critical: true,
+    mtbfTargetHours: 3000,
+    mttrTargetHours: 2
+  },
+  {
+    code: "EQ-BAT-SERR",
+    name: "Portes Automatiques, Rideaux Métalliques & Serrurerie",
+    workshop: "Maintenance Bâtiment",
+    status: "Opérationnel",
+    purchaseDate: "2022-03-20",
+    warrantyEnd: "2025-03-20",
+    purchasePrice: 22000,
+    location: "Accès Ateliers & Showroom",
+    serialNumber: "SERR-STA-01",
+    critical: true,
+    mtbfTargetHours: 2000,
+    mttrTargetHours: 3
+  },
+  {
+    code: "EQ-BAT-ECLAIR",
+    name: "Éclairage LED & Projecteurs Ateliers / Extérieur",
+    workshop: "Maintenance Bâtiment",
+    status: "Opérationnel",
+    purchaseDate: "2023-01-10",
+    warrantyEnd: "2026-01-10",
+    purchasePrice: 12000,
+    location: "Ateliers & Abords STA Chery",
+    serialNumber: "LED-STA-01",
+    critical: false,
+    mtbfTargetHours: 4000,
+    mttrTargetHours: 2
   }
 ];
 

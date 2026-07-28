@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   LayoutDashboard,
   Wrench,
@@ -26,7 +26,14 @@ import {
   Menu,
   X,
   Presentation,
-  LogOut
+  LogOut,
+  History,
+  AlertTriangle,
+  AlertOctagon,
+  DollarSign,
+  Search,
+  Command,
+  Sparkles
 } from "lucide-react";
 
 // Types & Initial Data
@@ -41,7 +48,9 @@ import {
   EquipmentStatus,
   InterventionStatus,
   Workshop,
-  PurchaseRequest
+  PurchaseRequest,
+  ActivityLog,
+  UserRoleProfile
 } from "./types";
 
 import {
@@ -52,7 +61,8 @@ import {
   INITIAL_CONTRACTS,
   INITIAL_COMPLIANCE_CHECKS,
   BUDGET_2026,
-  INITIAL_PURCHASE_REQUESTS
+  INITIAL_PURCHASE_REQUESTS,
+  WORKSHOPS
 } from "./data";
 
 // Sub Components
@@ -64,14 +74,60 @@ import ExcelBlueprint from "./components/ExcelBlueprint";
 import PurchasesManager from "./components/PurchasesManager";
 import SettingsManager from "./components/SettingsManager";
 import UserGuide from "./components/UserGuide";
+import AuditLogs from "./components/AuditLogs";
+import DocumentationManager from "./components/DocumentationManager";
+import { FinancialManager } from "./components/FinancialManager";
+import CommandPaletteModal from "./components/CommandPaletteModal";
+import ToastNotification from "./components/ToastNotification";
 
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>(() => {
-    return localStorage.getItem("chery_gmao_active_tab") || "dashboard";
+    const saved = localStorage.getItem("chery_gmao_active_tab");
+    if (saved === "excel" || saved === "guide") return "dashboard";
+    return saved || "dashboard";
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [resetConfirmType, setResetConfirmType] = useState<"reset" | "clear" | null>(null);
+
+  // 🔍 Command Palette & Toast Notification State
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
+  const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ message, type });
+  };
+
+  // ⌨️ Global Cmd+K / Ctrl+K keyboard shortcut listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // 🚨 State for Global Breakdown Alert Modal
+  const [showGlobalAlertModal, setShowGlobalAlertModal] = useState<boolean>(false);
+  const [alertSelectedWorkshop, setAlertSelectedWorkshop] = useState<string>("All");
+  const [alertEqCode, setAlertEqCode] = useState<string>("");
+  const [alertTech, setAlertTech] = useState<string>("");
+  const [alertTitle, setAlertTitle] = useState<string>("");
+  const [alertDesc, setAlertDesc] = useState<string>("");
+  const [alertPriority, setAlertPriority] = useState<"Faible" | "Moyenne" | "Haute" | "Critique">("Moyenne");
+
+  // 🏢 State for Building Anomaly Reporting Modal (Authentication Page & Quick Portal)
+  const [showBuildingAnomalyModal, setShowBuildingAnomalyModal] = useState<boolean>(false);
+  const [buildingAnomalySuccess, setBuildingAnomalySuccess] = useState<string | null>(null);
+  const [anomalyCategory, setAnomalyCategory] = useState<string>("⚡ Électricité & Éclairage");
+  const [anomalyLocation, setAnomalyLocation] = useState<string>("Showroom Véhicules Neufs");
+  const [anomalyDesc, setAnomalyDesc] = useState<string>("");
+  const [anomalyReporter, setAnomalyReporter] = useState<string>("");
+  const [anomalyPhone, setAnomalyPhone] = useState<string>("");
+  const [anomalyPriority, setAnomalyPriority] = useState<"Faible" | "Moyenne" | "Haute" | "Critique">("Moyenne");
 
   // Status of disk database synchronization
   const [diskSyncStatus, setDiskSyncStatus] = useState<"synced" | "syncing" | "error" | "idle">("idle");
@@ -103,44 +159,49 @@ export default function App() {
   const [equipments, setEquipments] = useState<Equipment[]>(() => {
     const saved = localStorage.getItem("chery_gmao_equipments");
     if (saved) return JSON.parse(saved);
-    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_EQUIPMENTS : [];
   });
 
   const [interventions, setInterventions] = useState<Intervention[]>(() => {
     const saved = localStorage.getItem("chery_gmao_interventions");
     if (saved) return JSON.parse(saved);
-    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_INTERVENTIONS : [];
   });
 
   const [spareParts, setSpareParts] = useState<SparePart[]>(() => {
     const saved = localStorage.getItem("chery_gmao_spare_parts");
     if (saved) return JSON.parse(saved);
-    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_SPARE_PARTS : [];
   });
 
   const [vendors, setVendors] = useState<Vendor[]>(() => {
     const saved = localStorage.getItem("chery_gmao_vendors");
     if (saved) return JSON.parse(saved);
-    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_VENDORS : [];
   });
 
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>(() => {
     const saved = localStorage.getItem("chery_gmao_purchase_requests");
     if (saved) return JSON.parse(saved);
-    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_PURCHASE_REQUESTS : [];
   });
 
-  const [contracts] = useState<MaintenanceContract[]>(INITIAL_CONTRACTS);
+  const [contracts, setContracts] = useState<MaintenanceContract[]>(() => {
+    const saved = localStorage.getItem("chery_gmao_contracts");
+    if (saved) return JSON.parse(saved);
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
+    return mode === "demo" ? INITIAL_CONTRACTS : [];
+  });
 
   const [compliance, setCompliance] = useState<ComplianceCheck[]>(() => {
     const saved = localStorage.getItem("chery_gmao_compliance");
     if (saved) return JSON.parse(saved);
-    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_COMPLIANCE_CHECKS : [];
   });
 
@@ -175,27 +236,108 @@ export default function App() {
     };
   });
 
-  // User Authentication & Access Control States
-  const DEFAULT_PASSWORDS: Record<string, string> = {
-    admin: "1924",
-    supervisor: "1234",
-    magasin: "2026",
-    service_rapide: "0000",
-    atelier_mecanique: "0000",
-    atelier_diagnostic: "0000",
-    carrosserie: "0000",
-    lavage: "0000",
-    batiment: "0000"
-  };
+  // User Authentication & Access Control States & Editable Profiles
+  const DEFAULT_USER_PROFILES: UserRoleProfile[] = [
+    { id: "admin", label: "M. Ahmed Amine (Admin)", userFullName: "Ahmed Amine", rights: "Accès total, modifications budget, mots de passe", badge: "Administrateur", pin: "1924", isSystem: true },
+    { id: "supervisor", label: "Superviseur (Lecture seule)", userFullName: "Direction STA", rights: "Lecture seule sur tous les modules", badge: "Superviseur", pin: "1234", isSystem: true },
+    { id: "magasin", label: "Responsable Achats & Appro", userFullName: "Sami Ben Ali", rights: "Gestion des commandes de travaux, fournitures et achats", badge: "Achats", pin: "2026", isSystem: true },
+    { id: "service_rapide", label: "Chef d'Atelier : Service Rapide", userFullName: "Mohamed Ben Amor", rights: "Interventions et pannes sur Service Rapide", badge: "Atelier", pin: "0000", workshop: "Service Rapide" },
+    { id: "atelier_mecanique", label: "Chef d'Atelier : Mécanique & Élec", userFullName: "Karim Gharbi", rights: "Interventions et pannes sur Mécanique", badge: "Atelier", pin: "0000", workshop: "Atelier Mécanique" },
+    { id: "atelier_diagnostic", label: "Chef d'Atelier : Diagnostic", userFullName: "Youssef Tounsi", rights: "Interventions et pannes sur Diagnostic", badge: "Atelier", pin: "0000", workshop: "Atelier Diagnostic" },
+    { id: "carrosserie", label: "Chef d'Atelier : Carrosserie", userFullName: "Khaled Khelifi", rights: "Interventions et pannes sur Carrosserie", badge: "Atelier", pin: "0000", workshop: "Carrosserie" },
+    { id: "lavage", label: "Chef d'Atelier : Lavage", userFullName: "Hassen Jlassi", rights: "Interventions et pannes sur Lavage", badge: "Atelier", pin: "0000", workshop: "Lavage" },
+    { id: "batiment", label: "Chef d'Atelier : Maintenance Bâtiment", userFullName: "Ali Trabelsi", rights: "Interventions et pannes sur Bâtiment", badge: "Atelier", pin: "0000", workshop: "Maintenance Bâtiment" }
+  ];
+
+  const [userProfiles, setUserProfiles] = useState<UserRoleProfile[]>(() => {
+    const saved = localStorage.getItem("chery_gmao_user_profiles");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return DEFAULT_USER_PROFILES;
+      }
+    }
+    return DEFAULT_USER_PROFILES;
+  });
 
   const [passwords, setPasswords] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem("chery_gmao_passwords");
-    return saved ? JSON.parse(saved) : DEFAULT_PASSWORDS;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // fallback
+      }
+    }
+    const map: Record<string, string> = {};
+    DEFAULT_USER_PROFILES.forEach((p) => { map[p.id] = p.pin; });
+    return map;
   });
+
+  // Sync userProfiles to localStorage and keep passwords state in sync
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_user_profiles", JSON.stringify(userProfiles));
+    const passMap: Record<string, string> = {};
+    userProfiles.forEach((p) => {
+      passMap[p.id] = p.pin || "0000";
+    });
+    setPasswords(passMap);
+    localStorage.setItem("chery_gmao_passwords", JSON.stringify(passMap));
+  }, [userProfiles]);
 
   const [currentUserRole, setCurrentUserRole] = useState<string>(() => {
     return localStorage.getItem("chery_gmao_user_role") || "admin";
   });
+
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
+    const saved = localStorage.getItem("chery_gmao_activity_logs");
+    if (saved) return JSON.parse(saved);
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    if (mode === "demo") {
+      return [
+        {
+          id: "init-1",
+          timestamp: "2026-07-01 08:30:00",
+          userRole: "admin",
+          action: "Initialisation Système",
+          details: "Démarrage et chargement de la base de données GMAO STA Tunisie en mode démonstration.",
+          type: "other"
+        },
+        {
+          id: "init-2",
+          timestamp: "2026-07-01 09:15:00",
+          userRole: "admin",
+          action: "Vérification Budget",
+          details: "Le budget annuel de maintenance 2026 de 405 000 TND a été affecté par l'administrateur.",
+          type: "budget"
+        }
+      ];
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_activity_logs", JSON.stringify(activityLogs));
+  }, [activityLogs]);
+
+  const logActivity = (action: string, details: string, type: ActivityLog["type"] = "other") => {
+    const newLog: ActivityLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toLocaleString("fr-FR"),
+      userRole: currentUserRole,
+      action,
+      details,
+      type
+    };
+    setActivityLogs((prev) => [newLog, ...prev]);
+  };
+
+  const handleClearActivityLogs = () => {
+    if (currentUserRole !== "admin") return;
+    setActivityLogs([]);
+    localStorage.setItem("chery_gmao_activity_logs", JSON.stringify([]));
+  };
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem("chery_gmao_authenticated") === "true";
@@ -209,16 +351,36 @@ export default function App() {
   const [passwordError, setPasswordError] = useState(false);
   const [showHelperCodes, setShowHelperCodes] = useState(false);
 
-  const ROLE_LABELS: Record<string, string> = {
-    admin: "M. Ahmed Amine (Admin)",
-    supervisor: "Superviseur (Lecture seule)",
-    magasin: "Magasinier (Pièces)",
-    service_rapide: "Chef d'Atelier: Service Rapide",
-    atelier_mecanique: "Chef d'Atelier: Mécanique / élec",
-    atelier_diagnostic: "Chef d'Atelier: Diagnostic",
-    carrosserie: "Chef d'Atelier: Carrosserie",
-    lavage: "Chef d'Atelier: Lavage",
-    batiment: "Chef d'Atelier: Maintenance Bâtiment"
+  // Dynamic ROLE_LABELS map based on userProfiles
+  const ROLE_LABELS: Record<string, string> = useMemo(() => {
+    const map: Record<string, string> = {};
+    userProfiles.forEach((p) => {
+      map[p.id] = p.label;
+    });
+    return map;
+  }, [userProfiles]);
+
+  // Profile Management Handlers
+  const handleUpdateRoleProfile = (updated: UserRoleProfile) => {
+    setUserProfiles((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    logActivity("Modification Profil", `Mise à jour du profil utilisateur : ${updated.label}`, "other");
+  };
+
+  const handleAddRoleProfile = (newProfile: UserRoleProfile) => {
+    setUserProfiles((prev) => [...prev, newProfile]);
+    logActivity("Nouveau Profil", `Création du profil utilisateur : ${newProfile.label}`, "other");
+  };
+
+  const handleDeleteRoleProfile = (profileId: string) => {
+    const target = userProfiles.find((p) => p.id === profileId);
+    if (target?.isSystem) {
+      alert("Ce profil système ne peut pas être supprimé car il est essentiel au fonctionnement de l'application.");
+      return;
+    }
+    setUserProfiles((prev) => prev.filter((p) => p.id !== profileId));
+    if (target) {
+      logActivity("Suppression Profil", `Suppression du profil : ${target.label}`, "other");
+    }
   };
 
   const handleVerifyPassword = () => {
@@ -299,10 +461,18 @@ export default function App() {
     localStorage.setItem("chery_gmao_budget", JSON.stringify(budget));
   }, [budget]);
 
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_contracts", JSON.stringify(contracts));
+  }, [contracts]);
+
   // Save navigation and filter states to LocalStorage on changes
   useEffect(() => {
+    if (activeTab === "excel" || activeTab === "guide" || (activeTab === "logs" && currentUserRole !== "admin")) {
+      setActiveTab("dashboard");
+      return;
+    }
     localStorage.setItem("chery_gmao_active_tab", activeTab);
-  }, [activeTab]);
+  }, [activeTab, currentUserRole]);
 
   useEffect(() => {
     localStorage.setItem("chery_gmao_filter_workshop", selectedWorkshopFilter);
@@ -394,22 +564,181 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [equipments, interventions, spareParts, vendors, purchaseRequests, compliance, budget]);
 
-  // One-time auto-migration to version 7 to force blank "vierge" mode as requested
+  // Auto-migration to version 9: Populated with full STA Chery Tunisia dataset
   useEffect(() => {
-    const migrated = localStorage.getItem("chery_gmao_db_migrated_v7");
+    const migrated = localStorage.getItem("chery_gmao_db_migrated_v9_populated_chery");
     if (!migrated) {
-      localStorage.setItem("chery_gmao_database_mode", "vierge");
-      localStorage.removeItem("chery_gmao_equipments");
-      localStorage.removeItem("chery_gmao_interventions");
-      localStorage.removeItem("chery_gmao_spare_parts");
-      localStorage.removeItem("chery_gmao_compliance");
-      localStorage.removeItem("chery_gmao_budget");
-      localStorage.removeItem("chery_gmao_vendors");
-      localStorage.removeItem("chery_gmao_purchase_requests");
-      localStorage.setItem("chery_gmao_db_migrated_v7", "true");
-      window.location.reload();
+      localStorage.setItem("chery_gmao_database_mode", "demo");
+      localStorage.setItem("chery_gmao_equipments", JSON.stringify(INITIAL_EQUIPMENTS));
+      localStorage.setItem("chery_gmao_interventions", JSON.stringify(INITIAL_INTERVENTIONS));
+      localStorage.setItem("chery_gmao_spare_parts", JSON.stringify(INITIAL_SPARE_PARTS));
+      localStorage.setItem("chery_gmao_vendors", JSON.stringify(INITIAL_VENDORS));
+      localStorage.setItem("chery_gmao_purchase_requests", JSON.stringify(INITIAL_PURCHASE_REQUESTS));
+      localStorage.setItem("chery_gmao_contracts", JSON.stringify(INITIAL_CONTRACTS));
+      localStorage.setItem("chery_gmao_compliance", JSON.stringify(INITIAL_COMPLIANCE_CHECKS));
+      localStorage.setItem("chery_gmao_budget", JSON.stringify(BUDGET_2026));
+      localStorage.setItem("chery_gmao_db_migrated_v9_populated_chery", "true");
+
+      setDbMode("demo");
+      setEquipments(INITIAL_EQUIPMENTS);
+      setInterventions(INITIAL_INTERVENTIONS);
+      setSpareParts(INITIAL_SPARE_PARTS);
+      setVendors(INITIAL_VENDORS);
+      setPurchaseRequests(INITIAL_PURCHASE_REQUESTS);
+      setContracts(INITIAL_CONTRACTS);
+      setCompliance(INITIAL_COMPLIANCE_CHECKS);
+      setBudget(BUDGET_2026);
+      setActivityLogs([
+        {
+          id: "chery-init-1",
+          timestamp: new Date().toLocaleString("fr-FR"),
+          userRole: "admin",
+          action: "Base de Données Chery Chargée",
+          details: "Chargement du parc d'équipements, des demandes d'achats, interventions et budget de STA Chery Tunisie.",
+          type: "other"
+        }
+      ]);
     }
   }, []);
+
+  // Sync selected equipment code for breakdown alert from URL or default to first
+  useEffect(() => {
+    if (showGlobalAlertModal) {
+      const params = new URLSearchParams(window.location.search);
+      const eqCode = params.get("eq");
+      if (eqCode && equipments.some((e) => e.code.toUpperCase() === eqCode.toUpperCase())) {
+        setAlertEqCode(eqCode.toUpperCase());
+      } else if (equipments.length > 0 && !alertEqCode) {
+        setAlertEqCode(equipments[0].code);
+      }
+
+      // Prefill technician name based on current logged in user role
+      if (!alertTech) {
+        const roleLabel = ROLE_LABELS[currentUserRole] || "Technicien STA";
+        const cleanedName = roleLabel.split(" (")[0].includes("Chef d'Atelier:")
+          ? roleLabel.split("Chef d'Atelier:")[1]?.trim()
+          : roleLabel.split(" (")[0];
+        setAlertTech(cleanedName || "Technicien STA");
+      }
+    }
+  }, [showGlobalAlertModal, equipments, currentUserRole]);
+
+  // Handle global breakdown alert submission
+  const handleGlobalAlertSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!alertEqCode || !alertTitle) {
+      alert("Veuillez sélectionner un équipement et décrire succinctement le symptôme.");
+      return;
+    }
+
+    const selectedEq = equipments.find((eq) => eq.code === alertEqCode);
+    if (!selectedEq) return;
+
+    // 1. Create Corrective Intervention
+    const newInt: Intervention = {
+      id: `INT-PANNE-${Date.now()}`,
+      equipmentCode: alertEqCode,
+      type: "Correctif",
+      title: `🚨 ALERTE PANNE: ${alertTitle}`,
+      description: alertDesc || "Alerte de panne signalée d'urgence par le technicien en atelier.",
+      dateIntervention: new Date().toISOString().split("T")[0],
+      durationHours: 2,
+      costParts: 0,
+      costLabor: 120, // default labor rate for diagnostics
+      technician: alertTech || "Technicien STA",
+      status: "Nouvelle",
+      partsUsed: [],
+      priority: alertPriority
+    };
+
+    // 2. Add intervention
+    handleAddIntervention(newInt);
+
+    // 3. Mark equipment status as En Panne
+    handleUpdateEquipmentStatus(alertEqCode, "En Panne");
+
+    // 4. Log in audit journal
+    logActivity(
+      "Alerte Panne Émise",
+      `Alerte de panne créée pour l'équipement ${selectedEq.name} (${alertEqCode}) par ${alertTech || "Technicien"}. Symptôme: ${alertTitle} (Sévérité: ${alertPriority})`,
+      "equipment"
+    );
+
+    // 5. Success feedback & navigation
+    showToast(`🚨 Alerte enregistrée ! Équipement ${selectedEq.name} (${alertEqCode}) est passé "En Panne".`, "error");
+    
+    // Reset states
+    setShowGlobalAlertModal(false);
+    setAlertTitle("");
+    setAlertDesc("");
+    setAlertPriority("Moyenne");
+
+    // Navigate to the equipment list to show the panne state
+    setActiveTab("equipements");
+    setSelectedWorkshopFilter("All");
+  };
+
+  // Handle Building Anomaly Report Submission (No Auth Required)
+  const handleReportBuildingAnomaly = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!anomalyDesc.trim() || !anomalyReporter.trim()) {
+      alert("Veuillez saisir une description du problème et votre nom/prénom.");
+      return;
+    }
+
+    // Determine default equipment code based on selected domain/category
+    let targetEqCode = "EQ-BAT-ELEC";
+    if (anomalyCategory.includes("Climatisation") || anomalyCategory.includes("Chauffage")) {
+      targetEqCode = "EQ-BAT-CLIM";
+    } else if (anomalyCategory.includes("Plomberie") || anomalyCategory.includes("Fuite")) {
+      targetEqCode = "EQ-BAT-PLOMB";
+    } else if (anomalyCategory.includes("Serrurerie") || anomalyCategory.includes("Porte") || anomalyCategory.includes("Rideau")) {
+      targetEqCode = "EQ-BAT-SERR";
+    } else if (anomalyCategory.includes("Éclairage") || anomalyCategory.includes("Ampoule")) {
+      targetEqCode = "EQ-BAT-ECLAIR";
+    }
+
+    // Find equipment or fall back to EQ-BAT-ELEC or any building equipment
+    const existingEq = equipments.find((eq) => eq.code === targetEqCode) || equipments.find((eq) => eq.workshop === "Maintenance Bâtiment");
+    const finalEqCode = existingEq ? existingEq.code : "EQ-BAT-ELEC";
+
+    const ticketNumber = `TICKET-BAT-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newIntervention: Intervention = {
+      id: `INT-BAT-${Date.now()}`,
+      equipmentCode: finalEqCode,
+      type: "Correctif",
+      title: `[ANOMALIE BÂTIMENT] ${anomalyCategory} - ${anomalyLocation}`,
+      description: `${anomalyDesc.trim()}\n\n📍 Zone: ${anomalyLocation}\n👤 Demandeur: ${anomalyReporter.trim()} ${anomalyPhone.trim() ? `(Tél/Poste: ${anomalyPhone.trim()})` : ""}\n🎫 N° Ticket Suivi: ${ticketNumber}`,
+      dateIntervention: new Date().toISOString().split("T")[0],
+      durationHours: 1,
+      costParts: 0,
+      costLabor: 0,
+      technician: "Équipe Maintenance Bâtiment",
+      status: "Nouvelle",
+      partsUsed: [],
+      priority: anomalyPriority,
+      executorType: "Interne"
+    };
+
+    // Add intervention
+    handleAddIntervention(newIntervention);
+
+    // If critical or high, mark equipment degraded or in breakdown
+    if (anomalyPriority === "Critique" || anomalyPriority === "Haute") {
+      handleUpdateEquipmentStatus(finalEqCode, "Dégradé");
+    }
+
+    // Audit log
+    logActivity(
+      "Anomalie Bâtiment Déclarée",
+      `Nouveau ticket ${ticketNumber} créé sans connexion. Domaine: ${anomalyCategory} | Zone: ${anomalyLocation} | Demandeur: ${anomalyReporter.trim()} (Sévérité: ${anomalyPriority})`,
+      "intervention"
+    );
+
+    // Set success view
+    setBuildingAnomalySuccess(ticketNumber);
+  };
 
   // -------------------------------------------------------------
   // CORE GMAO WORKFLOW OPERATIONS & SYSTEM INTEGRATIONS
@@ -418,6 +747,12 @@ export default function App() {
   // A. Add a new Equipment Asset
   const handleAddEquipment = (newEq: Equipment) => {
     setEquipments((prev) => [newEq, ...prev]);
+    showToast(`Équipement ${newEq.code} (${newEq.name}) ajouté avec succès`, "success");
+    logActivity(
+      "Ajout Équipement",
+      `Création de l'équipement : ${newEq.name} (${newEq.code}) - Criticité: ${newEq.critical ? "Critique A" : "Standard"} - Atelier: ${newEq.workshop}`,
+      "equipment"
+    );
   };
 
   // A1. Update an existing Equipment Asset
@@ -425,17 +760,32 @@ export default function App() {
     setEquipments((prev) =>
       prev.map((eq) => (eq.code === updatedEq.code ? updatedEq : eq))
     );
+    logActivity(
+      "Modification Équipement",
+      `Mise à jour des informations de l'équipement : ${updatedEq.name} (${updatedEq.code}) - Statut: ${updatedEq.status}`,
+      "equipment"
+    );
   };
 
   // A2. Delete an Equipment Asset
   const handleDeleteEquipment = (code: string) => {
     setEquipments((prev) => prev.filter((eq) => eq.code !== code));
+    logActivity(
+      "Suppression Équipement",
+      `Suppression définitive de l'équipement avec le code ${code}`,
+      "equipment"
+    );
   };
 
   // B. Update Equipment Operational Status
   const handleUpdateEquipmentStatus = (code: string, status: EquipmentStatus) => {
     setEquipments((prev) =>
       prev.map((eq) => (eq.code === code ? { ...eq, status } : eq))
+    );
+    logActivity(
+      "Changement d'État",
+      `Équipement ${code} passé au statut : ${status}`,
+      "equipment"
     );
   };
 
@@ -487,6 +837,14 @@ export default function App() {
         });
       }
     }
+
+    showToast(`Intervention ${newInt.id} créée avec succès (${newInt.equipmentCode})`, "success");
+
+    logActivity(
+      "Nouvelle Intervention",
+      `Création d'une intervention ${newInt.type} pour l'équipement ${newInt.equipmentCode} (${newInt.title}) - Statut: ${newInt.status}`,
+      "intervention"
+    );
   };
 
   // D. Update Intervention Status (and sync Equipment status back)
@@ -508,6 +866,34 @@ export default function App() {
     } else if (newStatus === "En cours" && intRecord) {
       handleUpdateEquipmentStatus(intRecord.equipmentCode, "En Maintenance");
     }
+
+    if (intRecord) {
+      logActivity(
+        "Statut Intervention",
+        `Intervention sur ${intRecord.equipmentCode} mise à jour vers le statut : ${newStatus}`,
+        "intervention"
+      );
+    }
+  };
+
+  // D2. Update entire Intervention record (signature, checklist, etc.)
+  const handleUpdateIntervention = (updatedInt: Intervention) => {
+    setInterventions((prev) =>
+      prev.map((int) => (int.id === updatedInt.id ? updatedInt : int))
+    );
+
+    // Sync equipment status back if the intervention is Terminée or Clôturée
+    if (updatedInt.status === "Clôturée" || updatedInt.status === "Terminée") {
+      handleUpdateEquipmentStatus(updatedInt.equipmentCode, "Opérationnel");
+    } else if (updatedInt.status === "En cours") {
+      handleUpdateEquipmentStatus(updatedInt.equipmentCode, "En Maintenance");
+    }
+
+    logActivity(
+      "Mise à jour Intervention",
+      `Intervention ${updatedInt.id} sur ${updatedInt.equipmentCode} mise à jour. Statut: ${updatedInt.status}`,
+      "intervention"
+    );
   };
 
   // E. Restock Spare Parts
@@ -515,21 +901,41 @@ export default function App() {
     setSpareParts((prev) =>
       prev.map((part) => (part.code === code ? { ...part, currentStock: part.currentStock + qty } : part))
     );
+    logActivity(
+      "Réapprovisionnement Pièce",
+      `Entrée en stock de +${qty} unités pour la pièce ${code}`,
+      "spare_part"
+    );
   };
 
   // F. Register a new Spare Part designation
   const handleAddPart = (newPart: SparePart) => {
     setSpareParts((prev) => [newPart, ...prev]);
+    logActivity(
+      "Création Pièce",
+      `Ajout de la pièce de rechange au catalogue : ${newPart.name} (${newPart.code}) - Prix: ${newPart.unitPrice} TND`,
+      "spare_part"
+    );
   };
 
   // G. Log a new Regulatory Audit Certificate
   const handleAddComplianceCheck = (newCheck: ComplianceCheck) => {
     setCompliance((prev) => [newCheck, ...prev]);
+    logActivity(
+      "Contrôle Conformité",
+      `Saisie du contrôle réglementaire : ${newCheck.title} pour l'équipement ${newCheck.equipmentCode} (Organisme: ${newCheck.bodyName} - Statut: ${newCheck.status})`,
+      "compliance"
+    );
   };
 
   // H. Purchase Order (DA) Operations
   const handleAddPurchaseRequest = (newReq: PurchaseRequest) => {
     setPurchaseRequests((prev) => [newReq, ...prev]);
+    logActivity(
+      "Création DA",
+      `Création de la Demande d'Achat (DA #${newReq.id}) pour : ${newReq.equipmentName} - Quantité: ${newReq.quantity} - Urgence: ${newReq.urgency} - Coût estimé: ${newReq.estimatedCost} TND`,
+      "purchase"
+    );
   };
 
   const handleUpdatePurchaseRequestStatus = (id: string, nextStatus: PurchaseRequest["status"]) => {
@@ -541,10 +947,41 @@ export default function App() {
         return req;
       })
     );
+    logActivity(
+      "Validation DA",
+      `Demande d'achat #${id} mise à jour vers le statut : ${nextStatus}`,
+      "purchase"
+    );
   };
 
   const handleAddVendor = (newVendor: Vendor) => {
     setVendors((prev) => [newVendor, ...prev]);
+    logActivity(
+      "Nouveau Fournisseur",
+      `Enregistrement du fournisseur agréé : ${newVendor.name} - Spécialité: ${newVendor.serviceType}`,
+      "purchase"
+    );
+  };
+
+  const handleUpdateVendor = (updatedVendor: Vendor) => {
+    setVendors((prev) => prev.map((v) => (v.id === updatedVendor.id ? updatedVendor : v)));
+    logActivity(
+      "Modification Fournisseur",
+      `Mise à jour des coordonnées du prestataire : ${updatedVendor.name}`,
+      "purchase"
+    );
+  };
+
+  const handleDeleteVendor = (vendorId: string) => {
+    const v = vendors.find((x) => x.id === vendorId);
+    setVendors((prev) => prev.filter((x) => x.id !== vendorId));
+    if (v) {
+      logActivity(
+        "Suppression Fournisseur",
+        `Suppression du prestataire externe : ${v.name}`,
+        "purchase"
+      );
+    }
   };
 
   const handleUpdateBudgetAllocation = (workshop: Workshop, amount: number) => {
@@ -560,6 +997,11 @@ export default function App() {
         totalBudget: nextTotal
       };
     });
+    logActivity(
+      "Allocation Budgétaire",
+      `Le budget alloué à l'atelier ${workshop} a été redéfini à : ${(amount ?? 0).toLocaleString()} TND`,
+      "budget"
+    );
   };
 
   // Reset demo data trigger
@@ -578,6 +1020,8 @@ export default function App() {
     localStorage.removeItem("chery_gmao_budget");
     localStorage.removeItem("chery_gmao_vendors");
     localStorage.removeItem("chery_gmao_purchase_requests");
+    localStorage.removeItem("chery_gmao_contracts");
+    localStorage.removeItem("chery_gmao_activity_logs");
     
     setEquipments(INITIAL_EQUIPMENTS);
     setInterventions(INITIAL_INTERVENTIONS);
@@ -586,6 +1030,21 @@ export default function App() {
     setBudget(BUDGET_2026);
     setVendors(INITIAL_VENDORS);
     setPurchaseRequests(INITIAL_PURCHASE_REQUESTS);
+    setContracts(INITIAL_CONTRACTS);
+    
+    const initialLogs: ActivityLog[] = [
+      {
+        id: "reset-log-1",
+        timestamp: new Date().toLocaleString("fr-FR"),
+        userRole: "admin",
+        action: "Réinitialisation Système",
+        details: "Restauration complète de la base de données d'usine STA Tunisie (Mode Démonstration)",
+        type: "other"
+      }
+    ];
+    setActivityLogs(initialLogs);
+    localStorage.setItem("chery_gmao_activity_logs", JSON.stringify(initialLogs));
+
     setSelectedWorkshopFilter("All");
     setSelectedMaintenanceType("All");
     setSelectedMaintenanceStatus("All");
@@ -610,11 +1069,14 @@ export default function App() {
     localStorage.removeItem("chery_gmao_budget");
     localStorage.removeItem("chery_gmao_vendors");
     localStorage.removeItem("chery_gmao_purchase_requests");
+    localStorage.removeItem("chery_gmao_contracts");
+    localStorage.removeItem("chery_gmao_activity_logs");
     
     setEquipments([]);
     setInterventions([]);
     setSpareParts([]);
     setCompliance([]);
+    setContracts([]);
     setBudget({
       year: 2026,
       totalBudget: 0,
@@ -641,6 +1103,20 @@ export default function App() {
     });
     setVendors([]);
     setPurchaseRequests([]);
+    
+    const initialLogs: ActivityLog[] = [
+      {
+        id: "clear-log-1",
+        timestamp: new Date().toLocaleString("fr-FR"),
+        userRole: "admin",
+        action: "Mise à Zéro Base",
+        details: "Wipe de l'intégralité des données d'équipements, pièces, DAs et budgets (Mode Vierge activé)",
+        type: "other"
+      }
+    ];
+    setActivityLogs(initialLogs);
+    localStorage.setItem("chery_gmao_activity_logs", JSON.stringify(initialLogs));
+
     setSelectedWorkshopFilter("All");
     setSelectedMaintenanceType("All");
     setSelectedMaintenanceStatus("All");
@@ -662,23 +1138,28 @@ export default function App() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col justify-between antialiased font-sans">
-        {/* Top corporate header branding (Login page style) */}
-        <header className="bg-white border-b border-neutral-200 shrink-0 shadow-xs py-4">
-          <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between">
-            <div className="flex items-center gap-2 select-none mx-auto sm:mx-0">
-              <div className="bg-chery-red text-white text-xs font-black px-2.5 py-1.5 rounded-md tracking-wider flex items-center justify-center shadow-xs">
+      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col justify-between antialiased font-sans relative overflow-hidden">
+        {/* Futuristic glowing backdrop elements */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-chery-red/10 rounded-full blur-[120px] pointer-events-none animate-pulse-subtle"></div>
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-red-900/10 rounded-full blur-[150px] pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30 pointer-events-none"></div>
+
+        {/* Corporate header branding with premium styling */}
+        <header className="border-b border-white/5 bg-neutral-900/40 backdrop-blur-md shrink-0 py-5 z-10">
+          <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+            <div className="flex items-center gap-3 select-none mx-auto sm:mx-0">
+              <div className="bg-chery-red text-white text-xs font-black px-3 py-1.5 rounded-lg tracking-widest flex items-center justify-center shadow-lg shadow-chery-red/20 border border-red-500/20">
                 STA
               </div>
-              <span className="font-sans font-black text-lg tracking-wide text-neutral-800">
+              <span className="font-sans font-black text-xl tracking-wider text-white">
                 CHERY
               </span>
-              <div className="border-l border-neutral-200 pl-3 ml-1">
-                <span className="font-display font-black text-sm tracking-tight text-neutral-800 block leading-tight">
+              <div className="border-l border-white/10 pl-3.5 ml-1.5">
+                <span className="font-display font-black text-sm tracking-tight text-white block leading-tight">
                   STA TUNISIE
                 </span>
-                <span className="text-[10px] text-neutral-400 font-semibold tracking-wider block uppercase -mt-0.5">
-                  Concessionnaire Officiel Chery
+                <span className="text-[10px] text-neutral-400 font-bold tracking-wider block uppercase mt-0.5">
+                  Concessionnaire Officiel • Portail GMAO 2.0
                 </span>
               </div>
             </div>
@@ -686,41 +1167,43 @@ export default function App() {
         </header>
 
         {/* Central Auth Container */}
-        <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 max-w-4xl mx-auto w-full">
-          <div className="text-center space-y-2 mb-8 animate-fade-in">
-            <span className="text-4xl">🔐</span>
-            <h1 className="text-xl sm:text-2xl font-black text-neutral-800 tracking-tight">
-              Portail d'Accès GMAO STA
+        <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-5xl mx-auto w-full z-10 relative">
+          <div className="text-center space-y-3 mb-10 max-w-xl">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-chery-red/10 border border-chery-red/20 text-chery-red text-xs font-semibold uppercase tracking-wider mb-2 animate-pulse-subtle">
+              <span className="h-1.5 w-1.5 rounded-full bg-chery-red animate-ping"></span>
+              Système de Contrôle d'Accès Sécurisé
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+              Portail d'Authentification GMAO
             </h1>
-            <p className="text-xs sm:text-sm text-neutral-500 max-w-md mx-auto leading-relaxed">
-              Sélectionnez votre profil professionnel et saisissez votre code PIN pour vous connecter à la gestion de maintenance STA Tunisie.
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              Sélectionnez votre profil professionnel ci-dessous et saisissez votre code PIN d'atelier pour accéder à vos indicateurs et fiches d'intervention.
             </p>
           </div>
 
           {/* Profiles Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
             {Object.entries(ROLE_LABELS).map(([role, label]) => {
-              // Custom icon/style based on role
               let icon = "⚙️";
-              let colorClasses = "border-neutral-200 hover:border-neutral-400 hover:shadow-md";
+              let colorClasses = "border-white/5 hover:border-white/10 hover:bg-white/[0.02]";
               let badgeText = "Chef d'Atelier";
-              let badgeColor = "bg-neutral-100 text-neutral-600";
+              let badgeColor = "bg-white/5 text-neutral-300 border-white/5";
 
               if (role === "admin") {
                 icon = "🔑";
-                colorClasses = "border-red-200 hover:border-chery-red hover:shadow-md bg-red-50/10";
+                colorClasses = "border-red-500/20 hover:border-chery-red/50 hover:bg-chery-red/[0.02] shadow-[0_0_25px_rgba(209,26,42,0.02)]";
                 badgeText = "Administrateur";
-                badgeColor = "bg-red-100 text-chery-red";
+                badgeColor = "bg-chery-red/10 text-chery-red border-chery-red/20";
               } else if (role === "supervisor") {
                 icon = "👁️";
-                colorClasses = "border-amber-200 hover:border-amber-500 hover:shadow-md bg-amber-50/10";
+                colorClasses = "border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/[0.02]";
                 badgeText = "Superviseur";
-                badgeColor = "bg-amber-100 text-amber-800";
+                badgeColor = "bg-amber-500/10 text-amber-400 border-amber-500/20";
               } else if (role === "magasin") {
                 icon = "📦";
-                colorClasses = "border-slate-300 hover:border-slate-800 hover:shadow-md bg-slate-50/10";
+                colorClasses = "border-emerald-500/20 hover:border-emerald-500/50 hover:bg-emerald-500/[0.02]";
                 badgeText = "Magasinier";
-                badgeColor = "bg-slate-800 text-white";
+                badgeColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
               } else {
                 if (role === "service_rapide") icon = "⚡";
                 else if (role === "carrosserie") icon = "🎨";
@@ -738,56 +1221,295 @@ export default function App() {
                     setLoginPasswordInput("");
                     setLoginPasswordError(false);
                   }}
-                  className={`flex flex-col text-left p-5 rounded-2xl border border-neutral-200 hover:border-neutral-400 hover:shadow-md bg-white transition-all duration-200 cursor-pointer ${colorClasses} group relative overflow-hidden`}
+                  className={`flex flex-col text-left p-6 rounded-2xl border bg-neutral-900/50 backdrop-blur-md transition-all duration-300 cursor-pointer group relative overflow-hidden ${colorClasses} hover:scale-[1.02] hover:shadow-xl`}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl">{icon}</span>
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${badgeColor}`}>
+                  {/* Subtle top indicator bar */}
+                  <div className={`absolute top-0 left-0 right-0 h-[2px] transition-all duration-300 opacity-0 group-hover:opacity-100 ${
+                    role === "admin" ? "bg-chery-red" : role === "supervisor" ? "bg-amber-500" : role === "magasin" ? "bg-emerald-500" : "bg-blue-500"
+                  }`} />
+                  
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-3xl filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)]">{icon}</span>
+                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${badgeColor}`}>
                       {badgeText}
                     </span>
                   </div>
-                  <h3 className="font-bold text-xs text-neutral-800 leading-snug group-hover:text-chery-red transition-colors">
+                  <h3 className="font-bold text-sm text-white tracking-wide group-hover:text-chery-red transition-colors">
                     {label}
                   </h3>
-                  <p className="text-[10px] text-neutral-400 mt-1 leading-tight">
+                  <p className="text-[11px] text-neutral-400 mt-2 leading-relaxed">
                     {role === "admin" 
-                      ? "Configuration complète & validation globale"
+                      ? "Supervision globale, gestion budgétaire & extraction des données"
                       : role === "supervisor"
-                      ? "Consultation de tous les ateliers en lecture seule"
+                      ? "Consultation de l'état des ateliers en temps réel (lecture seule)"
                       : role === "magasin"
-                      ? "Suivi des stocks, pièces de rechange et achats"
-                      : "Saisie des pannes et bons de travail de l'atelier"}
+                      ? "Mouvements de stock, inventaire des pièces détachées et demandes d'achat"
+                      : "Saisie d'interventions, signalement de pannes et demandes d'achat de pièces"}
                   </p>
                 </button>
               );
             })}
           </div>
 
+          {/* 🏢 Quick Building Anomaly Report Banner (Free Access for All Staff) */}
+          <div className="w-full mt-8 p-6 bg-gradient-to-r from-neutral-900 via-neutral-900/90 to-neutral-900 rounded-3xl border border-blue-500/30 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div className="flex items-start gap-4">
+              <div className="p-3.5 bg-blue-500/15 border border-blue-500/30 rounded-2xl text-blue-400 shrink-0 shadow-lg">
+                <Building className="h-7 w-7 animate-pulse-subtle" />
+              </div>
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider">
+                  ⚡ Espace Déclaration Libre • Tout le Personnel
+                </div>
+                <h3 className="text-base font-black text-white tracking-wide">
+                  Signaler une Anomalie Bâtiment & Infrastructure
+                </h3>
+                <p className="text-xs text-neutral-400 leading-relaxed max-w-xl">
+                  Électricité, climatisation, fuite d'eau/plomberie, serrurerie, portes ou éclairage ? Déclarez un problème en 30 secondes sans mot de passe pour alerter l'équipe de maintenance.
+                </p>
+              </div>
+            </div>
 
+            <button
+              type="button"
+              onClick={() => {
+                setShowBuildingAnomalyModal(true);
+                setBuildingAnomalySuccess(null);
+              }}
+              className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white font-black text-xs py-3.5 px-6 rounded-2xl transition-all duration-200 shadow-lg shadow-blue-600/30 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <AlertTriangle className="h-4 w-4 text-amber-300" />
+              <span>Déclarer une Anomalie Bâtiment</span>
+            </button>
+          </div>
         </main>
 
-        {/* Inline Password Entry Modal / Prompt */}
+        {/* 🏢 Building Anomaly Reporting Modal (Free Access) */}
+        {showBuildingAnomalyModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-neutral-900 border border-blue-500/30 rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-7 space-y-5 relative overflow-hidden text-neutral-100 max-h-[90vh] overflow-y-auto">
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-600"></div>
+
+              {buildingAnomalySuccess ? (
+                <div className="text-center space-y-5 py-4">
+                  <div className="w-16 h-16 bg-emerald-500/20 border border-emerald-500/40 rounded-full flex items-center justify-center text-emerald-400 mx-auto text-3xl animate-bounce">
+                    ✅
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black text-white">Anomalie Signalée avec Succès !</h3>
+                    <p className="text-xs text-neutral-300 max-w-md mx-auto leading-relaxed">
+                      Votre déclaration a été transmise instantanément au service Maintenance Bâtiment de la STA Chery Tunisie.
+                    </p>
+                    <div className="p-3 bg-neutral-800 rounded-2xl border border-neutral-700 font-mono text-xs text-blue-400 font-bold tracking-wider inline-block">
+                      Ticket N° : {buildingAnomalySuccess}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    Un technicien qualifié va intervenir dans les meilleurs délais pour résoudre le problème.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBuildingAnomalyModal(false);
+                      setBuildingAnomalySuccess(null);
+                    }}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-2xl text-xs cursor-pointer transition-colors shadow-lg shadow-emerald-600/20"
+                  >
+                    Fermer et Retourner à l'Accueil
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleReportBuildingAnomaly} className="space-y-4">
+                  <div className="flex items-start justify-between pb-3 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-blue-500/20 border border-blue-500/30 rounded-2xl text-blue-400">
+                        <Building className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-white tracking-wide">
+                          Signaler une Anomalie Bâtiment
+                        </h3>
+                        <p className="text-[11px] text-neutral-400">
+                          Déclaration libre sans mot de passe pour tout le personnel STA
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowBuildingAnomalyModal(false)}
+                      className="text-neutral-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {/* Category Selector Buttons */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-neutral-300">
+                      Type / Domaine de l'anomalie :
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: "⚡ Électricité & Éclairage", label: "⚡ Électricité", desc: "Prise, disjoncteur, panne d'élec" },
+                        { id: "❄️ Climatisation & Chauffage", label: "❄️ Climatisation", desc: "Split, climatiseur, fuite, bruit" },
+                        { id: "🚰 Plomberie & Sanitaires", label: "🚰 Plomberie", desc: "Fuite d'eau, lavabo, WC, pression" },
+                        { id: "🚪 Serrurerie & Portes", label: "🚪 Serrurerie & Portes", desc: "Serrure, porte, rideau métallique" },
+                        { id: "💡 Éclairage Ateliers/Showroom", label: "💡 Éclairage", desc: "Ampoules, projecteurs, néons" },
+                        { id: "🧱 Structure & Infiltration", label: "🧱 Structure / Bâtiment", desc: "Fissure, peinture, faux-plafond" },
+                        { id: "🛡️ Sécurité & Extincteurs", label: "🛡️ Sécurité & Incendie", desc: "Extincteur, alarme, accès" },
+                        { id: "❓ Autre Problème Bâtiment", label: "❓ Autre Problème", desc: "Propreté, nuisances, divers" }
+                      ].map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setAnomalyCategory(cat.id)}
+                          className={`text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
+                            anomalyCategory === cat.id
+                              ? "bg-blue-600/30 border-blue-500 text-white shadow-md shadow-blue-500/10 font-bold"
+                              : "bg-white/5 border-white/5 text-neutral-300 hover:bg-white/10"
+                          }`}
+                        >
+                          <div className="text-xs">{cat.label}</div>
+                          <div className="text-[9px] text-neutral-400 font-normal">{cat.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Location / Zone */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-neutral-300">
+                      Zone / Localisation dans la concession STA :
+                    </label>
+                    <select
+                      value={anomalyLocation}
+                      onChange={(e) => setAnomalyLocation(e.target.value)}
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white font-medium outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="Showroom Véhicules Neufs">🏢 Showroom Véhicules Neufs Chery</option>
+                      <option value="Réception Après-Vente">📋 Réception Après-Vente / Accueil</option>
+                      <option value="Atelier Service Rapide">⚡ Atelier Service Rapide</option>
+                      <option value="Atelier Mécanique / Électricité">⚙️ Atelier Mécanique / Électricité</option>
+                      <option value="Atelier Diagnostic">🔬 Atelier Diagnostic</option>
+                      <option value="Atelier Carrosserie / Peinture">🎨 Atelier Carrosserie / Peinture</option>
+                      <option value="Atelier Lavage">🧼 Atelier Lavage</option>
+                      <option value="Magasin Pièces de Rechange">📦 Magasin Pièces de Rechange</option>
+                      <option value="Bureaux Administratifs / Direction">💼 Bureaux Administratifs & Direction</option>
+                      <option value="Sanitaires & Salles d'eau">🚰 Sanitaires & Salles d'eau</option>
+                      <option value="Parking & Extérieur">🚗 Parking & Abords Extérieurs</option>
+                    </select>
+                  </div>
+
+                  {/* Symptom Description */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-neutral-300">
+                      Description précise du problème constaté * :
+                    </label>
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="Exemple : Le climatiseur du bureau réception fuit sur le sol / La prise 380V de la baie 2 disjoncte..."
+                      value={anomalyDesc}
+                      onChange={(e) => setAnomalyDesc(e.target.value)}
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+
+                  {/* Reporter Name & Phone */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-neutral-300">
+                        Votre Nom & Prénom * :
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Mohamed Ben Ali"
+                        value={anomalyReporter}
+                        onChange={(e) => setAnomalyReporter(e.target.value)}
+                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-neutral-300">
+                        Téléphone / Poste interne :
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Poste 102 / Tél 98..."
+                        value={anomalyPhone}
+                        onChange={(e) => setAnomalyPhone(e.target.value)}
+                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Priority */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-neutral-300">
+                      Niveau d'Urgence :
+                    </label>
+                    <select
+                      value={anomalyPriority}
+                      onChange={(e) => setAnomalyPriority(e.target.value as any)}
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white font-medium outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="Faible">🟢 Normal (Gêne mineure, à traiter sous 48h)</option>
+                      <option value="Moyenne">🟡 Moyen (Dysfonctionnement gênant le travail)</option>
+                      <option value="Haute">🟠 Important (Empêche l'utilisation de la zone)</option>
+                      <option value="Critique">🔴 Urgent / Critique (Fuite active, coupure générale, sécurité)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-3 pt-2 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setShowBuildingAnomalyModal(false)}
+                      className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 text-xs font-bold py-3 rounded-2xl cursor-pointer transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black py-3 rounded-2xl cursor-pointer transition-colors shadow-lg shadow-blue-600/30 flex items-center justify-center gap-1.5"
+                    >
+                      <Building className="h-4 w-4" />
+                      <span>Envoyer le Ticket</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Interactive Glassmorphism PIN Entry Modal */}
         {loginPendingRole && (
-          <div className="fixed inset-0 bg-neutral-900/80 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl max-w-sm w-full p-6 space-y-4">
-              <div className="text-center space-y-1">
-                <span className="text-3xl">🔑</span>
-                <h3 className="text-base font-bold text-neutral-800">
-                  Saisir le Code d'Accès
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-neutral-900/90 border border-white/10 rounded-3xl shadow-2xl max-w-sm w-full p-7 space-y-5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-chery-red to-transparent"></div>
+              
+              <div className="text-center space-y-1.5">
+                <span className="text-4xl filter drop-shadow-[0_4px_10px_rgba(209,26,42,0.3)] block mb-1">🔐</span>
+                <h3 className="text-lg font-black text-white tracking-wide">
+                  Code d'Accès Requis
                 </h3>
-                <p className="text-xs text-neutral-400">
-                  Veuillez entrer le PIN pour vous authentifier en tant que :
+                <p className="text-[11px] text-neutral-400">
+                  Veuillez renseigner le code PIN d'atelier pour :
                 </p>
-                <p className="text-xs font-bold text-neutral-700 bg-neutral-50 p-2.5 rounded-xl border border-neutral-100">
+                <p className="text-xs font-mono font-bold text-white bg-white/5 py-2 px-3 rounded-xl border border-white/10 inline-block mt-1">
                   {ROLE_LABELS[loginPendingRole]}
                 </p>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <input
                   type="password"
                   autoFocus
-                  placeholder="Saisir le code / PIN"
+                  maxLength={4}
+                  placeholder="••••"
                   value={loginPasswordInput}
                   onChange={(e) => {
                     setLoginPasswordInput(e.target.value);
@@ -796,12 +1518,32 @@ export default function App() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleLoginVerifyPassword();
                   }}
-                  className="w-full text-center tracking-widest text-lg font-bold font-mono border border-neutral-200 rounded-xl p-2.5 bg-neutral-50 outline-none focus:ring-2 focus:ring-chery-red"
+                  className="w-full text-center tracking-[0.75em] text-2xl font-black font-mono border border-white/10 rounded-2xl p-3 bg-black/40 text-white outline-none focus:border-chery-red focus:ring-1 focus:ring-chery-red transition-all"
                 />
                 {loginPasswordError && (
-                  <p className="text-[11px] text-chery-red font-bold text-center">
-                    ❌ Code d'accès PIN incorrect !
+                  <p className="text-[11px] text-red-400 font-bold text-center animate-bounce">
+                    ⚠️ Code PIN d'atelier incorrect !
                   </p>
+                )}
+              </div>
+
+              {/* Helper to show default codes in a clean expandable bar */}
+              <div className="bg-white/5 rounded-xl border border-white/5 p-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowHelperCodes(!showHelperCodes)}
+                  className="text-[10px] text-neutral-400 font-bold hover:text-white transition-colors cursor-pointer w-full flex items-center justify-center gap-1"
+                >
+                  <span>{showHelperCodes ? "Masquer" : "Afficher"} les codes PIN par défaut</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showHelperCodes ? "rotate-180" : ""}`} />
+                </button>
+                {showHelperCodes && (
+                  <div className="mt-2 text-[10px] text-left text-neutral-300 font-mono space-y-1 border-t border-white/5 pt-2 pl-1 grid grid-cols-2 gap-1">
+                    <div>Admin : <span className="text-chery-red font-bold">1924</span></div>
+                    <div>Magasin : <span className="text-emerald-400 font-bold">2026</span></div>
+                    <div>Supervis : <span className="text-amber-400 font-bold">1234</span></div>
+                    <div>Ateliers : <span className="text-blue-400 font-bold">0000</span></div>
+                  </div>
                 )}
               </div>
 
@@ -812,17 +1554,18 @@ export default function App() {
                     setLoginPendingRole(null);
                     setLoginPasswordInput("");
                     setLoginPasswordError(false);
+                    setShowHelperCodes(false);
                   }}
-                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+                  className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 text-neutral-300 text-xs font-semibold py-3 rounded-xl cursor-pointer transition-all active:scale-95"
                 >
                   Annuler
                 </button>
                 <button
                   type="button"
                   onClick={handleLoginVerifyPassword}
-                  className="flex-1 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-colors"
+                  className="flex-1 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-3 rounded-xl cursor-pointer transition-all active:scale-95 shadow-lg shadow-chery-red/25"
                 >
-                  S'authentifier
+                  Se connecter
                 </button>
               </div>
             </div>
@@ -830,9 +1573,9 @@ export default function App() {
         )}
 
         {/* Corporate Footer */}
-        <footer className="bg-white border-t border-neutral-200 py-4 text-center text-[10px] text-neutral-400 shrink-0">
-          <p className="font-bold text-neutral-500">
-            Portail de GMAO STA Tunisie • Ahmed Amine Ben Salah © 2026
+        <footer className="border-t border-white/5 py-5 text-center text-[10px] text-neutral-500 shrink-0 bg-neutral-900/10 z-10">
+          <p className="font-bold tracking-wider">
+            PORTAIL GMAO HAUTE PERFORMANCE • CONCESSIONNAIRE STA TUNISIE © 2026
           </p>
         </footer>
       </div>
@@ -840,32 +1583,32 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
-      {/* Top corporate header branding */}
-      <header className="bg-white border-b border-neutral-200 shrink-0 sticky top-0 z-40 shadow-xs">
+    <div className="min-h-screen chery-app-wrapper text-neutral-800 flex flex-col antialiased">
+      {/* Top corporate header branding - Chery Titanium & Red signature */}
+      <header className="chery-header-bar shrink-0 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Mobile menu button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-neutral-100 text-neutral-600 focus:outline-none"
+              className="md:hidden p-2 rounded-lg hover:bg-white/10 text-neutral-200 focus:outline-none"
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
 
             {/* Simple & Premium STA Chery Logo */}
             <div className="flex items-center gap-2 select-none">
-              <div className="bg-chery-red text-white text-xs font-black px-2.5 py-1.5 rounded-md tracking-wider flex items-center justify-center shadow-xs">
+              <div className="bg-chery-red text-white text-xs font-black px-2.5 py-1.5 rounded-md tracking-wider flex items-center justify-center shadow-glow-red border border-red-500/30">
                 STA
               </div>
-              <span className="font-sans font-black text-lg tracking-wide text-neutral-800">
+              <span className="font-sans font-black text-xl tracking-widest text-white drop-shadow-xs">
                 CHERY
               </span>
-              <div className="hidden sm:block border-l border-neutral-200 pl-3 ml-1">
-                <span className="font-display font-black text-sm tracking-tight text-neutral-800 block leading-tight">
+              <div className="hidden sm:block border-l border-white/20 pl-3 ml-1">
+                <span className="font-display font-black text-sm tracking-tight text-white block leading-tight">
                   STA TUNISIE
                 </span>
-                <span className="text-[10px] text-neutral-400 font-semibold tracking-wider block uppercase -mt-0.5">
+                <span className="text-[10px] text-red-300 font-bold tracking-wider block uppercase -mt-0.5">
                   Concessionnaire Officiel Chery
                 </span>
               </div>
@@ -876,30 +1619,53 @@ export default function App() {
             type="button"
             onClick={handleManualSaveToDisk}
             title="Cliquer pour forcer la sauvegarde instantanée sur votre PC"
-            className="hidden md:flex items-center gap-2.5 bg-neutral-50 hover:bg-neutral-100 px-4 py-2 rounded-full border border-neutral-200/50 transition-all cursor-pointer group active:scale-95"
+            className="hidden md:flex items-center gap-2.5 bg-slate-800/80 hover:bg-slate-700 px-4 py-2 rounded-full border border-slate-700/80 transition-all cursor-pointer group active:scale-95 shadow-xs"
           >
             {diskSyncStatus === "syncing" ? (
               <>
-                <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
-                <span className="text-xs font-semibold text-neutral-600 font-mono flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
+                <span className="text-xs font-semibold text-neutral-200 font-mono flex items-center gap-1">
                   🔄 Synchronisation PC...
                 </span>
               </>
             ) : diskSyncStatus === "error" ? (
               <>
-                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
-                <span className="text-xs font-semibold text-neutral-600 font-mono group-hover:text-amber-800">
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
+                <span className="text-xs font-semibold text-amber-300 font-mono group-hover:text-amber-200">
                   ⚠️ Réessayer la Sauvegarde
                 </span>
               </>
             ) : (
               <>
-                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse-subtle"></span>
-                <span className="text-xs font-semibold text-neutral-600 font-mono group-hover:text-neutral-800 flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse-subtle"></span>
+                <span className="text-xs font-semibold text-neutral-300 font-mono group-hover:text-white flex items-center gap-1">
                   🟢 Sauvegardé sur PC • Enregistrer
                 </span>
               </>
             )}
+          </button>
+
+          {/* Global Quick Search (⌘K / Ctrl+K) button */}
+          <button
+            type="button"
+            onClick={() => setCommandPaletteOpen(true)}
+            title="Recherche globale rapide (Raccourci ⌘K ou Ctrl+K)"
+            className="hidden sm:flex items-center gap-2 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl border border-slate-700/80 transition-all cursor-pointer text-xs font-medium shadow-xs"
+          >
+            <Search className="h-3.5 w-3.5 text-red-400 shrink-0" />
+            <span className="hidden lg:inline text-slate-300">Recherche rapide...</span>
+            <span className="text-[10px] font-mono bg-slate-900/90 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 ml-0.5">
+              ⌘K
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCommandPaletteOpen(true)}
+            title="Recherche globale"
+            className="sm:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-red-400 border border-slate-700 cursor-pointer"
+          >
+            <Search className="h-4 w-4" />
           </button>
 
           {/* Dynamic Role Switcher dropdown */}
@@ -913,23 +1679,23 @@ export default function App() {
                   setPasswordInput("");
                   setPasswordError(false);
                 }}
-                className="bg-neutral-50 hover:bg-neutral-100 text-neutral-800 text-[11px] font-bold py-1.5 px-3 rounded-xl border border-neutral-200 outline-none cursor-pointer shadow-xs transition-all"
+                className="bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl border border-slate-700 outline-none cursor-pointer shadow-xs transition-all"
               >
-                <option value="admin">🔑 Admin: M. Ahmed Amine</option>
-                <option value="supervisor">👁️ Superviseur (Lecture seule)</option>
-                <option value="magasin">📦 Magasinier (Pièces)</option>
-                <option value="service_rapide">⚡ Atelier Service Rapide</option>
-                <option value="atelier_mecanique">⚙️ Atelier Mécanique / élec</option>
-                <option value="atelier_diagnostic">🔬 Atelier Diagnostic</option>
-                <option value="carrosserie">🎨 Atelier Carrosserie</option>
-                <option value="lavage">🧼 Atelier Lavage</option>
-                <option value="batiment">🏢 Maintenance Bâtiment</option>
+                <option value="admin" className="bg-slate-900 text-white">🔑 Admin: M. Ahmed Amine</option>
+                <option value="supervisor" className="bg-slate-900 text-white">👁️ Superviseur (Lecture seule)</option>
+                <option value="magasin" className="bg-slate-900 text-white">📦 Magasinier (Pièces)</option>
+                <option value="service_rapide" className="bg-slate-900 text-white">⚡ Atelier Service Rapide</option>
+                <option value="atelier_mecanique" className="bg-slate-900 text-white">⚙️ Atelier Mécanique / élec</option>
+                <option value="atelier_diagnostic" className="bg-slate-900 text-white">🔬 Atelier Diagnostic</option>
+                <option value="carrosserie" className="bg-slate-900 text-white">🎨 Atelier Carrosserie</option>
+                <option value="lavage" className="bg-slate-900 text-white">🧼 Atelier Lavage</option>
+                <option value="batiment" className="bg-slate-900 text-white">🏢 Maintenance Bâtiment</option>
               </select>
             </div>
 
-            <div className="flex items-center gap-2.5 ml-1 pl-2 border-l border-neutral-200">
+            <div className="flex items-center gap-2.5 ml-1 pl-2 border-l border-slate-700">
               <div className="text-right hidden sm:block">
-                <span className="font-bold text-xs text-neutral-800 block leading-tight">
+                <span className="font-bold text-xs text-white block leading-tight">
                   {currentUserRole === "admin" 
                     ? "M. Ahmed Amine" 
                     : currentUserRole === "supervisor" 
@@ -938,7 +1704,7 @@ export default function App() {
                     ? "Magasinier Chery" 
                     : "Chef d'Atelier"}
                 </span>
-                <span className="text-[9px] text-neutral-400 font-bold uppercase block tracking-wider">
+                <span className="text-[9px] text-red-300 font-bold uppercase block tracking-wider">
                   {currentUserRole === "admin" 
                     ? "Admin Maintenance" 
                     : currentUserRole === "supervisor" 
@@ -950,7 +1716,7 @@ export default function App() {
               </div>
               <div className={`h-8 w-8 rounded-full border flex items-center justify-center text-white font-bold text-xs shadow-inner ${
                 currentUserRole === "admin" 
-                  ? "bg-chery-red border-red-500" 
+                  ? "bg-chery-red border-red-500 shadow-glow-red" 
                   : currentUserRole === "supervisor" 
                   ? "bg-amber-600 border-amber-500" 
                   : currentUserRole === "magasin" 
@@ -960,6 +1726,32 @@ export default function App() {
                 {currentUserRole === "admin" ? "AA" : currentUserRole === "supervisor" ? "SV" : currentUserRole === "magasin" ? "MG" : "OP"}
               </div>
             </div>
+
+            {/* 🚨 Quick Alerte Panne header action */}
+            <button
+              type="button"
+              onClick={() => setShowGlobalAlertModal(true)}
+              title="Signaler d'urgence un équipement en panne"
+              className="bg-red-600 hover:bg-red-700 hover:scale-102 border border-red-500 text-white px-3 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1.5 text-[10px] font-black shadow-xs shadow-red-500/10 active:scale-95 ml-1"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <span>ALERTE PANNE</span>
+            </button>
+
+            {/* 🏢 Quick Anomalie Bâtiment header action */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowBuildingAnomalyModal(true);
+                setBuildingAnomalySuccess(null);
+              }}
+              title="Signaler une anomalie bâtiment (Électricité, Climatisation, Plomberie...)"
+              className="bg-blue-600 hover:bg-blue-700 hover:scale-102 border border-blue-500 text-white px-3 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1.5 text-[10px] font-black shadow-xs shadow-blue-500/10 active:scale-95 ml-1"
+            >
+              <Building className="h-3.5 w-3.5" />
+              <span className="hidden lg:inline">ANOMALIE BÂTIMENT</span>
+              <span className="lg:hidden">BÂTIMENT</span>
+            </button>
 
             {/* Logout button */}
             <button
@@ -1059,45 +1851,56 @@ export default function App() {
               )}
             </div>
 
-            {/* 🔧 Maintenance Accordion */}
+            {/* 📋 Interventions & Maintenance Accordion */}
             <div className="space-y-1">
               <button
-                onClick={() => setMaintenanceOpen(!maintenanceOpen)}
+                onClick={() => {
+                  setMaintenanceOpen(!maintenanceOpen);
+                  if (activeTab !== "interventions" && activeTab !== "maintenance") {
+                    setActiveTab("interventions");
+                  }
+                }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  activeTab === "maintenance"
-                    ? "bg-neutral-100 text-neutral-800"
+                  activeTab === "interventions" || activeTab === "maintenance"
+                    ? "bg-chery-red text-white shadow-md shadow-red-500/10"
                     : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <Sliders className="h-4 w-4 text-neutral-500" />
-                  <span>🔧 Maintenance</span>
+                  <FileText className="h-4 w-4" />
+                  <span>📋 Interventions & Maintenance</span>
                 </div>
-                {maintenanceOpen ? <ChevronDown className="h-3.5 w-3.5 text-neutral-500" /> : <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />}
+                {maintenanceOpen ? <ChevronDown className="h-3.5 w-3.5 text-current" /> : <ChevronRight className="h-3.5 w-3.5 text-current opacity-60" />}
               </button>
               
               {maintenanceOpen && (
-                <div className="pl-4 pr-1 py-1 space-y-1 border-l border-neutral-100 ml-4">
+                <div className="pl-4 pr-1 py-1 space-y-1 border-l border-neutral-100 ml-4 animate-fade-in">
                   {[
-                    { id: "preventive", label: "Préventive", type: "Préventif", status: "All", calendar: false },
-                    { id: "corrective", label: "Corrective", type: "Correctif", status: "All", calendar: false },
-                    { id: "planning", label: "Planning", type: "All", status: "Planifié", calendar: false },
-                    { id: "calendrier", label: "Calendrier View", type: "All", status: "All", calendar: true }
+                    { id: "all", label: "Toutes les Interventions", type: "All", status: "All", calendar: false, isInterventionsTab: true },
+                    { id: "preventive", label: "Maintenance Préventive", type: "Préventif", status: "All", calendar: false, isInterventionsTab: false },
+                    { id: "corrective", label: "Maintenance Corrective", type: "Correctif", status: "All", calendar: false, isInterventionsTab: false },
+                    { id: "planning", label: "Planning de Travaux", type: "All", status: "Planifié", calendar: false, isInterventionsTab: false },
+                    { id: "calendrier", label: "Vue Calendrier", type: "All", status: "All", calendar: true, isInterventionsTab: false }
                   ].map((sub) => {
-                    const isSelected =
-                      activeTab === "maintenance" &&
-                      (sub.calendar
-                        ? showMaintenanceCalendar
-                        : selectedMaintenanceType === sub.type && selectedMaintenanceStatus === sub.status && !showMaintenanceCalendar);
+                    const isSelected = sub.isInterventionsTab
+                      ? (activeTab === "interventions")
+                      : (activeTab === "maintenance" &&
+                        (sub.calendar
+                          ? showMaintenanceCalendar
+                          : selectedMaintenanceType === sub.type && selectedMaintenanceStatus === sub.status && !showMaintenanceCalendar));
                     
                     return (
                       <button
                         key={sub.id}
                         onClick={() => {
-                          setActiveTab("maintenance");
-                          setSelectedMaintenanceType(sub.type);
-                          setSelectedMaintenanceStatus(sub.status);
-                          setShowMaintenanceCalendar(sub.calendar);
+                          if (sub.isInterventionsTab) {
+                            setActiveTab("interventions");
+                          } else {
+                            setActiveTab("maintenance");
+                            setSelectedMaintenanceType(sub.type);
+                            setSelectedMaintenanceStatus(sub.status);
+                            setShowMaintenanceCalendar(sub.calendar);
+                          }
                         }}
                         className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer block ${
                           isSelected
@@ -1113,22 +1916,22 @@ export default function App() {
               )}
             </div>
 
-            {/* 📋 Interventions */}
+            {/* 📚 Centre Documentaire */}
             <button
               onClick={() => {
-                setActiveTab("interventions");
+                setActiveTab("documentation");
               }}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "interventions"
+                activeTab === "documentation"
                   ? "bg-chery-red text-white shadow-md shadow-red-500/10"
                   : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
               }`}
             >
               <div className="flex items-center gap-2.5">
                 <FileText className="h-4 w-4" />
-                <span>📋 Interventions</span>
+                <span>📚 Centre Documentaire</span>
               </div>
-              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "interventions" ? "opacity-100" : ""}`} />
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "documentation" ? "opacity-100" : ""}`} />
             </button>
 
             {/* 🛒 Achats */}
@@ -1167,43 +1970,27 @@ export default function App() {
               <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "contracts" ? "opacity-100" : ""}`} />
             </button>
 
-            {/* 📊 Rapports & Export */}
-            <button
-              onClick={() => {
-                setActiveTab("excel");
-              }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "excel"
-                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
-                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <FileSpreadsheet className="h-4 w-4" />
-                <span>📊 Rapports & Export</span>
-              </div>
-              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "excel" ? "opacity-100" : ""}`} />
-            </button>
+            {/* 📜 Journal d'Audit (Administrateur Uniquement) */}
+            {currentUserRole === "admin" && (
+              <button
+                onClick={() => {
+                  setActiveTab("logs");
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === "logs"
+                    ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                    : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <History className="h-4 w-4" />
+                  <span>📜 Journal d'Audit</span>
+                </div>
+                <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "logs" ? "opacity-100" : ""}`} />
+              </button>
+            )}
 
-            {/* 📖 Manuel & Formation */}
-            <button
-              onClick={() => {
-                setActiveTab("guide");
-              }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "guide"
-                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
-                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Presentation className="h-4 w-4" />
-                <span>📖 Guide & Formation</span>
-              </div>
-              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "guide" ? "opacity-100" : ""}`} />
-            </button>
-
-            {/* ⚙️ Paramètres */}
+            {/* ⚙️ Paramètres / Administration */}
             <button
               onClick={() => {
                 setActiveTab("settings");
@@ -1216,9 +2003,31 @@ export default function App() {
             >
               <div className="flex items-center gap-2.5">
                 <Settings className="h-4 w-4" />
-                <span>⚙️ Paramètres</span>
+                <span>🛠️ Administration</span>
               </div>
               <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "settings" ? "opacity-100" : ""}`} />
+            </button>
+          </div>
+
+          {/* 🚨 Quick Breakdown Reporter Card for Technicians */}
+          <div className="bg-red-50/70 border border-red-200/60 rounded-2xl p-4 text-center space-y-3 shadow-xs">
+            <div className="flex justify-center">
+              <div className="p-2 bg-red-100 rounded-full text-chery-red animate-pulse">
+                <AlertOctagon className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-xs font-black text-neutral-800">Panne en Atelier ?</h4>
+              <p className="text-[10px] text-neutral-500 leading-tight">
+                Déclarez immédiatement un dysfonctionnement pour alerter l'équipe technique.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowGlobalAlertModal(true)}
+              className="w-full bg-chery-red hover:bg-chery-dark text-white text-[11px] font-black py-2.5 px-3 rounded-xl cursor-pointer transition-colors shadow-xs flex items-center justify-center gap-1.5"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 animate-pulse" />
+              Signaler une Panne
             </button>
           </div>
         </aside>
@@ -1249,12 +2058,12 @@ export default function App() {
                   {[
                     { id: "dashboard", label: "🏠 Tableau de Bord", icon: LayoutDashboard },
                     { id: "equipements", label: "🏭 Parc Équipements", icon: Wrench },
-                    { id: "interventions", label: "📋 Interventions", icon: FileText },
+                    { id: "interventions", label: "📋 Interventions & Maintenance", icon: FileText },
+                    { id: "documentation", label: "📚 Centre Documentaire", icon: FileText },
                     { id: "achats", label: "🛒 Achats", icon: ShoppingCart },
                     { id: "contracts", label: "📑 Contrats & Conformité", icon: ShieldCheck },
-                    { id: "excel", label: "📊 Rapports & Export", icon: FileSpreadsheet },
-                    { id: "guide", label: "📖 Guide & Formation", icon: Presentation },
-                    { id: "settings", label: "⚙️ Paramètres", icon: Settings }
+                    ...(currentUserRole === "admin" ? [{ id: "logs", label: "📜 Journal d'Audit", icon: History }] : []),
+                    { id: "settings", label: "🛠️ Administration", icon: Settings }
                   ].map((tab) => {
                     return (
                       <button
@@ -1273,6 +2082,20 @@ export default function App() {
                       </button>
                     );
                   })}
+                </div>
+
+                {/* 🚨 Quick Mobile Breakdown Alert button */}
+                <div className="pt-2 border-t border-neutral-100">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setShowGlobalAlertModal(true);
+                    }}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-black py-3 px-4 rounded-xl shadow-md shadow-red-500/10 flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <AlertTriangle className="h-4 w-4 animate-pulse" />
+                    Signaler une Panne
+                  </button>
                 </div>
               </div>
 
@@ -1295,13 +2118,22 @@ export default function App() {
               compliance={compliance}
               budget={budget}
               purchaseRequests={purchaseRequests}
+              contracts={contracts}
+              vendors={vendors}
               onNavigate={(tab) => {
-                if (tab === "equipements") {
+                const normalized = tab.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                let targetTab = tab;
+                if (normalized.includes("intervention") || normalized.includes("maintenance")) {
+                  targetTab = "interventions";
+                } else if (normalized.includes("equipement")) {
                   setSelectedWorkshopFilter("All");
+                  targetTab = "equipements";
                 }
-                setActiveTab(tab);
+                setActiveTab(targetTab);
               }}
               onResetDemoData={handleResetDemoData}
+              onUpdateBudgetAllocation={handleUpdateBudgetAllocation}
+              currentUserRole={currentUserRole}
             />
           )}
 
@@ -1327,6 +2159,7 @@ export default function App() {
               spareParts={spareParts}
               onAddIntervention={handleAddIntervention}
               onUpdateInterventionStatus={handleUpdateInterventionStatus}
+              onUpdateIntervention={handleUpdateIntervention}
               initialType={selectedMaintenanceType}
               initialStatus={selectedMaintenanceStatus}
               showCalendarByDefault={showMaintenanceCalendar}
@@ -1342,11 +2175,19 @@ export default function App() {
               spareParts={spareParts}
               onAddIntervention={handleAddIntervention}
               onUpdateInterventionStatus={handleUpdateInterventionStatus}
+              onUpdateIntervention={handleUpdateIntervention}
               initialType="All"
               initialStatus="All"
               showCalendarByDefault={false}
               isReadOnly={isEquipmentsReadOnly}
               allowedWorkshop={allowedWorkshop}
+            />
+          )}
+
+          {activeTab === "documentation" && (
+            <DocumentationManager
+              equipments={equipments}
+              isReadOnly={isEquipmentsReadOnly}
             />
           )}
 
@@ -1372,18 +2213,6 @@ export default function App() {
             />
           )}
 
-          {activeTab === "excel" && (
-            <ExcelBlueprint
-              equipments={equipments}
-              interventions={interventions}
-              spareParts={spareParts}
-              contracts={contracts}
-              vendors={vendors}
-              compliance={compliance}
-              budget={budget}
-            />
-          )}
-
           {activeTab === "settings" && (
             <SettingsManager
               budget={budget}
@@ -1402,11 +2231,24 @@ export default function App() {
               dbMode={dbMode}
               onResetDemoData={handleResetDemoData}
               onClearAllData={handleClearAllData}
+              activityLogs={activityLogs}
+              onClearLogs={handleClearActivityLogs}
+              onAddVendor={handleAddVendor}
+              onUpdateVendor={handleUpdateVendor}
+              onDeleteVendor={handleDeleteVendor}
+              userProfiles={userProfiles}
+              onAddRoleProfile={handleAddRoleProfile}
+              onUpdateRoleProfile={handleUpdateRoleProfile}
+              onDeleteRoleProfile={handleDeleteRoleProfile}
             />
           )}
 
-          {activeTab === "guide" && (
-            <UserGuide onNavigate={setActiveTab} />
+          {currentUserRole === "admin" && activeTab === "logs" && (
+            <AuditLogs 
+              logs={activityLogs} 
+              onClearLogs={handleClearActivityLogs} 
+              currentUserRole={currentUserRole} 
+            />
           )}
         </main>
       </div>
@@ -1550,6 +2392,209 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* 🚨 Global Breakdown Alert Reporting Modal */}
+      {showGlobalAlertModal && (
+        <div className="fixed inset-0 bg-neutral-900/85 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-2xl max-w-lg w-full p-6 space-y-5 animate-fade-in">
+            
+            {/* Modal Header */}
+            <div className="flex items-start gap-4 pb-3 border-b border-neutral-100">
+              <div className="p-3 bg-red-100 rounded-2xl text-chery-red shrink-0 animate-pulse">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-neutral-800">
+                  🚨 Signaler une Panne en Atelier
+                </h3>
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  Cette alerte va marquer immédiatement l'équipement comme <strong>"En Panne"</strong> et générer un ticket d'intervention curative d'urgence (type Correctif).
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleGlobalAlertSubmit} className="space-y-4">
+              
+              {/* Workshop Filter & Equipment Selector */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-black text-neutral-600">
+                    Atelier Émetteur :
+                  </label>
+                  <select
+                    value={alertSelectedWorkshop}
+                    onChange={(e) => {
+                      const ws = e.target.value;
+                      setAlertSelectedWorkshop(ws);
+                      const filtered = ws === "All" ? equipments : equipments.filter((eq) => eq.workshop === ws);
+                      if (filtered.length > 0) {
+                        setAlertEqCode(filtered[0].code);
+                      } else {
+                        setAlertEqCode("");
+                      }
+                    }}
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs font-bold text-neutral-800 outline-none focus:ring-2 focus:ring-chery-red cursor-pointer"
+                  >
+                    <option value="All">⚠️ Tous les Ateliers</option>
+                    {WORKSHOPS.map((w) => (
+                      <option key={w} value={w}>
+                        {w}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-black text-neutral-600">
+                    Équipement en panne :
+                  </label>
+                  <select
+                    value={alertEqCode}
+                    onChange={(e) => setAlertEqCode(e.target.value)}
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs font-bold text-neutral-800 outline-none focus:ring-2 focus:ring-chery-red cursor-pointer"
+                  >
+                    {equipments.length === 0 ? (
+                      <option value="">-- Aucun équipement (Base vierge) --</option>
+                    ) : (() => {
+                      const filtered = alertSelectedWorkshop === "All"
+                        ? equipments
+                        : equipments.filter((eq) => eq.workshop === alertSelectedWorkshop);
+                      if (filtered.length === 0) {
+                        return <option value="">-- Aucun équipement dans cet atelier --</option>;
+                      }
+                      return filtered.map((eq) => (
+                        <option key={eq.code} value={eq.code}>
+                          [{eq.code}] {eq.name}
+                        </option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-neutral-400">
+                💡 Sélectionnez d'abord l'Atelier pour restreindre instantanément la liste des appareils et trouver plus facilement l'équipement en panne. Le code d'équipement correspond précisément à sa plaque d'identification.
+              </p>
+
+              {/* Symptom title */}
+              <div className="space-y-1">
+                <label className="block text-xs font-black text-neutral-600">
+                  Symptôme de Panne / Constat (court) :
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Moteur chauffe anormalement, Vérin bloqué, Fuite d'air..."
+                  value={alertTitle}
+                  onChange={(e) => setAlertTitle(e.target.value)}
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs font-medium outline-none focus:ring-2 focus:ring-chery-red"
+                />
+              </div>
+
+              {/* Detailed symptoms description */}
+              <div className="space-y-1">
+                <label className="block text-xs font-black text-neutral-600">
+                  Description détaillée du dysfonctionnement (Optionnel) :
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Décrivez précisément ce qui s'est produit ou les bruits/symptômes observés pour aider le diagnostic..."
+                  value={alertDesc}
+                  onChange={(e) => setAlertDesc(e.target.value)}
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs font-medium outline-none focus:ring-2 focus:ring-chery-red resize-none"
+                />
+              </div>
+
+              {/* Technician & Priority side-by-side */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-black text-neutral-600">
+                    Déclaré par (Technicien / Chef) :
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nom du technicien"
+                    value={alertTech}
+                    onChange={(e) => setAlertTech(e.target.value)}
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs font-medium outline-none focus:ring-2 focus:ring-chery-red"
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="block text-xs font-black text-neutral-600">
+                    Niveau de Criticité / Urgence :
+                  </label>
+                  <select
+                    value={alertPriority}
+                    onChange={(e) => setAlertPriority(e.target.value as any)}
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 text-xs font-bold outline-none focus:ring-2 focus:ring-chery-red cursor-pointer"
+                  >
+                    <option value="Faible">🟢 Faible (Dégradé mais utilisable)</option>
+                    <option value="Moyenne">🟡 Moyenne (Ralentissement de production)</option>
+                    <option value="Haute">🟠 Haute (Arrêt immédiat de la machine)</option>
+                    <option value="Critique">🔴 Critique (Grave incident / Sécurité)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Form Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowGlobalAlertModal(false);
+                    setAlertTitle("");
+                    setAlertDesc("");
+                  }}
+                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-bold py-3 rounded-xl cursor-pointer transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={equipments.length === 0}
+                  className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-neutral-300 disabled:cursor-not-allowed text-white text-xs font-black py-3 rounded-xl cursor-pointer transition-colors shadow-md shadow-red-500/15 flex items-center justify-center gap-1.5"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Envoyer l'Alerte de Panne
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🔍 Global Command Palette Modal */}
+      <CommandPaletteModal
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        equipments={equipments}
+        interventions={interventions}
+        purchaseRequests={purchaseRequests}
+        vendors={vendors}
+        contracts={contracts}
+        onSelectTab={(tab) => {
+          const normalized = tab.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          let targetTab = tab;
+          if (normalized.includes("intervention") || normalized.includes("maintenance")) {
+            targetTab = "interventions";
+          } else if (normalized.includes("equipement")) {
+            setSelectedWorkshopFilter("All");
+            targetTab = "equipements";
+          }
+          setActiveTab(targetTab);
+          showToast(`Navigation vers ${tab}`, "info");
+        }}
+      />
+
+      {/* 🔔 Global Toast Notification */}
+      <ToastNotification
+        message={toast?.message || null}
+        type={toast?.type}
+        onClose={() => setToast(null)}
+      />
 
       {/* Page Footer */}
       <footer className="bg-white border-t border-neutral-200 py-6 text-center text-xs text-neutral-400 shrink-0 mt-auto">

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   FileSpreadsheet,
   Download,
@@ -18,20 +18,44 @@ import {
   Sliders,
   Check,
   Zap,
-  Sparkles
+  Sparkles,
+  BarChart2,
+  TrendingDown,
+  AlertTriangle,
+  History,
+  TrendingUp,
+  LineChart as LineIcon,
+  Search,
+  CheckCircle2,
+  Clock
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Cell
+} from "recharts";
 import { generateSTAExcelFile } from "../utils/excelGenerator";
 import { Equipment, Intervention, SparePart, MaintenanceContract, BudgetYear, ComplianceCheck, Vendor } from "../types";
 
 interface ExcelBlueprintProps {
   equipments: Equipment[];
-  interventions: Intervention[];
-  spareParts: SparePart[];
+  interventions: InterventionsPropType[]; // Backward compatible
+  spareParts?: SparePart[];
   contracts: MaintenanceContract[];
   vendors: Vendor[];
   compliance: ComplianceCheck[];
   budget: BudgetYear;
 }
+
+type InterventionsPropType = any;
 
 export default function ExcelBlueprint({
   equipments,
@@ -42,11 +66,23 @@ export default function ExcelBlueprint({
   compliance,
   budget
 }: ExcelBlueprintProps) {
+  // Main sub-views inside the Reports tab:
+  // "analytics" = Live Reports & Analytics
+  // "blueprint" = Excel Specifications & Guide
+  const [reportSubTab, setReportSubTab] = useState<"analytics" | "blueprint">("analytics");
   const [activeTab, setActiveTab] = useState<string>("equipements");
   const [copiedFormula, setCopiedFormula] = useState<string | null>(null);
 
+  // Filter for monthly report details
+  const [selectedMonth, setSelectedMonth] = useState<number>(6); // July is default (6 is July, 0-indexed)
+
+  const MONTHS_LIST_FR = [
+    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+  ];
+
   const handleDownload = () => {
-    generateSTAExcelFile(equipments, interventions, spareParts, contracts, vendors, compliance, budget);
+    generateSTAExcelFile(equipments, interventions, undefined, contracts, vendors, compliance, budget);
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -54,6 +90,88 @@ export default function ExcelBlueprint({
     setCopiedFormula(id);
     setTimeout(() => setCopiedFormula(null), 2000);
   };
+
+  // --- ANALYTICS CALCULATIONS ---
+
+  // 1. Monthly Report calculations for selectedMonth
+  const monthlyMetrics = useMemo(() => {
+    const monthNumStr = String(selectedMonth + 1).padStart(2, "0");
+    const monthInterventions = interventions.filter((int) => {
+      const parts = int.dateIntervention.split("-");
+      return parts[0] === "2026" && parts[1] === monthNumStr;
+    });
+
+    const preventives = monthInterventions.filter((i) => i.type === "Préventif");
+    const correctives = monthInterventions.filter((i) => i.type === "Correctif");
+    const regulatory = monthInterventions.filter((i) => i.type === "Réglementaire");
+
+    const costLabor = monthInterventions.reduce((sum, i) => sum + (i.costLabor || 0), 0);
+    const totalCost = costLabor;
+
+    return {
+      interventionsCount: monthInterventions.length,
+      preventivesCount: preventives.length,
+      correctivesCount: correctives.length,
+      regulatoryCount: regulatory.length,
+      costLabor,
+      totalCost
+    };
+  }, [interventions, selectedMonth]);
+
+  // 2. Frequency of failures by Equipment
+  const failureFrequencyList = useMemo(() => {
+    const counts: Record<string, number> = {};
+    // Seed all equipments with 0
+    equipments.forEach((eq) => {
+      counts[eq.code] = 0;
+    });
+
+    // Count corrective interventions
+    interventions.forEach((int) => {
+      if (int.type === "Correctif" && counts[int.equipmentCode] !== undefined) {
+        counts[int.equipmentCode] += 1;
+      }
+    });
+
+    return Object.entries(counts)
+      .map(([code, count]) => {
+        const eqName = equipments.find((e) => e.code === code)?.name || "N/A";
+        return { code, count, eqName };
+      })
+      .sort((a, b) => b.count - a.count);
+  }, [equipments, interventions]);
+
+  // 3. Availability by Equipment Details
+  const availabilityDetailsList = useMemo(() => {
+    return equipments.map((eq) => {
+      let score = 100;
+      if (eq.status === "Opérationnel") score = 100;
+      else if (eq.status === "Dégradé") score = 90;
+      else if (eq.status === "En Maintenance") score = 40;
+      else if (eq.status === "En Panne") score = 0;
+
+      return {
+        code: eq.code,
+        name: eq.name,
+        workshop: eq.workshop,
+        status: eq.status,
+        score
+      };
+    }).sort((a, b) => a.score - b.score);
+  }, [equipments]);
+
+  // 4. Budget vs Spent Chart Data
+  const budgetChartData = useMemo(() => {
+    return Object.keys(budget.allocatedByWorkshop).map((wKey) => {
+      const allocated = budget.allocatedByWorkshop[wKey] || 0;
+      const spent = budget.spentByWorkshop[wKey] || 0;
+      return {
+        name: wKey.replace("Atelier ", "Atl. "),
+        Alloué: allocated,
+        Consommé: spent
+      };
+    });
+  }, [budget]);
 
   const sheetsSpecs = [
     {
@@ -116,29 +234,6 @@ export default function ExcelBlueprint({
       ]
     },
     {
-      id: "pieces",
-      name: "3. PIECES_RECHANGE",
-      role: "Suivi du stock physique, des valeurs financières d'inventaire et génération automatique des demandes d'achats.",
-      dropdowns: [
-        { name: "Alerte Réappro", values: ["Alerte Stock Bas", "Stock OK"] }
-      ],
-      columns: [
-        { col: "A", name: "Code Pièce", type: "Texte unique", validation: "ex: PR-SR-FL1", formula: "Saisie manuelle" },
-        { col: "B", name: "Désignation", type: "Texte", validation: "Saisie libre", formula: "Saisie manuelle" },
-        { col: "C", name: "Stock Actuel", type: "Entier", validation: "Nombre supérieur ou égal à 0", formula: "Saisie physique" },
-        { col: "D", name: "Seuil d'Alerte (Min)", type: "Entier", validation: "Nombre supérieur à 0", formula: "Déterminé par criticité" },
-        { col: "E", name: "Prix Unitaire (TND)", type: "Décimal", validation: "Nombre supérieur à 0", formula: "Prix d'achat fournisseur" },
-        { col: "F", name: "Alerte Réappro", type: "Texte calculé", validation: "Automatique", formula: '=SI(C2<=D2;"Alerte Stock Bas";"Stock OK")' },
-        { col: "G", name: "Valeur Stock (TND)", type: "Décimal calculé", validation: "Automatique", formula: "=C2*E2" },
-        { col: "H", name: "Emplacement Magasin", type: "Texte", validation: "Saisie libre (ex: Rayon A-4)", formula: "Saisie manuelle" },
-        { col: "I", name: "Catégorie", type: "Texte", validation: "ex: Hydraulique, Électricité", formula: "Saisie manuelle" }
-      ],
-      formatting: [
-        { condition: "Stock Critique / À commander", formula: '=$F2="Alerte Stock Bas"', style: "Remplissage rouge clair, texte rouge gras (Indique une commande immédiate)" },
-        { condition: "Stock à Zéro", formula: '=$C2=0', style: "Remplissage rouge vif et texte blanc en gras" }
-      ]
-    },
-    {
       id: "compliance",
       name: "4. CONTROLES_REGLEMENTAIRES",
       role: "Registre de conformité légale et suivi des PV d'épreuves obligatoires délivrés par les organismes certifiés.",
@@ -185,216 +280,342 @@ export default function ExcelBlueprint({
 
   return (
     <div className="space-y-6">
-      {/* Excel Download Callout */}
+      {/* 1. Header Download Banner */}
       <div className="bg-gradient-to-r from-neutral-900 via-neutral-800 to-red-950 text-white rounded-2xl p-6 border border-neutral-800 shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 h-full w-1/3 opacity-15 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-chery-red via-transparent to-transparent pointer-events-none"></div>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-1.5 flex-1">
             <div className="flex items-center gap-2 text-chery-red font-bold text-xs uppercase tracking-wider">
               <Sparkles className="h-3.5 w-3.5 animate-pulse-subtle" />
-              Générateur Automatique de Fichier Excel
+              Générateur de Rapports & Exports Excel
             </div>
-            <h2 className="text-xl md:text-2xl font-bold tracking-tight">
-              Télécharger Votre Classeur Excel Clé en Main
+            <h2 className="text-xl md:text-2xl font-black tracking-tight text-white">
+              Générer et Exporter les Données GMAO STA
             </h2>
             <p className="text-xs md:text-sm text-neutral-300 max-w-2xl leading-relaxed">
-              Ne perdez pas de temps à ressaisir toutes les colonnes et formules.
-              Nous avons programmé un bouton qui génère instantanément un classeur <strong>.xlsx d'origine</strong> pré-configuré avec les 6 feuilles demandées,
-              tous les codes équipements, pièces de rechange, contrats et budgets de STA Tunisie, incluant les formules Excel natives (SI, IF, TODAY, SUM).
+              Consultez les graphiques de conformité et exportez instantanément un fichier <strong>Excel (.xlsx)</strong> d'origine entièrement pré-configuré avec l'ensemble des données, formules et feuilles d'audit de la STA.
             </p>
           </div>
           <button
             onClick={handleDownload}
-            className="flex items-center justify-center gap-2.5 bg-chery-red hover:bg-chery-dark text-white px-6 py-4 rounded-xl font-bold text-sm shadow-xl hover:shadow-red-900/30 transition-all cursor-pointer group self-stretch md:self-auto"
+            className="flex items-center justify-center gap-2.5 bg-chery-red hover:bg-chery-dark text-white px-6 py-4 rounded-xl font-extrabold text-sm shadow-xl hover:shadow-red-900/30 transition-all cursor-pointer group self-stretch md:self-auto shrink-0"
           >
             <Download className="h-5 w-5 animate-bounce" />
-            Télécharger le Modèle Excel (.xlsx)
+            Télécharger le Classeur Excel (.xlsx)
           </button>
         </div>
       </div>
 
-      {/* Sheet specifications segment */}
-      <div className="bg-white rounded-2xl border border-neutral-100 shadow-xs p-6 space-y-6">
-        <div>
-          <h3 className="text-base font-bold text-neutral-800 flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-chery-red" />
-            Guide et Spécifications Techniques du Classeur Excel
-          </h3>
-          <p className="text-xs text-neutral-500 mt-1">
-            Parcourez ci-dessous la configuration technique exacte, feuille par feuille, pour recréer vous-même ce classeur dans Microsoft Excel ou en comprendre les relations d'ingénierie.
-          </p>
-        </div>
+      {/* Selector: Live Analytics vs Excel Blueprint */}
+      <div className="flex bg-neutral-100 p-1.5 rounded-2xl border border-neutral-200/50 max-w-md">
+        <button
+          onClick={() => setReportSubTab("analytics")}
+          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            reportSubTab === "analytics"
+              ? "bg-white text-neutral-800 shadow-sm border border-neutral-200/40"
+              : "text-neutral-500 hover:text-neutral-800"
+          }`}
+        >
+          <BarChart2 className="h-4 w-4" />
+          Rapports & Analyses Live
+        </button>
+        <button
+          onClick={() => setReportSubTab("blueprint")}
+          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            reportSubTab === "blueprint"
+              ? "bg-white text-neutral-800 shadow-sm border border-neutral-200/40"
+              : "text-neutral-500 hover:text-neutral-800"
+          }`}
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Fiches & Formules Excel
+        </button>
+      </div>
 
-        {/* Tabs navigation */}
-        <div className="flex flex-wrap border-b border-neutral-100 gap-1.5 pb-2">
-          {sheetsSpecs.map((sh) => (
-            <button
-              key={sh.id}
-              onClick={() => setActiveTab(sh.id)}
-              className={`text-xs font-bold py-2.5 px-4 rounded-lg transition-all cursor-pointer ${
-                activeTab === sh.id
-                  ? "bg-chery-red text-white shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
-              }`}
-            >
-              {sh.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Specs Content */}
-        <div className="space-y-5 animate-fade-in">
-          {/* Objectif */}
-          <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-100 text-xs">
-            <span className="font-bold text-neutral-400 uppercase tracking-wider block text-[10px]">
-              Rôle de cette feuille Excel
-            </span>
-            <p className="text-neutral-700 font-medium mt-1 leading-relaxed">{currentSheet.role}</p>
-          </div>
-
-          {/* List validation fields */}
-          {currentSheet.dropdowns.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
-                <Sliders className="h-3.5 w-3.5 text-neutral-400" />
-                Listes Déroulantes & Validation de Données
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentSheet.dropdowns.map((drop, idx) => (
-                  <div key={idx} className="bg-neutral-50/50 p-3 rounded-lg border border-neutral-100 text-xs">
-                    <span className="font-bold text-neutral-600 block mb-1">Colonne: {drop.name}</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {drop.values.map((v, i) => (
-                        <span key={i} className="bg-white px-2 py-0.5 rounded border border-neutral-150 text-[10px] font-mono text-neutral-600">
-                          {v}
-                        </span>
-                      ))}
-                    </div>
-                    <span className="text-[10px] text-neutral-400 block mt-2">
-                      Astuce Excel : Sélectionner la colonne &rarr; Données &rarr; Validation des données &rarr; Autoriser : Liste &rarr; Source : Saisir les valeurs séparées par un point-virgule (ou référencer une plage).
-                    </span>
-                  </div>
-                ))}
+      {/* Sub-view switcher */}
+      {reportSubTab === "analytics" ? (
+        /* ANALYTICS VIEW MODULES */
+        <div className="space-y-6 animate-fade-in">
+          {/* Section A: Monthly Reports and Indicators */}
+          <div className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-neutral-50 pb-3">
+              <div>
+                <h3 className="text-xs font-black text-neutral-400 uppercase tracking-widest">Rapports Mensuels d'Activité</h3>
+                <span className="text-sm font-black text-neutral-700 block mt-0.5">Analyses comparatives préventives vs correctives (Exercice 2026)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-neutral-500 font-bold">Mois d'analyse :</span>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  className="border border-neutral-200 rounded-lg text-xs py-1.5 px-2.5 bg-white outline-none font-bold cursor-pointer"
+                >
+                  {MONTHS_LIST_FR.map((m, idx) => (
+                    <option key={idx} value={idx}>{m} 2026</option>
+                  ))}
+                </select>
               </div>
             </div>
-          )}
 
-          {/* Columns Specifications Table */}
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
-              <Table className="h-3.5 w-3.5 text-neutral-400" />
-              Structure des colonnes du Tableau
-            </h4>
-            <div className="overflow-x-auto border border-neutral-100 rounded-xl">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-neutral-50 border-b border-neutral-100 text-neutral-500 font-bold">
-                    <th className="py-2.5 px-4 text-center">Col.</th>
-                    <th className="py-2.5 px-4">Nom du Champ / En-tête</th>
-                    <th className="py-2.5 px-4">Type de Donnée</th>
-                    <th className="py-2.5 px-4">Validation Excel / Consignes</th>
-                    <th className="py-2.5 px-4">Formule Excel (Syntaxe FR)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-50">
-                  {currentSheet.columns.map((col, index) => {
-                    const isFormula = col.formula.startsWith("=");
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-neutral-50 p-4 rounded-xl text-xs">
+                <span className="text-neutral-400 font-bold uppercase block text-[9px]">Interventions totales</span>
+                <span className="text-xl font-black text-neutral-800 font-mono block mt-1">{monthlyMetrics.interventionsCount} bons</span>
+                <span className="text-[10px] text-neutral-400 mt-1 block">Toutes catégories confondues</span>
+              </div>
+              
+              <div className="bg-neutral-50 p-4 rounded-xl text-xs">
+                <span className="text-neutral-400 font-bold uppercase block text-[9px]">Ratio Préventif / Panne</span>
+                <span className="text-xl font-black text-neutral-800 font-mono block mt-1">
+                  {monthlyMetrics.preventivesCount} Prv / {monthlyMetrics.correctivesCount} Cur
+                </span>
+                <span className="text-[10px] text-neutral-400 mt-1 block">Réglementaires : {monthlyMetrics.regulatoryCount}</span>
+              </div>
 
-                    return (
-                      <tr key={index} className="hover:bg-neutral-50/20 font-medium">
-                        <td className="py-2.5 px-4 text-center font-bold text-neutral-400 font-mono">
-                          {col.col}
-                        </td>
-                        <td className="py-2.5 px-4 text-neutral-800 font-bold">{col.name}</td>
-                        <td className="py-2.5 px-4 text-neutral-500 font-semibold">{col.type}</td>
-                        <td className="py-2.5 px-4 text-neutral-400 text-[11px] leading-relaxed">
-                          {col.validation}
-                        </td>
-                        <td className="py-2.5 px-4 font-mono text-[11px] text-neutral-700">
-                          {isFormula ? (
-                            <div className="flex items-center gap-1.5 bg-neutral-50 p-1.5 rounded border border-neutral-150">
-                              <span className="text-chery-red select-all">{col.formula}</span>
-                              <button
-                                onClick={() => copyToClipboard(col.formula, `${currentSheet.id}-${col.col}`)}
-                                className="ml-auto text-[10px] bg-neutral-200 hover:bg-neutral-300 px-1 py-0.5 rounded text-neutral-600 transition-colors cursor-pointer"
-                              >
-                                {copiedFormula === `${currentSheet.id}-${col.col}` ? <Check className="h-3 w-3 text-green-600" /> : "Copier"}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-neutral-400 italic">{col.formula}</span>
-                          )}
+              <div className="bg-neutral-50 p-4 rounded-xl text-xs">
+                <span className="text-neutral-400 font-bold uppercase block text-[9px]">Facturation Main d'Œuvre</span>
+                <span className="text-xl font-black text-neutral-800 font-mono block mt-1">{(monthlyMetrics.costLabor ?? 0).toLocaleString()} TND</span>
+                <span className="text-[10px] text-neutral-400 mt-1 block">Heures facturées atelier</span>
+              </div>
+
+              <div className="bg-neutral-50 p-4 rounded-xl text-xs">
+                <span className="text-neutral-400 font-bold uppercase block text-[9px]">Coût Pièces Détachées</span>
+                <span className="text-xl font-black text-neutral-800 font-mono block mt-1">{(monthlyMetrics.costParts ?? 0).toLocaleString()} TND</span>
+                <span className="text-[10px] text-neutral-400 mt-1 block">Total Consommation magasin</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section B: Grid for failure frequency & availability tables */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Failure Counts by Equipment */}
+            <div className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs space-y-4">
+              <div className="border-b border-neutral-50 pb-2 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-chery-red" />
+                <div>
+                  <h3 className="text-xs font-black text-neutral-400 uppercase tracking-widest">Fréquence des Pannes par Machine</h3>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">Nombre d'interventions curatives correctives déclarées.</p>
+                </div>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto text-xs border border-neutral-50 rounded-xl">
+                <table className="w-full text-left font-medium">
+                  <thead>
+                    <tr className="bg-neutral-50 border-b border-neutral-100 text-neutral-400 font-bold text-[10px] uppercase">
+                      <th className="py-2.5 px-3">Code</th>
+                      <th className="py-2.5 px-3">Désignation</th>
+                      <th className="py-2.5 px-3 text-center">Nombre Pannes</th>
+                      <th className="py-2.5 px-3 text-center">Sévérité</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50">
+                    {failureFrequencyList.map((f) => (
+                      <tr key={f.code} className="hover:bg-neutral-50/50">
+                        <td className="py-2.5 px-3 font-mono font-bold text-neutral-400">{f.code}</td>
+                        <td className="py-2.5 px-3 text-neutral-700 font-bold">{f.eqName}</td>
+                        <td className="py-2.5 px-3 text-center font-mono font-extrabold text-neutral-800">{f.count} pannes</td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${
+                            f.count > 2
+                              ? "bg-red-50 text-chery-red animate-pulse"
+                              : f.count > 0
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-green-50 text-green-700"
+                          }`}>
+                            {f.count > 2 ? "Fréquent" : f.count > 0 ? "Modéré" : "Zéro Panne"}
+                          </span>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Equipment Availability % details */}
+            <div className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs space-y-4">
+              <div className="border-b border-neutral-50 pb-2 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <div>
+                  <h3 className="text-xs font-black text-neutral-400 uppercase tracking-widest">Détails de Disponibilité unitaire</h3>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">Taux de service individuel calculé selon l'état actuel.</p>
+                </div>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto text-xs border border-neutral-50 rounded-xl">
+                <table className="w-full text-left font-medium">
+                  <thead>
+                    <tr className="bg-neutral-50 border-b border-neutral-100 text-neutral-400 font-bold text-[10px] uppercase">
+                      <th className="py-2.5 px-3">Code</th>
+                      <th className="py-2.5 px-3">Désignation</th>
+                      <th className="py-2.5 px-3">Atelier</th>
+                      <th className="py-2.5 px-3 text-right">Dispo. (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50">
+                    {availabilityDetailsList.map((av) => (
+                      <tr key={av.code} className="hover:bg-neutral-50/50">
+                        <td className="py-2.5 px-3 font-mono font-bold text-neutral-400">{av.code}</td>
+                        <td className="py-2.5 px-3 text-neutral-700 font-bold">{av.name}</td>
+                        <td className="py-2.5 px-3 text-neutral-400 font-semibold">{av.workshop}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          <span className={`font-mono font-extrabold ${
+                            av.score > 80 ? "text-green-600" : av.score > 30 ? "text-amber-600" : "text-chery-red"
+                          }`}>
+                            {av.score}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          {/* Conditional Formatting Rules */}
-          {currentSheet.formatting.length > 0 && (
+          {/* Section C: Budget Allocation vs Consumption Chart */}
+          <div className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs space-y-4">
+            <div className="border-b border-neutral-50 pb-2">
+              <h3 className="text-xs font-black text-neutral-400 uppercase tracking-widest">Maîtrise budgétaire par Atelier</h3>
+              <p className="text-[11px] text-neutral-500 mt-0.5">Comparatif graphique de l'enveloppe allouée vs dépenses constatées (TND)</p>
+            </div>
+            
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={budgetChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
+                  <XAxis dataKey="name" stroke="#a3a3a3" fontSize={9} tickLine={false} />
+                  <YAxis stroke="#a3a3a3" fontSize={10} tickLine={false} />
+                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="Alloué" fill="#1e293b" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Consommé" fill="#cc0000" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* BLUEPRINT SPECIFICATIONS GUIDE SHEET (As previously constructed) */
+        <div className="bg-white rounded-2xl border border-neutral-100 shadow-xs p-6 space-y-6">
+          <div>
+            <h3 className="text-base font-bold text-neutral-800 flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-chery-red" />
+              Guide et Spécifications Techniques du Classeur Excel
+            </h3>
+            <p className="text-xs text-neutral-500 mt-1">
+              Parcourez la configuration exacte du classeur, feuille par feuille, pour en comprendre les relations ou saisir directement les formules adaptées.
+            </p>
+          </div>
+
+          {/* Tabs navigation */}
+          <div className="flex flex-wrap border-b border-neutral-100 gap-1.5 pb-2">
+            {sheetsSpecs.map((sh) => (
+              <button
+                key={sh.id}
+                onClick={() => setActiveTab(sh.id)}
+                className={`text-xs font-bold py-2 px-3 rounded-lg transition-all cursor-pointer ${
+                  activeTab === sh.id
+                    ? "bg-chery-red text-white shadow-sm"
+                    : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+                }`}
+              >
+                {sh.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Specs Content */}
+          <div className="space-y-5 animate-fade-in text-xs">
+            {/* Objectif */}
+            <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-100">
+              <span className="font-bold text-neutral-400 uppercase tracking-wider block text-[9px]">
+                Rôle de cette feuille Excel
+              </span>
+              <p className="text-neutral-700 font-medium mt-1 leading-relaxed">{currentSheet.role}</p>
+            </div>
+
+            {/* List validation fields */}
+            {currentSheet.dropdowns.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sliders className="h-3.5 w-3.5 text-neutral-400" />
+                  Listes Déroulantes & Validation de Données
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {currentSheet.dropdowns.map((drop, idx) => (
+                    <div key={idx} className="bg-neutral-50/50 p-3 rounded-lg border border-neutral-100 text-xs">
+                      <span className="font-bold text-neutral-600 block mb-1">Colonne: {drop.name}</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {drop.values.map((v, i) => (
+                          <span key={i} className="bg-white px-2 py-0.5 rounded border border-neutral-200 text-[10px] font-mono text-neutral-600">
+                            {v}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Columns Specifications Table */}
             <div className="space-y-2">
               <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
-                <Cpu className="h-3.5 w-3.5 text-neutral-400" />
-                Mise en Forme Conditionnelle (Automatisation Visuelle)
+                <Table className="h-3.5 w-3.5 text-neutral-400" />
+                Structure des colonnes du Tableau
               </h4>
-              <div className="space-y-2.5">
-                {currentSheet.formatting.map((fmt, idx) => (
-                  <div key={idx} className="bg-neutral-50/30 p-3 rounded-lg border border-neutral-100 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs font-medium">
-                    <div className="space-y-0.5">
-                      <span className="text-neutral-800 font-bold block">{fmt.condition}</span>
-                      <span className="text-neutral-400 text-[10px] block">Règle par formule :</span>
-                      <code className="text-chery-red bg-white px-1.5 py-0.5 rounded border border-neutral-150 font-mono text-[11px] block md:inline-block">
-                        {fmt.formula}
-                      </code>
-                    </div>
-                    <div className="p-2.5 bg-white border border-neutral-150 rounded text-neutral-600 text-[11px] max-w-sm">
-                      <strong className="block text-neutral-700 mb-0.5">Format appliqué :</strong>
-                      {fmt.style}
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto border border-neutral-100 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-neutral-50 border-b border-neutral-100 text-neutral-500 font-bold text-[10px]">
+                      <th className="py-2.5 px-4 text-center">Col.</th>
+                      <th className="py-2.5 px-4">Nom du Champ / En-tête</th>
+                      <th className="py-2.5 px-4">Type de Donnée</th>
+                      <th className="py-2.5 px-4">Validation Excel</th>
+                      <th className="py-2.5 px-4">Formule Excel (Syntaxe FR)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-50 font-medium">
+                    {currentSheet.columns.map((col, index) => {
+                      const isFormula = col.formula.startsWith("=");
+
+                      return (
+                        <tr key={index} className="hover:bg-neutral-50/20">
+                          <td className="py-2.5 px-4 text-center font-bold text-neutral-400 font-mono">
+                            {col.col}
+                          </td>
+                          <td className="py-2.5 px-4 text-neutral-800 font-bold">{col.name}</td>
+                          <td className="py-2.5 px-4 text-neutral-500 font-semibold">{col.type}</td>
+                          <td className="py-2.5 px-4 text-neutral-400 text-[11px] leading-relaxed">
+                            {col.validation}
+                          </td>
+                          <td className="py-2.5 px-4 font-mono text-[11px] text-neutral-700">
+                            {isFormula ? (
+                              <div className="flex items-center gap-1.5 bg-neutral-50 p-1.5 rounded border border-neutral-250">
+                                <span className="text-chery-red select-all">{col.formula}</span>
+                                <button
+                                  onClick={() => copyToClipboard(col.formula, `${currentSheet.id}-${col.col}`)}
+                                  className="ml-auto text-[10px] bg-neutral-200 hover:bg-neutral-300 px-1 py-0.5 rounded text-neutral-600 transition-colors cursor-pointer"
+                                >
+                                  {copiedFormula === `${currentSheet.id}-${col.col}` ? "Copié !" : "Copier"}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-neutral-400 italic">{col.formula}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
-
-      {/* Best practices tips */}
-      <div className="bg-white rounded-2xl border border-neutral-100 p-6 shadow-xs space-y-4 text-xs">
-        <h3 className="text-sm font-bold text-neutral-800 flex items-center gap-2">
-          <Zap className="h-5 w-5 text-amber-500" />
-          Recommandations d'Expert pour Ahmed Amine Ben Salah
-        </h3>
-        <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 text-neutral-600 leading-relaxed font-medium">
-          <li className="bg-neutral-50/50 p-3.5 rounded-xl border border-neutral-100 space-y-1">
-            <strong className="text-neutral-800 block text-[13px]">1. Protection du Classeur</strong>
-            <span>
-              Verrouillez les feuilles <strong>EQUIPEMENTS</strong>, <strong>SUIVI_BUDGETAIRE</strong> et <strong>CONTROLES_REGLEMENTAIRES</strong> en lecture seule pour l'équipe technique, et ne laissez modifiables que les colonnes de prélèvement de pièces et d'heures d'interventions. Cela évitera l'altération involontaire des formules complexes.
-            </span>
-          </li>
-          <li className="bg-neutral-50/50 p-3.5 rounded-xl border border-neutral-100 space-y-1">
-            <strong className="text-neutral-800 block text-[13px]">2. Utilisation des Formules Français vs Anglais</strong>
-            <span>
-              Si vous utilisez Excel configuré en Français, utilisez <strong>AUJOURDHUI()</strong>, <strong>SI()</strong>, et <strong>SOMME.SI()</strong>. Si votre version d'Excel est en Anglais, remplacez-les respectivement par <strong>TODAY()</strong>, <strong>IF()</strong>, et <strong>SUMIF()</strong>. Le modèle automatique .xlsx généré par notre bouton gère nativement cette traduction !
-            </span>
-          </li>
-          <li className="bg-neutral-50/50 p-3.5 rounded-xl border border-neutral-100 space-y-1">
-            <strong className="text-neutral-800 block text-[13px]">3. Liaison Magasin Pièces & Bons</strong>
-            <span>
-              L'intégration de la formule <code>SOMME.SI</code> dans le budget permet de lier dynamiquement le coût total de maintenance au prix de sortie des pièces détachées. Veillez à ce que les techniciens renseignent scrupuleusement le <strong>Code Équipement</strong> correct sur chaque bon pour une imputation analytique exacte !
-            </span>
-          </li>
-          <li className="bg-neutral-50/50 p-3.5 rounded-xl border border-neutral-100 space-y-1">
-            <strong className="text-neutral-800 block text-[13px]">4. Graphiques Croisés Dynamiques (GCD)</strong>
-            <span>
-              Pour reproduire les graphiques du tableau de bord Web dans votre Excel, sélectionnez le tableau d'interventions, allez dans <strong>Insertion &rarr; Tableau Croisé Dynamique</strong>. Placez "Service" en lignes, et "Coût Total" en valeurs. Cliquez ensuite sur "Graphique Croisé Dynamique (Histogramme)" pour obtenir le rapport analytique.
-            </span>
-          </li>
-        </ul>
-      </div>
+      )}
     </div>
   );
 }

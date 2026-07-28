@@ -30,10 +30,16 @@ export interface Equipment {
   inspectionIntervalMonths?: number;
   mtbfTargetHours: number; // Target Mean Time Between Failures
   mttrTargetHours: number; // Target Mean Time To Repair
+  criticite?: "A - Critique" | "B - Moyen" | "C - Faible";
+  warrantyDetails?: string;
+  vendorId?: string;
+  responsableName?: string;
+  documents?: { name: string; type: "Procédure" | "Instruction" | "Manuel" | "Plan" | "Réglementaire"; dateAdded: string; version: string; size: string }[];
+  photos?: string[];
 }
 
 export type InterventionType = "Préventif" | "Correctif" | "Réglementaire";
-export type InterventionStatus = "Planifié" | "En cours" | "Terminé" | "Annulé";
+export type InterventionStatus = "Nouvelle" | "Planifiée" | "En cours" | "En attente" | "Terminée" | "Clôturée" | "Annulée" | "Planifié" | "Terminé" | "Annulé";
 
 export interface PartUsed {
   partCode: string;
@@ -56,6 +62,12 @@ export interface Intervention {
   notes?: string;
   executorType?: "Interne" | "Externe";
   externalProvider?: string;
+  priority?: "Faible" | "Moyenne" | "Haute" | "Critique";
+  validationBy?: string;
+  checklist?: { task: string; done: boolean }[];
+  signature?: { name: string; date: string; dataUrl?: string };
+  photos?: string[];
+  realDurationMinutes?: number;
 }
 
 export interface SparePart {
@@ -131,6 +143,28 @@ export interface PurchaseRequest {
   dateRequested: string;
   status: "En attente" | "Approuvé" | "Commandé" | "Reçu" | "Refusé";
   estimatedCost: number;
-  category?: "Équipement" | "Infrastructure";
+  category?: "Équipement" | "Infrastructure" | "Service";
+}
+
+export interface ActivityLog {
+  id: string;
+  timestamp: string;
+  userRole: string;
+  action: string;
+  details: string;
+  type: "equipment" | "intervention" | "spare_part" | "purchase" | "budget" | "compliance" | "other";
+}
+
+export interface UserRoleProfile {
+  id: string;
+  label: string;
+  rights: string;
+  badge: string;
+  pin: string;
+  userFullName?: string;
+  email?: string;
+  phone?: string;
+  workshop?: string;
+  isSystem?: boolean;
 }
 
