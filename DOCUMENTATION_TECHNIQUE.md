@@ -212,7 +212,12 @@ Puisque l'application GMAO a été construite sous la forme d'un projet **Vite S
 Si vous souhaitez faire tourner l'application sur un poste dédié de l'atelier sans serveur web existant, un script batch nommé `demarrer.bat` a été préparé à la racine :
 1. Installez **Node.js** (recommandé v18 ou v20 LTS) sur le poste Windows.
 2. Double-cliquez sur le fichier `demarrer.bat` présent à la racine du dossier du projet.
-3. Le script va automatiquement installer les dépendances (la première fois), lancer le serveur web embarqué ultra-léger et ouvrir automatiquement votre navigateur par défaut à l'adresse : `http://localhost:3000`.
+3. Le script va automatiquement vérifier/installer les dépendances (la première fois), libérer tout processus bloqué, réserver le port 3000 (ou le port libre suivant) et ouvrir automatiquement votre navigateur par défaut à l'adresse : `http://localhost:3000`.
+
+#### 📌 Lancement automatique au démarrage de Windows (Réservation d'adresse permanente)
+Pour que l'application se lance et réserve son adresse automatiquement dès l'allumage du PC (sans intervention humaine) :
+* **Activer le démarrage automatique** : Exécutez le script `installer-demarrage-automatique.bat`. Il crée un raccourci dans le dossier de démarrage Windows (`Startup`). L'application démarrera en tâche de fond dès le boot du PC et l'adresse `http://localhost:3000` (ou IP locale LAN) sera active en permanence.
+* **Désactiver le démarrage automatique** : Si besoin, exécutez le script `desinstaller-demarrage-automatique.bat`.
 
 ---
 
