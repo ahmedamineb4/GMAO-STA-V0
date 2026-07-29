@@ -33,7 +33,8 @@ import {
   DollarSign,
   Search,
   Command,
-  Sparkles
+  Sparkles,
+  Terminal
 } from "lucide-react";
 
 // Types & Initial Data
@@ -80,6 +81,7 @@ import { FinancialManager } from "./components/FinancialManager";
 import CommandPaletteModal from "./components/CommandPaletteModal";
 import ToastNotification from "./components/ToastNotification";
 import CheryStaLogo from "./components/CheryStaLogo";
+import DeveloperConsoleModal from "./components/DeveloperConsoleModal";
 
 export default function App() {
   // Navigation State
@@ -91,20 +93,24 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [resetConfirmType, setResetConfirmType] = useState<"reset" | "clear" | null>(null);
 
-  // 🔍 Command Palette & Toast Notification State
+  // 🔍 Command Palette, Dev Console & Toast Notification State
   const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
+  const [devConsoleOpen, setDevConsoleOpen] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
   };
 
-  // ⌨️ Global Cmd+K / Ctrl+K keyboard shortcut listener
+  // ⌨️ Global Cmd+K / Ctrl+K and Ctrl+Shift+D keyboard shortcut listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setCommandPaletteOpen((prev) => !prev);
+      } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        setDevConsoleOpen((prev) => !prev);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -1654,9 +1660,14 @@ export default function App() {
                 <CheryStaLogo className="h-7 w-auto" />
               </div>
               <div className="hidden lg:block border-l border-white/20 pl-3">
-                <span className="font-display font-black text-xs tracking-tight text-white block leading-tight">
-                  STA TUNISIE
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-display font-black text-xs tracking-tight text-white block leading-tight">
+                    STA TUNISIE
+                  </span>
+                  <span className="bg-red-600/90 text-white font-mono text-[9px] font-extrabold px-1.5 py-0.2 rounded border border-red-500/50 shadow-xs">
+                    v1.0
+                  </span>
+                </div>
                 <span className="text-[9px] text-red-300 font-bold tracking-wider block uppercase -mt-0.5">
                   Concessionnaire Officiel Chery
                 </span>
@@ -1706,6 +1717,18 @@ export default function App() {
             <span className="text-[10px] font-mono bg-slate-900/90 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 ml-0.5">
               ⌘K
             </span>
+          </button>
+
+          {/* ⚡ Pro Developer Console Trigger Button */}
+          <button
+            type="button"
+            onClick={() => setDevConsoleOpen(true)}
+            title="Console Développeur Pro & Télémétrie System (Ctrl+Shift+D)"
+            className="hidden xl:flex items-center gap-1.5 bg-slate-900/90 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 px-2.5 py-1.5 rounded-xl border border-emerald-500/30 transition-all cursor-pointer text-xs font-mono font-bold shadow-xs shrink-0"
+          >
+            <Terminal className="h-3.5 w-3.5 text-emerald-400" />
+            <span>DEV CONSOLE</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           </button>
 
           <button
@@ -2646,6 +2669,25 @@ export default function App() {
         }}
       />
 
+      {/* 💻 Pro Developer Console Modal */}
+      <DeveloperConsoleModal
+        isOpen={devConsoleOpen}
+        onClose={() => setDevConsoleOpen(false)}
+        currentUserRole={currentUserRole}
+        onSwitchRoleQuick={(role) => {
+          setCurrentUserRole(role);
+          localStorage.setItem("chery_gmao_user_role", role);
+        }}
+        activityLogs={activityLogs}
+        showToast={showToast}
+        handleManualSaveToDisk={handleManualSaveToDisk}
+        equipmentsCount={equipments.length}
+        interventionsCount={interventions.length}
+        sparePartsCount={spareParts.length}
+        purchaseRequestsCount={purchaseRequests.length}
+        contractsCount={contracts.length}
+      />
+
       {/* 🔔 Global Toast Notification */}
       <ToastNotification
         message={toast?.message || null}
@@ -2662,8 +2704,8 @@ export default function App() {
           <p className="mt-1">
             Concessionnaire Officiel Chery en Tunisie. Conçu et développé par <strong>Ahmed Amine Ben Salah</strong>, Responsable Maintenance et Parc.
           </p>
-          <p className="text-[10px] text-neutral-300 mt-2 font-mono">
-            STA Tunisie • Ben Arous, Tunisie
+          <p className="text-[10px] text-neutral-400 mt-2 font-mono">
+            STA Tunisie • Version 1.0 (Release Officielle) • Ben Arous, Tunisie
           </p>
         </div>
       </footer>
