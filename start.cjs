@@ -42,7 +42,18 @@ async function main() {
       console.log("Premier lancement detecte ! Cette etape ne se produit qu'une seule fois. Veuillez patienter...\n");
     }
     try {
-      execSync('npm install', { stdio: 'inherit' });
+      let npmCmd = 'npm';
+      const nodeDir = path.dirname(process.execPath);
+      const portableNpmCmd = path.join(nodeDir, 'npm.cmd');
+      const portableNpmCli = path.join(nodeDir, 'node_modules', 'npm', 'bin', 'npm-cli.js');
+
+      if (fs.existsSync(portableNpmCmd)) {
+        npmCmd = `"${portableNpmCmd}"`;
+      } else if (fs.existsSync(portableNpmCli)) {
+        npmCmd = `"${process.execPath}" "${portableNpmCli}"`;
+      }
+
+      execSync(`${npmCmd} install`, { stdio: 'inherit' });
       console.log("\n[SUCCES] Installation et verification terminees !\n");
     } catch (err) {
       console.error("\n[ERREUR] L'installation des composants a echoue.");
@@ -143,7 +154,14 @@ async function main() {
   }, 1500);
 
   // 7. Lancement du serveur Vite de développement sur le port sélectionné
-  const devServer = spawn('npx', ['vite', '--host', '0.0.0.0', '--port', String(activePort)], { stdio: 'inherit', shell: true });
+  const viteBinPath = path.join(__dirname, 'node_modules', 'vite', 'bin', 'vite.js');
+  let devServer;
+
+  if (fs.existsSync(viteBinPath)) {
+    devServer = spawn(process.execPath, [viteBinPath, '--host', '0.0.0.0', '--port', String(activePort)], { stdio: 'inherit' });
+  } else {
+    devServer = spawn('npx', ['vite', '--host', '0.0.0.0', '--port', String(activePort)], { stdio: 'inherit', shell: true });
+  }
 
   devServer.on('exit', (code) => {
     process.exit(code || 0);

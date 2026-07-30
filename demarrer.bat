@@ -6,13 +6,27 @@ cls
 echo "%~dp0" | findstr /i "AppData\Local\Temp" >nul
 if %errorlevel% EQU 0 goto ERROR_ZIP
 
-:: 2. Verification si Node.js est installe
+:: 2. Verification si Node.js (systeme ou portable) est disponible
+if exist "%~dp0node\node.exe" (
+    echo [INFO] Node.js portable detecte.
+    "%~dp0node\node.exe" start.cjs
+    if %errorlevel% NEQ 0 goto ERROR_RUN
+    echo.
+    echo Le serveur s'est arrete.
+    pause
+    exit
+)
+
 where node >nul 2>nul
 if %errorlevel% NEQ 0 goto ERROR_NODE
 
 :: 3. Execution du script de demarrage Node.js
 node start.cjs
 if %errorlevel% NEQ 0 goto ERROR_RUN
+
+echo.
+echo Le serveur s'est arrete.
+pause
 exit
 
 :ERROR_ZIP
