@@ -153,17 +153,19 @@ async function main() {
     }
   }, 1500);
 
-  // 7. Lancement du serveur Vite de développement sur le port sélectionné
-  const viteBinPath = path.join(__dirname, 'node_modules', 'vite', 'bin', 'vite.js');
-  let devServer;
-
-  if (fs.existsSync(viteBinPath)) {
-    devServer = spawn(process.execPath, [viteBinPath, '--host', '0.0.0.0', '--port', String(activePort)], { stdio: 'inherit' });
-  } else {
-    devServer = spawn('npx', ['vite', '--host', '0.0.0.0', '--port', String(activePort)], { stdio: 'inherit', shell: true });
-  }
+  // 7. Lancement du serveur Express GMAO (Vite + APIs de sauvegarde sur disque)
+  const serverPath = path.join(__dirname, 'server.js');
+  const env = Object.assign({}, process.env, { PORT: String(activePort) });
+  
+  const devServer = spawn(process.execPath, [serverPath], { 
+    stdio: 'inherit',
+    env: env
+  });
 
   devServer.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(`\n[ERREUR] Le serveur s'est arrete avec le code d'erreur: ${code}`);
+    }
     process.exit(code || 0);
   });
 }
