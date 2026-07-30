@@ -501,7 +501,7 @@ export default function App() {
     localStorage.setItem("chery_gmao_filter_calendar", showMaintenanceCalendar ? "true" : "false");
   }, [showMaintenanceCalendar]);
 
-  // Function to manually trigger database backup to LocalStorage
+  // Function to manually trigger database backup to LocalStorage AND disk folder (/sauvegardes)
   const handleManualSaveToDisk = () => {
     setDiskSyncStatus("syncing");
     try {
@@ -516,16 +516,76 @@ export default function App() {
       localStorage.setItem("chery_gmao_activity_logs", JSON.stringify(activityLogs));
       localStorage.setItem("chery_gmao_user_profiles", JSON.stringify(userProfiles));
 
-      setTimeout(() => {
-        setDiskSyncStatus("synced");
-        showToast("💾 Base de données enregistrée en mémoire locale (LocalStorage)", "success");
-      }, 250);
+      const backupPayload = {
+        equipments,
+        interventions,
+        spareParts,
+        vendors,
+        purchaseRequests,
+        compliance,
+        budget,
+        contracts,
+        activityLogs,
+        userProfiles,
+        savedAt: new Date().toISOString(),
+        version: "GMAO-STA-1.0"
+      };
+
+      fetch("/api/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(backupPayload)
+      })
+        .then((res) => res.json())
+        .then((resData) => {
+          setDiskSyncStatus("synced");
+          if (resData.success) {
+            showToast("💾 Sauvegarde réussie dans le dossier 'sauvegardes' de votre ordinateur !", "success");
+          } else {
+            showToast("💾 Base de données enregistrée en mémoire locale", "info");
+          }
+        })
+        .catch((err) => {
+          console.warn("[GMAO] API Backup non disponible, sauvegarde locale OK:", err);
+          setDiskSyncStatus("synced");
+          showToast("💾 Base de données enregistrée en mémoire locale (LocalStorage)", "success");
+        });
     } catch (err) {
       console.error("[GMAO] Échec de la sauvegarde locale:", err);
       setDiskSyncStatus("error");
       showToast("⚠️ Mémoire locale pleine ou inaccessible", "error");
     }
   };
+
+  // Automatic debounced backup to server disk folder (/sauvegardes)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const backupPayload = {
+        equipments,
+        interventions,
+        spareParts,
+        vendors,
+        purchaseRequests,
+        compliance,
+        budget,
+        contracts,
+        activityLogs,
+        userProfiles,
+        savedAt: new Date().toISOString(),
+        version: "GMAO-STA-1.0"
+      };
+
+      fetch("/api/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(backupPayload)
+      }).catch(() => {
+        // Silent catch for automatic background backup
+      });
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [equipments, interventions, spareParts, vendors, purchaseRequests, compliance, budget, contracts, userProfiles]);
 
   // Set disk sync status to synced on mount
   useEffect(() => {
@@ -1195,6 +1255,14 @@ export default function App() {
     if (importedData.purchaseRequests) setPurchaseRequests(importedData.purchaseRequests);
     if (importedData.compliance) setCompliance(importedData.compliance);
     if (importedData.budget) setBudget(importedData.budget);
+    if (importedData.contracts) setContracts(importedData.contracts);
+    if (importedData.userProfiles) setUserProfiles(importedData.userProfiles);
+
+    fetch("/api/backup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(importedData)
+    }).catch(() => {});
   };
 
   if (!isAuthenticated) {

@@ -62,6 +62,26 @@ async function main() {
     }
   }
 
+  // 1b. Verification et compilation automatique du dossier dist si absent
+  const distIndexPath = path.join(__dirname, 'dist', 'index.html');
+  if (!fs.existsSync(distIndexPath)) {
+    console.log("======================================================================");
+    console.log("[INFO] Generation des fichiers d'application (Compilation build)...");
+    console.log("======================================================================");
+    try {
+      let npmCmd = 'npm';
+      const nodeDir = path.dirname(process.execPath);
+      const portableNpmCmd = path.join(nodeDir, 'npm.cmd');
+      if (fs.existsSync(portableNpmCmd)) {
+        npmCmd = `"${portableNpmCmd}"`;
+      }
+      execSync(`${npmCmd} run build`, { stdio: 'inherit' });
+      console.log("[SUCCES] Compilation terminee avec succes !\n");
+    } catch (err) {
+      console.warn("[ATTENTION] Echec de la compilation automatique dist:", err.message);
+    }
+  }
+
   // 2. Libération du port 3000 s'il est occupé par un ancien serveur GMAO (Windows)
   if (process.platform === 'win32') {
     try {
