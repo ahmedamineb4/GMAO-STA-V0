@@ -12,7 +12,8 @@ import {
   BudgetYear,
   ComplianceCheck,
   Workshop,
-  PurchaseRequest
+  PurchaseRequest,
+  ActivityLog
 } from "./types";
 
 export const WORKSHOPS: Workshop[] = [
@@ -1996,4 +1997,120 @@ export const INITIAL_ENV_LOGS: EnvironmentLog[] = [
     notes: "Contrôle des fuites sur le réseau pneumatique : 3 raccords étanchéifiés sur poste carrosserie."
   }
 ];
+
+export const INITIAL_ACTIVITY_LOGS: ActivityLog[] = [
+  {
+    id: "log-2026-08-03-04",
+    timestamp: "03/08/2026 11:15",
+    userRole: "admin",
+    action: "Sécurisation des Accès & Téléchargement",
+    details: "Mise à jour des profils de confidentialité pour les modules Projets & Chantier et Amélioration Continue. Export des rapports.",
+    type: "other"
+  },
+  {
+    id: "log-2026-08-03-03",
+    timestamp: "03/08/2026 10:00",
+    userRole: "admin",
+    action: "Revue Réglementaire APAVE",
+    details: "Inspection périodique programmée pour les ponts élévateurs Ravaglioli du Service Rapide.",
+    type: "compliance"
+  },
+  {
+    id: "log-2026-08-03-02",
+    timestamp: "03/08/2026 09:30",
+    userRole: "supervisor",
+    action: "Consultation Tableau de Bord",
+    details: "Vérification de la synthèse financière et du taux de disponibilité globale du parc (94.2%).",
+    type: "budget"
+  },
+  {
+    id: "log-2026-08-03-01",
+    timestamp: "03/08/2026 08:15",
+    userRole: "admin",
+    action: "Synchronisation Système",
+    details: "Mise à jour du serveur local et contrôle de l'intégrité des données GMAO STA Chery.",
+    type: "other"
+  },
+  {
+    id: "log-2026-08-02-02",
+    timestamp: "02/08/2026 15:40",
+    userRole: "magasin",
+    action: "Réception Stock Pièces",
+    details: "Entrée en stock de 20 jeux de plaquettes de frein et 10 filtres à air pour Chery Tiggo.",
+    type: "spare_part"
+  },
+  {
+    id: "log-2026-08-02-01",
+    timestamp: "02/08/2026 10:20",
+    userRole: "admin",
+    action: "Suivi Projet Cabine Peinture",
+    details: "Avancement du chantier cabine de peinture (PRJ-2026-01) passé à 65% avec validation du lot brûleurs.",
+    type: "equipment"
+  },
+  {
+    id: "log-2026-08-01-02",
+    timestamp: "01/08/2026 14:00",
+    userRole: "service_rapide",
+    action: "Ordre de Travail Préventif",
+    details: "Clôture de la maintenance préventive mensuelle sur le poste de distribution fluides EQ-SR-03.",
+    type: "intervention"
+  },
+  {
+    id: "log-2026-08-01-01",
+    timestamp: "01/08/2026 08:30",
+    userRole: "admin",
+    action: "Démarrage Planning Août 2026",
+    details: "Ouverture de la période mensuelle Août 2026 et génération automatique du calendrier de maintenance préventive.",
+    type: "other"
+  },
+  {
+    id: "log-2026-07-31-02",
+    timestamp: "31/07/2026 17:30",
+    userRole: "admin",
+    action: "Clôture Mensuelle Juillet 2026",
+    details: "Calcul de la disponibilité globale du parc équipements (94.2%) et clôture du journal de Juillet 2026.",
+    type: "other"
+  },
+  {
+    id: "log-2026-07-31-01",
+    timestamp: "31/07/2026 11:00",
+    userRole: "carrosserie",
+    action: "Fin d'Intervention Corrective",
+    details: "Remplacement du kit de filtration extraction sur la cabine de peinture Blowtherm.",
+    type: "intervention"
+  },
+  {
+    id: "log-2026-07-28-01",
+    timestamp: "28/07/2026 16:15",
+    userRole: "admin",
+    action: "Contrôle Environnemental",
+    details: "Collecte agréée de 850L d'huiles usagées par ECO-LUB et contrôle étanchéité air comprimé.",
+    type: "compliance"
+  },
+  {
+    id: "log-2026-07-25-01",
+    timestamp: "25/07/2026 10:00",
+    userRole: "atelier_mecanique",
+    action: "Audit 5S Conforme",
+    details: "Validation de l'audit 5S de l'Atelier Mécanique avec un score de 92% (Conforme).",
+    type: "compliance"
+  },
+  {
+    id: "log-2026-07-20-01",
+    timestamp: "20/07/2026 14:30",
+    userRole: "magasin",
+    action: "Demande d'Achat Approuvée",
+    details: "Validation de la DA-2026-001 pour acquisition d'un pont Ravaglioli 4 Tonnes.",
+    type: "purchase"
+  },
+  {
+    id: "log-2026-07-01-01",
+    timestamp: "01/07/2026 08:30",
+    userRole: "admin",
+    action: "Initialisation Système",
+    details: "Démarrage et chargement de la base de données GMAO STA Tunisie en mode démonstration.",
+    type: "other"
+  }
+];
+
 

@@ -1665,13 +1665,26 @@ export default function SettingsManager({
                               onClick={() => {
                                 setSmtpHost("smtp.gmail.com");
                                 setSmtpPort(587);
-                                setSmtpUser("ahmedaminebensalah1@gmail.com");
-                                setSmtpFrom("ahmedaminebensalah1@gmail.com");
-                                showToast?.("Champs configurés pour Gmail (smtp.gmail.com). Saisissez le mot de passe d'application.", "info");
+                                setSmtpUser("ahmedamineb4@gmail.com");
+                                setSmtpFrom("ahmedamineb4@gmail.com");
+                                showToast?.("Champs configurés pour Gmail (ahmedamineb4@gmail.com). Saisissez votre mot de passe d'application.", "info");
                               }}
                               className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 font-bold cursor-pointer transition-colors"
                             >
-                              ⚡ Pré-remplir pour Gmail (ahmedaminebensalah1@gmail.com)
+                              ⚡ Pré-remplir pour Gmail (ahmedamineb4@gmail.com)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSmtpHost("smtp.gmail.com");
+                                setSmtpPort(587);
+                                setSmtpUser("ahmedaminebensalah1@gmail.com");
+                                setSmtpFrom("ahmedaminebensalah1@gmail.com");
+                                showToast?.("Champs configurés pour Gmail (ahmedaminebensalah1@gmail.com)", "info");
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-red-50/70 hover:bg-red-100/80 border border-red-200 text-red-700 font-semibold cursor-pointer transition-colors"
+                            >
+                              ⚡ Gmail 2
                             </button>
                             <button
                               type="button"
@@ -1680,11 +1693,11 @@ export default function SettingsManager({
                                 setSmtpPort(587);
                                 setSmtpUser("ahmedamine.bensalah@sta-tunisie.com");
                                 setSmtpFrom("ahmedamine.bensalah@sta-tunisie.com");
-                                showToast?.("Champs configurés pour Outlook (smtp.office365.com)", "info");
+                                showToast?.("Champs configurés pour Outlook", "info");
                               }}
                               className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold cursor-pointer transition-colors"
                             >
-                              ⚡ Pré-remplir pour Outlook
+                              ⚡ Outlook STA
                             </button>
                           </div>
 

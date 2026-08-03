@@ -596,30 +596,47 @@ export default function GmaoDashboard({
           </div>
 
           <div className="space-y-3 text-xs">
-            {criticalEquipmentsList.map((eq) => (
-              <div key={eq.code} className="flex justify-between items-center p-3 rounded-xl border border-neutral-100 hover:bg-neutral-50/50 transition-colors">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono font-black text-neutral-800">{eq.code}</span>
-                    <span className="text-[9px] text-red-600 font-extrabold bg-red-50 px-1 rounded uppercase font-mono">Classe A</span>
+            {criticalEquipmentsList.map((eq) => {
+              const firstPhoto = eq.photos && eq.photos.length > 0 ? eq.photos[0] : null;
+              return (
+                <div key={eq.code} className="flex justify-between items-center p-3 rounded-xl border border-neutral-100 hover:bg-neutral-50/50 transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {firstPhoto ? (
+                      <img
+                        src={firstPhoto}
+                        alt={eq.name}
+                        referrerPolicy="no-referrer"
+                        className="w-9 h-9 rounded-lg object-cover border border-neutral-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-400 shrink-0">
+                        <Wrench className="h-4 w-4 text-neutral-400 stroke-[1.8]" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-black text-neutral-800">{eq.code}</span>
+                        <span className="text-[9px] text-red-600 font-extrabold bg-red-50 px-1 rounded uppercase font-mono">Classe A</span>
+                      </div>
+                      <span className="font-bold text-neutral-600 block mt-0.5 text-[11px] truncate max-w-[150px]">{eq.name}</span>
+                    </div>
                   </div>
-                  <span className="font-bold text-neutral-600 block mt-0.5 text-[11px] truncate max-w-[150px]">{eq.name}</span>
-                </div>
 
-                <div className="text-right">
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${
-                    eq.status === "Opérationnel"
-                      ? "bg-green-50 text-green-700"
-                      : eq.status === "Dégradé"
-                      ? "bg-amber-50 text-amber-700"
-                      : "bg-red-50 text-chery-red animate-pulse"
-                  }`}>
-                    {eq.status}
-                  </span>
-                  <span className="text-[9px] text-neutral-400 block mt-1 font-mono">MTBF: {eq.mtbfTargetHours}h</span>
+                  <div className="text-right shrink-0">
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${
+                      eq.status === "Opérationnel"
+                        ? "bg-green-50 text-green-700"
+                        : eq.status === "Dégradé"
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-red-50 text-chery-red animate-pulse"
+                    }`}>
+                      {eq.status}
+                    </span>
+                    <span className="text-[9px] text-neutral-400 block mt-1 font-mono">MTBF: {eq.mtbfTargetHours}h</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

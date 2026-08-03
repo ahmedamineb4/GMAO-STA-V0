@@ -13,6 +13,8 @@ import {
   ChevronRight,
   LayoutDashboard,
   ShieldCheck,
+  Presentation,
+  Sparkles,
 } from "lucide-react";
 import { Equipment, Intervention, PurchaseRequest, Vendor, MaintenanceContract } from "../types";
 
@@ -27,6 +29,7 @@ interface CommandPaletteModalProps {
   onSelectTab: (tab: string) => void;
   onSelectEquipment?: (eq: Equipment) => void;
   onSelectIntervention?: (int: Intervention) => void;
+  currentUserRole?: string;
 }
 
 export default function CommandPaletteModal({
@@ -40,6 +43,7 @@ export default function CommandPaletteModal({
   onSelectTab,
   onSelectEquipment,
   onSelectIntervention,
+  currentUserRole = "admin",
 }: CommandPaletteModalProps) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,16 +72,22 @@ export default function CommandPaletteModal({
 
   const cleanQuery = query.trim().toLowerCase();
 
+  const canAccessProjetsAndAmelioration = currentUserRole === "admin" || currentUserRole === "supervisor";
+
   // Navigation pages
   const TABS = [
     { id: "dashboard", label: "Tableau de Bord GMAO", icon: LayoutDashboard, category: "Pages Principales", desc: "KPIs, Disponibilité, Conformité & Synthèse" },
     { id: "equipements", label: "Parc Équipements & Machines", icon: Wrench, category: "Pages Principales", desc: "Fiches techniques, QR codes, statuts et dossiers" },
     { id: "interventions", label: "Registre des Interventions", icon: FileText, category: "Pages Principales", desc: "Ordres de travaux, pannes, préventif et correctif" },
+    ...(canAccessProjetsAndAmelioration ? [
+      { id: "projets", label: "Projets & Chantier", icon: Presentation, category: "Pages Principales", desc: "Suivi des projets, chantiers et investissements" },
+      { id: "amelioration", label: "Amélioration Continue", icon: Sparkles, category: "Pages Principales", desc: "Audits 5S, Kaizen, Sécurité & Qualité" },
+    ] : []),
     { id: "achats", label: "Gestion des Achats & Fournisseurs", icon: ShoppingCart, category: "Pages Principales", desc: "Commandes de travaux, demandes d'achat et devis" },
     { id: "contracts", label: "Contrats & Conformité APAVE", icon: ShieldCheck, category: "Pages Principales", desc: "Suivi réglementaire et prestataires externes" },
     { id: "finances", label: "Finances & Suivi Budgétaire", icon: Building, category: "Pages Principales", desc: "Consommation des budgets par atelier" },
     { id: "documentation", label: "Dossiers Techniques & Notices", icon: FileText, category: "Pages Principales", desc: "Manuels, schémas électriques et documentations" },
-    { id: "logs", label: "Journal d'Audit & Historique", icon: History, category: "Pages Principales", desc: "Historique complet des actions utilisateurs" },
+    ...(currentUserRole === "admin" ? [{ id: "logs", label: "Journal d'Audit & Historique", icon: History, category: "Pages Principales", desc: "Historique complet des actions utilisateurs" }] : []),
     { id: "guide", label: "Guide & Formation Utilisateur", icon: HelpCircle, category: "Support", desc: "Procédures et manuel d'utilisation GMAO" },
     { id: "settings", label: "Paramètres & Profils d'Accès", icon: Settings, category: "Administration", desc: "Mots de passe, comptes et réinitialisation" }
   ];

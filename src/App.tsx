@@ -69,7 +69,8 @@ import {
   INITIAL_LEAN_ITEMS,
   INITIAL_SAFETY_RECORDS,
   INITIAL_QUALITY_RECORDS,
-  INITIAL_ENV_LOGS
+  INITIAL_ENV_LOGS,
+  INITIAL_ACTIVITY_LOGS
 } from "./data";
 import { sendEmailAlert, EmailAlert, DEFAULT_ALERT_EMAIL_RECIPIENT } from "./utils/emailAlerts";
 
@@ -431,32 +432,26 @@ export default function App() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
     try {
       const saved = localStorage.getItem("chery_gmao_activity_logs");
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: ActivityLog[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasAugust = parsed.some(
+            (l) => l.timestamp && (l.timestamp.includes("2026-08") || l.timestamp.includes("08/2026") || l.timestamp.includes("01/08") || l.timestamp.includes("02/08") || l.timestamp.includes("03/08"))
+          );
+          if (!hasAugust) {
+            // Append missing August demo logs to existing history
+            const augustDemoLogs = INITIAL_ACTIVITY_LOGS.filter(
+              (l) => l.timestamp.includes("2026-08") || l.timestamp.includes("01/08") || l.timestamp.includes("02/08") || l.timestamp.includes("03/08")
+            );
+            return [...augustDemoLogs, ...parsed];
+          }
+          return parsed;
+        }
+      }
     } catch (e) {
       console.warn("Failed to parse activityLogs from localStorage", e);
     }
-    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
-    if (mode === "demo") {
-      return [
-        {
-          id: "init-1",
-          timestamp: "2026-07-01 08:30:00",
-          userRole: "admin",
-          action: "Initialisation Système",
-          details: "Démarrage et chargement de la base de données GMAO STA Tunisie en mode démonstration.",
-          type: "other"
-        },
-        {
-          id: "init-2",
-          timestamp: "2026-07-01 09:15:00",
-          userRole: "admin",
-          action: "Vérification Budget",
-          details: "Le budget annuel de maintenance 2026 de 405 000 TND a été affecté par l'administrateur.",
-          type: "budget"
-        }
-      ];
-    }
-    return [];
+    return INITIAL_ACTIVITY_LOGS;
   });
 
   // Email Alert Toast State
@@ -701,7 +696,14 @@ export default function App() {
   const isEquipmentsReadOnly = currentUserRole === "supervisor" || currentUserRole === "magasin";
   const isPurchasesReadOnly = currentUserRole === "supervisor";
   const isSettingsReadOnly = currentUserRole !== "admin";
+  const canAccessProjetsAndAmelioration = currentUserRole === "admin" || currentUserRole === "supervisor";
   const allowedWorkshop = getAllowedWorkshop(currentUserRole);
+
+  useEffect(() => {
+    if (!canAccessProjetsAndAmelioration && (activeTab === "projets" || activeTab === "amelioration")) {
+      setActiveTab("dashboard");
+    }
+  }, [currentUserRole, activeTab, canAccessProjetsAndAmelioration]);
 
   useEffect(() => {
     localStorage.setItem("chery_gmao_passwords", JSON.stringify(passwords));
@@ -2398,40 +2400,44 @@ export default function App() {
             </div>
 
             {/* 📌 Projets & Investissements */}
-            <button
-              onClick={() => {
-                setActiveTab("projets");
-              }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "projets"
-                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
-                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Presentation className="h-4 w-4" />
-                <span>📌 Projets & Chantier</span>
-              </div>
-              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "projets" ? "opacity-100" : ""}`} />
-            </button>
+            {canAccessProjetsAndAmelioration && (
+              <button
+                onClick={() => {
+                  setActiveTab("projets");
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === "projets"
+                    ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                    : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Presentation className="h-4 w-4" />
+                  <span>📌 Projets & Chantier</span>
+                </div>
+                <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "projets" ? "opacity-100" : ""}`} />
+              </button>
+            )}
 
             {/* 🌱 Amélioration Continue */}
-            <button
-              onClick={() => {
-                setActiveTab("amelioration");
-              }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "amelioration"
-                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
-                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Sparkles className="h-4 w-4" />
-                <span>🌱 Amélioration Continue</span>
-              </div>
-              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "amelioration" ? "opacity-100" : ""}`} />
-            </button>
+            {canAccessProjetsAndAmelioration && (
+              <button
+                onClick={() => {
+                  setActiveTab("amelioration");
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === "amelioration"
+                    ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                    : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Sparkles className="h-4 w-4" />
+                  <span>🌱 Amélioration Continue</span>
+                </div>
+                <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "amelioration" ? "opacity-100" : ""}`} />
+              </button>
+            )}
 
             {/* 📚 Centre Documentaire */}
             <button
@@ -2576,8 +2582,12 @@ export default function App() {
                     { id: "dashboard", label: "🏠 Tableau de Bord", icon: LayoutDashboard },
                     { id: "equipements", label: "🏭 Parc Équipements", icon: Wrench },
                     { id: "interventions", label: "📋 Interventions & Maintenance", icon: FileText },
-                    { id: "projets", label: "📌 Projets & Chantier", icon: Presentation },
-                    { id: "amelioration", label: "🌱 Amélioration Continue", icon: Sparkles },
+                    ...(canAccessProjetsAndAmelioration
+                      ? [
+                          { id: "projets", label: "📌 Projets & Chantier", icon: Presentation },
+                          { id: "amelioration", label: "🌱 Amélioration Continue", icon: Sparkles }
+                        ]
+                      : []),
                     { id: "documentation", label: "📚 Centre Documentaire", icon: FileText },
                     { id: "achats", label: "🛒 Achats", icon: ShoppingCart },
                     { id: "contracts", label: "📑 Contrats & Conformité", icon: ShieldCheck },
@@ -2705,7 +2715,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === "projets" && (
+          {activeTab === "projets" && canAccessProjetsAndAmelioration && (
             <ProjectsManager
               projects={projects}
               onAddProject={handleAddProject}
@@ -2716,7 +2726,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === "amelioration" && (
+          {activeTab === "amelioration" && canAccessProjetsAndAmelioration && (
             <ContinuousImprovementManager
               audits5s={audits5s}
               leanItems={leanItems}
@@ -3122,6 +3132,7 @@ export default function App() {
         purchaseRequests={purchaseRequests}
         vendors={vendors}
         contracts={contracts}
+        currentUserRole={currentUserRole}
         onSelectTab={(tab) => {
           const normalized = tab.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           let targetTab = tab;

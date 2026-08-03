@@ -32,7 +32,7 @@ interface AuditLogsProps {
 export default function AuditLogs({ logs, onClearLogs, currentUserRole }: AuditLogsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<string>("All");
-  const [onlyMyUserLogs, setOnlyMyUserLogs] = useState<boolean>(true);
+  const [onlyMyUserLogs, setOnlyMyUserLogs] = useState<boolean>(false);
 
   const filteredLogs = useMemo(() => {
     const isAdmin = currentUserRole === "admin";

@@ -24,7 +24,7 @@ export interface SmtpConfig {
   from: string;
 }
 
-export const DEFAULT_ALERT_EMAIL_RECIPIENT = "ahmedaminebensalah1@gmail.com";
+export const DEFAULT_ALERT_EMAIL_RECIPIENT = "ahmedamineb4@gmail.com";
 
 export function getStoredAlertEmailRecipient(): string {
   try {

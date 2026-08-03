@@ -189,11 +189,32 @@ export default function EquipmentsManager({
 
   const [equipmentPhotos, setEquipmentPhotos] = useState<Record<string, string[]>>({
     "EQ-SR-05": [
-      "https://images.unsplash.com/photo-1517524206127-48bbd363f3d7?w=300&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1563720223185-11003d516935?w=300&auto=format&fit=crop"
+      "https://images.unsplash.com/photo-1517524206127-48bbd363f3d7?w=400&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1563720223185-11003d516935?w=400&auto=format&fit=crop"
+    ],
+    "EQ-SR-06": [
+      "https://images.unsplash.com/photo-1517524206127-48bbd363f3d7?w=400&auto=format&fit=crop"
     ],
     "EQ-SR-04": [
-      "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=300&auto=format&fit=crop"
+      "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&auto=format&fit=crop"
+    ],
+    "EQ-AM-03": [
+      "https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=400&auto=format&fit=crop"
+    ],
+    "EQ-AM-05": [
+      "https://images.unsplash.com/photo-1578844251758-2f71da64c96f?w=400&auto=format&fit=crop"
+    ],
+    "EQ-AM-11": [
+      "https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=400&auto=format&fit=crop"
+    ],
+    "EQ-CAR-01": [
+      "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?w=400&auto=format&fit=crop"
+    ],
+    "EQ-DIAG-01": [
+      "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=400&auto=format&fit=crop"
+    ],
+    "EQ-LAV-01": [
+      "https://images.unsplash.com/photo-1520340356584-f9917d1beb6d?w=400&auto=format&fit=crop"
     ]
   });
 
@@ -744,6 +765,8 @@ export default function EquipmentsManager({
                 {filteredEquipments.map((eq) => {
                   const criticalLevel = eq.criticite || (eq.critical ? "A - Critique" : "B - Moyen");
                   const hasWarranty = new Date(eq.warrantyEnd) > new Date("2026-07-01");
+                  const activePhotos = getActivePhotos(eq.code);
+                  const firstPhoto = activePhotos.length > 0 ? activePhotos[0] : null;
 
                   return (
                     <div
@@ -752,25 +775,67 @@ export default function EquipmentsManager({
                         setSelectedEqCode(eq.code);
                         setDetailTab("details");
                       }}
-                      className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-neutral-50/50 transition-colors cursor-pointer ${
-                        selectedEqCode === eq.code ? "bg-red-50/10 border-l-4 border-l-chery-red" : ""
+                      className={`p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-neutral-50/80 transition-colors cursor-pointer ${
+                        selectedEqCode === eq.code ? "bg-red-50/20 border-l-4 border-l-chery-red" : ""
                       }`}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        {/* Petite icône / vignette de la photo d'équipement (Visible de l'extérieur sans entrer) */}
                         <div
-                          className={`mt-1.5 h-3.5 w-3.5 rounded-full shrink-0 ${
-                            eq.status === "Opérationnel"
-                              ? "bg-green-500"
-                              : eq.status === "Dégradé"
-                              ? "bg-amber-500"
-                              : eq.status === "En Maintenance"
-                              ? "bg-blue-500"
-                              : eq.status === "Hors Service"
-                              ? "bg-neutral-400"
-                              : "bg-red-500 animate-pulse"
-                          }`}
-                        />
-                        <div>
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (firstPhoto) {
+                              setPreviewPhotoUrl(firstPhoto);
+                            } else {
+                              setSelectedEqCode(eq.code);
+                              setDetailTab("photos");
+                            }
+                          }}
+                          className="relative shrink-0 w-12 h-12 rounded-xl overflow-hidden border border-neutral-200 bg-neutral-100 shadow-2xs group cursor-pointer hover:border-chery-red transition-all"
+                          title={firstPhoto ? "Cliquer pour agrandir la photo de l'équipement" : "Cliquer pour ajouter une photo à cet équipement"}
+                        >
+                          {firstPhoto ? (
+                            <>
+                              <img
+                                src={firstPhoto}
+                                alt={eq.name}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                              />
+                              <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <ZoomIn className="h-4 w-4 text-white drop-shadow-xs" />
+                              </div>
+                              {activePhotos.length > 1 && (
+                                <span className="absolute bottom-0.5 right-0.5 bg-neutral-900/90 text-white text-[8px] font-black px-1 rounded-xs font-mono">
+                                  +{activePhotos.length - 1}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-neutral-400 group-hover:text-chery-red group-hover:bg-red-50/50 transition-colors">
+                              <Camera className="h-4 w-4 stroke-[1.8]" />
+                              <span className="text-[7.5px] font-black text-neutral-400 group-hover:text-chery-red mt-0.5 uppercase tracking-tight">Photo</span>
+                            </div>
+                          )}
+
+                          {/* Puce de statut d'équipement ancrée en haut à droite de l'icône */}
+                          <span
+                            className={`absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white shrink-0 shadow-2xs ${
+                              eq.status === "Opérationnel"
+                                ? "bg-green-500"
+                                : eq.status === "Dégradé"
+                                ? "bg-amber-500"
+                                : eq.status === "En Maintenance"
+                                ? "bg-blue-500"
+                                : eq.status === "Hors Service"
+                                ? "bg-neutral-400"
+                                : "bg-red-500 animate-pulse"
+                            }`}
+                            title={`Statut: ${eq.status}`}
+                          />
+                        </div>
+
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-[10px] font-bold text-neutral-400 font-mono">
                               {eq.code}
@@ -791,7 +856,7 @@ export default function EquipmentsManager({
                               {criticalLevel}
                             </span>
                           </div>
-                          <h4 className="text-sm font-black text-neutral-800 mt-1">{eq.name}</h4>
+                          <h4 className="text-sm font-black text-neutral-800 mt-0.5 truncate">{eq.name}</h4>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-400 mt-1">
                             <span>S/N: <strong>{eq.serialNumber}</strong></span>
                             <span>•</span>

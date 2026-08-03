@@ -105,12 +105,12 @@ async function startServer() {
       }
 
       if (!user || !pass) {
-        // Return 200 with simulated status if credentials not set yet, so app doesn't break
-        console.log(`[EMAIL SIMULÉ] Envoi d'email à ${recipient} (Raison: Identifiants SMTP non configurés)`);
+        console.log(`[EMAIL NON ENVOYÉ] Destination: ${recipient} (Raison: Mot de passe SMTP non configuré)`);
         return res.json({
-          success: true,
+          success: false,
           mode: "simulated",
-          message: "Alerte générée et enregistrée dans le système GMAO (Mode Démo - Ajoutez vos identifiants SMTP Outlook/Office 365 dans le fichier .env ou les Paramètres pour l'envoi réel)."
+          error: `Attention : L'alerte a été enregistrée en GMAO, mais AUCUN EMAIL RÉEL n'a été transmis vers ${recipient} car le serveur SMTP n'est pas encore configuré. Allez dans Paramètres > Notifications & Email pour renseigner votre compte Gmail / Outlook et le mot de passe d'application.`,
+          message: "Mode simulation : Aucun envoi SMTP effectué."
         });
       }
 
