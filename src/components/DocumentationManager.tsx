@@ -50,12 +50,14 @@ interface DocumentationManagerProps {
   equipments: Equipment[];
   isReadOnly?: boolean;
   currentUserRole?: string;
+  allowedWorkshop?: string;
 }
 
 export default function DocumentationManager({
   equipments,
   isReadOnly = false,
-  currentUserRole = "atelier"
+  currentUserRole = "atelier",
+  allowedWorkshop
 }: DocumentationManagerProps) {
   // 1. Initial documents to seed the demo mode
   const INITIAL_DOCUMENTS: GmaoDocument[] = [
@@ -177,9 +179,18 @@ export default function DocumentationManager({
         doc.description.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesType = selectedType === "All" || doc.type === selectedType;
-      return matchesSearch && matchesType;
+
+      const matchesWorkshop =
+        !allowedWorkshop ||
+        doc.associatedEquipments.length === 0 ||
+        doc.associatedEquipments.some((eqCode) => {
+          const eq = equipments.find((e) => e.code === eqCode);
+          return eq && eq.workshop === allowedWorkshop;
+        });
+
+      return matchesSearch && matchesType && matchesWorkshop;
     });
-  }, [documents, searchQuery, selectedType]);
+  }, [documents, searchQuery, selectedType, allowedWorkshop, equipments]);
 
   const selectedDoc = useMemo(() => {
     return documents.find((d) => d.id === selectedDocId) || null;

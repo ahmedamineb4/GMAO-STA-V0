@@ -168,3 +168,152 @@ export interface UserRoleProfile {
   isSystem?: boolean;
 }
 
+// ==========================================
+// MODULE PROJETS (Project Management)
+// ==========================================
+
+export type ProjectPriority = "Faible" | "Moyenne" | "Haute" | "Urgent";
+export type ProjectStatus = "Brouillon" | "En cours" | "En pause" | "Terminé" | "Annulé";
+
+export interface ProjectTask {
+  id: string;
+  projectId: string;
+  name: string;
+  manager: string;
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+  dependencies: string[];
+  priority: ProjectPriority;
+  status: "À faire" | "En cours" | "Terminé" | "Bloqué";
+  progressPercent: number;
+}
+
+export interface ProjectBudgetItem {
+  id: string;
+  projectId: string;
+  type: "Devis" | "Commande" | "Dépense" | "CAPEX" | "OPEX";
+  title: string;
+  supplier: string;
+  amount: number;
+  date: string;
+  roiEstimatedMonths?: number;
+  status: "Estimé" | "Validé" | "Payé";
+}
+
+export interface ProjectRisk {
+  id: string;
+  projectId: string;
+  risk: string;
+  probability: "Faible" | "Moyenne" | "Élevée";
+  impact: "Faible" | "Moyen" | "Fort" | "Critique";
+  priority: "Basse" | "Modérée" | "Haute" | "Critique";
+  preventiveAction: string;
+  responsible: string;
+  state: "Identifié" | "En cours" | "Mitigé" | "Clôturé";
+}
+
+export interface ProjectDoc {
+  id: string;
+  projectId: string;
+  name: string;
+  type: "Cahier des charges" | "Plan" | "Photo" | "Compte rendu" | "PV de réception";
+  uploadDate: string;
+  author: string;
+  fileSize?: string;
+  url?: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  manager: string;
+  department: string;
+  priority: ProjectPriority;
+  status: ProjectStatus;
+  startDate: string;
+  endDate: string;
+  budgetPlanned: number; // TND
+  budgetReal: number; // TND
+  progressPercent: number;
+  documents: ProjectDoc[];
+  photos: string[];
+  suppliers: string[];
+  tasks?: ProjectTask[];
+  budgetItems?: ProjectBudgetItem[];
+  risks?: ProjectRisk[];
+}
+
+// ==========================================
+// MODULE AMÉLIORATION CONTINUE
+// ==========================================
+
+export interface Audit5S {
+  id: string;
+  date: string;
+  workshop: Workshop;
+  auditor: string;
+  seiriScore: number;    // 0-20 (Seiri - Débarras)
+  seitonScore: number;   // 0-20 (Seiton - Rangement)
+  seisoScore: number;    // 0-20 (Seiso - Nettoyage)
+  seiketsuScore: number; // 0-20 (Seiketsu - Standardisation)
+  shitsukeScore: number; // 0-20 (Shitsuke - Respect/Rigueur)
+  totalScore: number;    // 0-100%
+  beforePhoto?: string;
+  afterPhoto?: string;
+  actionPlan: string;
+  status: "Conforme" | "À corriger" | "Clôturé";
+  comments?: string;
+}
+
+export interface LeanItem {
+  id: string;
+  type: "Gaspillage (Muda)" | "Kaizen" | "TPM" | "Suggestion" | "Standardisation";
+  mudaCategory?: "Surproduction" | "Attente" | "Transport" | "Processus inutile" | "Stock excessif" | "Mouvements" | "Retouches/Défauts";
+  title: string;
+  workshop: Workshop;
+  description: string;
+  author: string;
+  dateAdded: string;
+  status: "Nouveau" | "En cours" | "Appliqué" | "Standardisé";
+  impactScore?: "Faible" | "Moyen" | "Fort";
+  estimatedSavingTnd?: number;
+}
+
+export interface SafetyRecord {
+  id: string;
+  type: "Audit Sécurité" | "Incident" | "Quasi-accident" | "Analyse de Risque" | "Vérification Extincteurs" | "Vérification EPI";
+  date: string;
+  location: string;
+  description: string;
+  severity: "Mineure" | "Moyenne" | "Grave" | "Critique";
+  actionPlan: string;
+  responsible: string;
+  status: "En cours" | "Réglé" | "Sous contrôle";
+  checkExtinguishersCount?: number;
+  checkEpiCompliantPercent?: number;
+}
+
+export interface QualityRecord {
+  id: string;
+  type: "Non-conformité" | "Audit interne" | "Action corrective" | "Action préventive" | "Check-list" | "Traçabilité";
+  title: string;
+  workshop: Workshop;
+  date: string;
+  details: string;
+  responsible: string;
+  status: "Ouvert" | "En traitement" | "Résolu" | "Validé";
+}
+
+export interface EnvironmentLog {
+  id: string;
+  category: "Déchets" | "Huiles usagées" | "Batteries" | "Énergie (Électricité)" | "Eau" | "Air Comprimé";
+  date: string;
+  value: number;
+  unit: "kg" | "Litre" | "Unités" | "kWh" | "m³" | "Bar";
+  costOrSavingTnd: number;
+  notes: string;
+}
+
+

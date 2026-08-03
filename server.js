@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import nodemailer from "nodemailer";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,6 +72,119 @@ async function startServer() {
     } catch (error) {
       console.error("Backup read error:", error);
       res.status(500).json({ success: false, error: error?.message || "Erreur lecture disque" });
+    }
+  });
+
+  // 2b. Endpoint pour l'envoi réel d'emails via SMTP (Outlook / Office 365 / Gmail)
+  app.post("/api/send-email", async (req, res) => {
+    let host = "smtp.office365.com";
+    let port = 587;
+    try {
+      const { recipient, subject, message, details, smtpConfig } = req.body;
+
+      // Determine SMTP host, user, pass
+      let user = smtpConfig?.user || process.env.SMTP_USER;
+      let rawPass = smtpConfig?.pass || process.env.SMTP_PASS;
+      host = smtpConfig?.host || process.env.SMTP_HOST || "smtp.office365.com";
+      port = parseInt(smtpConfig?.port || process.env.SMTP_PORT || "587", 10);
+
+      // Clean password: strip spaces (e.g. "ikwu ayew klpu hwqr" -> "ikwuayewklpuhwqr")
+      const pass = rawPass ? String(rawPass).trim().replace(/\s+/g, '') : '';
+
+      // Auto-detect Gmail if user has @gmail.com
+      if (user && user.toLowerCase().includes("@gmail.com")) {
+        if (!smtpConfig?.host || host === "smtp.office365.com" || host.includes("office365") || host.includes("outlook")) {
+          host = "smtp.gmail.com";
+          port = 587;
+        }
+      }
+
+      let from = smtpConfig?.from || process.env.SMTP_FROM;
+      if (!from || (user && user.toLowerCase().includes("@gmail.com") && (from.includes("@sta-tunisie.com") || from.includes("@outlook.com")))) {
+        from = user;
+      }
+
+      if (!user || !pass) {
+        // Return 200 with simulated status if credentials not set yet, so app doesn't break
+        console.log(`[EMAIL SIMULÉ] Envoi d'email à ${recipient} (Raison: Identifiants SMTP non configurés)`);
+        return res.json({
+          success: true,
+          mode: "simulated",
+          message: "Alerte générée et enregistrée dans le système GMAO (Mode Démo - Ajoutez vos identifiants SMTP Outlook/Office 365 dans le fichier .env ou les Paramètres pour l'envoi réel)."
+        });
+      }
+
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false }
+      });
+
+      const htmlBody = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <div style="background-color: #D32F2F; padding: 12px 20px; border-radius: 6px 6px 0 0; color: white;">
+            <h2 style="margin: 0; font-size: 18px;">STA CHERY TUNISIE - Notification GMAO</h2>
+          </div>
+          <div style="padding: 20px; background-color: #fafafa;">
+            <h3 style="color: #111827; margin-top: 0;">${subject}</h3>
+            <p style="font-size: 14px; line-height: 1.6; white-space: pre-line;">${message}</p>
+            ${details ? `
+              <div style="margin-top: 20px; background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #e5e7eb;">
+                <h4 style="margin: 0 0 10px 0; color: #374151;">Détails de l'alerte :</h4>
+                <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #4b5563;">
+                  ${details.equipmentCode ? `<li><strong>Équipement:</strong> ${details.equipmentCode} (${details.equipmentName || ''})</li>` : ''}
+                  ${details.workshop ? `<li><strong>Atelier:</strong> ${details.workshop}</li>` : ''}
+                  ${details.urgency ? `<li><strong>Urgence / Priorité:</strong> ${details.urgency}</li>` : ''}
+                  ${details.author ? `<li><strong>Auteur / Technicien:</strong> ${details.author}</li>` : ''}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+          <div style="padding: 12px 20px; background-color: #f3f4f6; text-align: center; font-size: 11px; color: #6b7280; border-radius: 0 0 6px 6px;">
+            Cet email a été généré automatiquement par le système GMAO STA Chery Tunisie.
+          </div>
+        </div>
+      `;
+
+      const mailOptions = {
+        from: `GMAO STA Chery <${from}>`,
+        to: recipient,
+        subject,
+        text: message,
+        html: htmlBody
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[EMAIL RÉEL ENVOYÉ] Message ID: ${info.messageId} à ${recipient}`);
+
+      return res.json({
+        success: true,
+        mode: "real",
+        messageId: info.messageId,
+        message: `Email réel envoyé avec succès à ${recipient} via ${host} !`
+      });
+    } catch (error) {
+      const errMsg = error?.message || "Échec de l'envoi SMTP";
+      console.warn("[SMTP HANDLED ERROR]", errMsg);
+
+      let userFriendlyNotice = errMsg;
+      if (errMsg.includes("535") || errMsg.includes("Authentication unsuccessful") || errMsg.includes("Invalid login") || errMsg.includes("Username and Password not accepted")) {
+        if (host.includes("gmail")) {
+          userFriendlyNotice = "Échec d'authentification Gmail (535) : Mot de passe ou adresse incorrect. Pour Gmail, vous DEVEZ utiliser un 'Mot de passe d'application' de 16 lettres (généré sur myaccount.google.com/apppasswords après activation de la validation en deux étapes), et NON votre mot de passe habituel.";
+        } else {
+          userFriendlyNotice = "Échec d'authentification SMTP (535 5.7.3) : Identifiants ou mot de passe incorrects. Si la validation en deux étapes est activée, utilisez un 'Mot de passe d'application' à 16 caractères.";
+        }
+      } else if (errMsg.includes("ECONNREFUSED") || errMsg.includes("ETIMEDOUT")) {
+        userFriendlyNotice = `Impossible de se connecter au serveur SMTP sortant (${host}:${port}). Vérifiez l'hôte et le port.`;
+      }
+
+      return res.json({
+        success: false,
+        error: userFriendlyNotice,
+        rawError: errMsg
+      });
     }
   });
 

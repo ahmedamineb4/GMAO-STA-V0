@@ -63,8 +63,15 @@ import {
   INITIAL_COMPLIANCE_CHECKS,
   BUDGET_2026,
   INITIAL_PURCHASE_REQUESTS,
-  WORKSHOPS
+  WORKSHOPS,
+  INITIAL_PROJECTS,
+  INITIAL_AUDITS_5S,
+  INITIAL_LEAN_ITEMS,
+  INITIAL_SAFETY_RECORDS,
+  INITIAL_QUALITY_RECORDS,
+  INITIAL_ENV_LOGS
 } from "./data";
+import { sendEmailAlert, EmailAlert, DEFAULT_ALERT_EMAIL_RECIPIENT } from "./utils/emailAlerts";
 
 // Sub Components
 import GmaoDashboard from "./components/GmaoDashboard";
@@ -82,6 +89,8 @@ import CommandPaletteModal from "./components/CommandPaletteModal";
 import ToastNotification from "./components/ToastNotification";
 import CheryStaLogo from "./components/CheryStaLogo";
 import DeveloperConsoleModal from "./components/DeveloperConsoleModal";
+import ProjectsManager from "./components/ProjectsManager";
+import ContinuousImprovementManager from "./components/ContinuousImprovementManager";
 
 export default function App() {
   // Navigation State
@@ -102,15 +111,12 @@ export default function App() {
     setToast({ message, type });
   };
 
-  // ⌨️ Global Cmd+K / Ctrl+K and Ctrl+Shift+D keyboard shortcut listener
+  // ⌨️ Global Cmd+K / Ctrl+K keyboard shortcut listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setCommandPaletteOpen((prev) => !prev);
-      } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "d") {
-        e.preventDefault();
-        setDevConsoleOpen((prev) => !prev);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -162,59 +168,184 @@ export default function App() {
     return (saved as "demo" | "vierge") || "vierge";
   });
 
-  // Core Reactive States (With LocalStorage persistence fallback)
+  // Core Reactive States (With LocalStorage persistence fallback & try-catch safety)
   const [equipments, setEquipments] = useState<Equipment[]>(() => {
-    const saved = localStorage.getItem("chery_gmao_equipments");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("chery_gmao_equipments");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse equipments from localStorage", e);
+    }
     const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_EQUIPMENTS : [];
   });
 
   const [interventions, setInterventions] = useState<Intervention[]>(() => {
-    const saved = localStorage.getItem("chery_gmao_interventions");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("chery_gmao_interventions");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse interventions from localStorage", e);
+    }
     const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_INTERVENTIONS : [];
   });
 
   const [spareParts, setSpareParts] = useState<SparePart[]>(() => {
-    const saved = localStorage.getItem("chery_gmao_spare_parts");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("chery_gmao_spare_parts");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse spareParts from localStorage", e);
+    }
     const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_SPARE_PARTS : [];
   });
 
   const [vendors, setVendors] = useState<Vendor[]>(() => {
-    const saved = localStorage.getItem("chery_gmao_vendors");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("chery_gmao_vendors");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse vendors from localStorage", e);
+    }
     const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_VENDORS : [];
   });
 
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>(() => {
-    const saved = localStorage.getItem("chery_gmao_purchase_requests");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("chery_gmao_purchase_requests");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse purchaseRequests from localStorage", e);
+    }
     const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_PURCHASE_REQUESTS : [];
   });
 
   const [contracts, setContracts] = useState<MaintenanceContract[]>(() => {
-    const saved = localStorage.getItem("chery_gmao_contracts");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("chery_gmao_contracts");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse contracts from localStorage", e);
+    }
     const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_CONTRACTS : [];
   });
 
   const [compliance, setCompliance] = useState<ComplianceCheck[]>(() => {
-    const saved = localStorage.getItem("chery_gmao_compliance");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("chery_gmao_compliance");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse compliance from localStorage", e);
+    }
     const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
     return mode === "demo" ? INITIAL_COMPLIANCE_CHECKS : [];
   });
 
+  // Module Projets State
+  const [projects, setProjects] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("chery_gmao_projects");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse projects from localStorage", e);
+    }
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_PROJECTS : [];
+  });
+
+  // Module Amélioration Continue States
+  const [audits5s, setAudits5s] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("chery_gmao_audits_5s");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse audits5s from localStorage", e);
+    }
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_AUDITS_5S : [];
+  });
+
+  const [leanItems, setLeanItems] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("chery_gmao_lean_items");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse leanItems from localStorage", e);
+    }
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_LEAN_ITEMS : [];
+  });
+
+  const [safetyRecords, setSafetyRecords] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("chery_gmao_safety_records");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse safetyRecords from localStorage", e);
+    }
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_SAFETY_RECORDS : [];
+  });
+
+  const [qualityRecords, setQualityRecords] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("chery_gmao_quality_records");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse qualityRecords from localStorage", e);
+    }
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_QUALITY_RECORDS : [];
+  });
+
+  const [environmentLogs, setEnvironmentLogs] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("chery_gmao_env_logs");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse environmentLogs from localStorage", e);
+    }
+    const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
+    return mode === "demo" ? INITIAL_ENV_LOGS : [];
+  });
+
+  // LocalStorage Persistence Effects for new modules
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_projects", JSON.stringify(projects));
+  }, [projects]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_audits_5s", JSON.stringify(audits5s));
+  }, [audits5s]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_lean_items", JSON.stringify(leanItems));
+  }, [leanItems]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_safety_records", JSON.stringify(safetyRecords));
+  }, [safetyRecords]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_quality_records", JSON.stringify(qualityRecords));
+  }, [qualityRecords]);
+
+  useEffect(() => {
+    localStorage.setItem("chery_gmao_env_logs", JSON.stringify(environmentLogs));
+  }, [environmentLogs]);
+
   const [budget, setBudget] = useState<BudgetYear>(() => {
-    const saved = localStorage.getItem("chery_gmao_budget");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("chery_gmao_budget");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse budget from localStorage", e);
+    }
     const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
     if (mode === "demo") return BUDGET_2026;
     return {
@@ -298,8 +429,12 @@ export default function App() {
   });
 
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
-    const saved = localStorage.getItem("chery_gmao_activity_logs");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("chery_gmao_activity_logs");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse activityLogs from localStorage", e);
+    }
     const mode = localStorage.getItem("chery_gmao_database_mode") || "demo";
     if (mode === "demo") {
       return [
@@ -323,6 +458,23 @@ export default function App() {
     }
     return [];
   });
+
+  // Email Alert Toast State
+  const [emailAlertToast, setEmailAlertToast] = useState<EmailAlert | null>(null);
+
+  useEffect(() => {
+    const handleEmailAlert = (e: Event) => {
+      const customEv = e as CustomEvent<EmailAlert>;
+      if (customEv.detail) {
+        setEmailAlertToast(customEv.detail);
+        setTimeout(() => {
+          setEmailAlertToast((current) => (current?.id === customEv.detail.id ? null : current));
+        }, 8000);
+      }
+    };
+    window.addEventListener("chery_email_alert_triggered", handleEmailAlert);
+    return () => window.removeEventListener("chery_email_alert_triggered", handleEmailAlert);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("chery_gmao_activity_logs", JSON.stringify(activityLogs));
@@ -392,6 +544,118 @@ export default function App() {
     if (target) {
       logActivity("Suppression Profil", `Suppression du profil : ${target.label}`, "other");
     }
+  };
+
+  // Project Handlers
+  const handleAddProject = (newProject: any) => {
+    setProjects((prev) => [newProject, ...prev]);
+    logActivity("Nouveau Projet", `Création du projet : ${newProject.name}`, "other");
+    showToast(`Projet "${newProject.name}" créé avec succès !`, "success");
+  };
+
+  const handleUpdateProject = (updated: any) => {
+    setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    logActivity("Mise à jour Projet", `Mise à jour du projet : ${updated.name}`, "other");
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    const target = projects.find((p) => p.id === projectId);
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    if (target) {
+      logActivity("Suppression Projet", `Suppression du projet : ${target.name}`, "other");
+      showToast(`Projet "${target.name}" supprimé.`, "info");
+    }
+  };
+
+  // Continuous Improvement Handlers
+  const handleAddAudit5S = (newAudit: any) => {
+    setAudits5s((prev) => [newAudit, ...prev]);
+    logActivity("Audit 5S", `Nouvel audit 5S sur ${newAudit.workshop} : Score ${newAudit.totalScore}%`, "other");
+    showToast(`Audit 5S enregistré (Score: ${newAudit.totalScore}%)`, "success");
+  };
+
+  const handleUpdateAudit5S = (updated: any) => {
+    setAudits5s((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    logActivity("Modification Audit 5S", `Mise à jour audit 5S : ${updated.workshop}`, "other");
+    showToast(`Audit 5S mis à jour`, "success");
+  };
+
+  const handleDeleteAudit5S = (id: string) => {
+    setAudits5s((prev) => prev.filter((a) => a.id !== id));
+    logActivity("Suppression Audit 5S", `Suppression audit 5S ID: ${id}`, "other");
+    showToast(`Audit 5S supprimé`, "info");
+  };
+
+  const handleAddLeanItem = (newItem: any) => {
+    setLeanItems((prev) => [newItem, ...prev]);
+    logActivity("Action Lean", `Déclaration Lean/Kaizen : ${newItem.title}`, "other");
+    showToast(`Action Lean/Kaizen enregistrée`, "success");
+  };
+
+  const handleUpdateLeanItem = (updated: any) => {
+    setLeanItems((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+    logActivity("Modification Lean", `Mise à jour Kaizen : ${updated.title}`, "other");
+    showToast(`Action Lean mise à jour`, "success");
+  };
+
+  const handleDeleteLeanItem = (id: string) => {
+    setLeanItems((prev) => prev.filter((l) => l.id !== id));
+    logActivity("Suppression Lean", `Suppression fiche Lean ID: ${id}`, "other");
+    showToast(`Action Lean supprimée`, "info");
+  };
+
+  const handleAddSafetyRecord = (newRec: any) => {
+    setSafetyRecords((prev) => [newRec, ...prev]);
+    logActivity("Saisie Sécurité", `Saisie Sécurité (${newRec.type}) : ${newRec.location}`, "other");
+    showToast(`Événement Sécurité enregistré`, "info");
+  };
+
+  const handleUpdateSafetyRecord = (updated: any) => {
+    setSafetyRecords((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    logActivity("Modification Sécurité", `Mise à jour incident sécurité : ${updated.location}`, "other");
+    showToast(`Fiche Sécurité mise à jour`, "success");
+  };
+
+  const handleDeleteSafetyRecord = (id: string) => {
+    setSafetyRecords((prev) => prev.filter((s) => s.id !== id));
+    logActivity("Suppression Sécurité", `Suppression fiche sécurité ID: ${id}`, "other");
+    showToast(`Fiche Sécurité supprimée`, "info");
+  };
+
+  const handleAddQualityRecord = (newRec: any) => {
+    setQualityRecords((prev) => [newRec, ...prev]);
+    logActivity("Action Qualité", `Enregistrement Qualité : ${newRec.title}`, "other");
+    showToast(`Fiche Qualité créée`, "success");
+  };
+
+  const handleUpdateQualityRecord = (updated: any) => {
+    setQualityRecords((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+    logActivity("Modification Qualité", `Mise à jour fiche qualité : ${updated.title}`, "other");
+    showToast(`Fiche Qualité mise à jour`, "success");
+  };
+
+  const handleDeleteQualityRecord = (id: string) => {
+    setQualityRecords((prev) => prev.filter((q) => q.id !== id));
+    logActivity("Suppression Qualité", `Suppression fiche qualité ID: ${id}`, "other");
+    showToast(`Fiche Qualité supprimée`, "info");
+  };
+
+  const handleAddEnvironmentLog = (newLog: any) => {
+    setEnvironmentLogs((prev) => [newLog, ...prev]);
+    logActivity("Saisie Environnement", `Relevé Éco : ${newLog.category} (${newLog.value} ${newLog.unit})`, "other");
+    showToast(`Relevé Environnemental enregistré`, "success");
+  };
+
+  const handleUpdateEnvironmentLog = (updated: any) => {
+    setEnvironmentLogs((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    logActivity("Modification Environnement", `Mise à jour relevé éco : ${updated.category}`, "other");
+    showToast(`Relevé Environnemental mis à jour`, "success");
+  };
+
+  const handleDeleteEnvironmentLog = (id: string) => {
+    setEnvironmentLogs((prev) => prev.filter((e) => e.id !== id));
+    logActivity("Suppression Environnement", `Suppression relevé éco ID: ${id}`, "other");
+    showToast(`Relevé Environnemental supprimé`, "info");
   };
 
   const handleVerifyPassword = () => {
@@ -629,15 +893,25 @@ export default function App() {
     }
   }, []);
 
-  // Sync selected equipment code for breakdown alert from URL or default to first
+  // Sync selected equipment code for breakdown alert from URL or default to user's workshop
   useEffect(() => {
     if (showGlobalAlertModal) {
-      const params = new URLSearchParams(window.location.search);
-      const eqCode = params.get("eq");
-      if (eqCode && equipments.some((e) => e.code.toUpperCase() === eqCode.toUpperCase())) {
-        setAlertEqCode(eqCode.toUpperCase());
-      } else if (equipments.length > 0 && !alertEqCode) {
-        setAlertEqCode(equipments[0].code);
+      if (allowedWorkshop) {
+        setAlertSelectedWorkshop(allowedWorkshop);
+        const wsEquipments = equipments.filter((e) => e.workshop === allowedWorkshop);
+        if (wsEquipments.length > 0) {
+          setAlertEqCode(wsEquipments[0].code);
+        } else {
+          setAlertEqCode("");
+        }
+      } else {
+        const params = new URLSearchParams(window.location.search);
+        const eqCode = params.get("eq");
+        if (eqCode && equipments.some((e) => e.code.toUpperCase() === eqCode.toUpperCase())) {
+          setAlertEqCode(eqCode.toUpperCase());
+        } else if (equipments.length > 0) {
+          setAlertEqCode(equipments[0].code);
+        }
       }
 
       // Prefill technician name based on current logged in user role
@@ -649,7 +923,7 @@ export default function App() {
         setAlertTech(cleanedName || "Technicien STA");
       }
     }
-  }, [showGlobalAlertModal, equipments, currentUserRole]);
+  }, [showGlobalAlertModal, equipments, currentUserRole, allowedWorkshop]);
 
   // Handle global breakdown alert submission
   const handleGlobalAlertSubmit = (e: React.FormEvent) => {
@@ -781,6 +1055,23 @@ export default function App() {
       `Création de l'équipement : ${newEq.name} (${newEq.code}) - Criticité: ${newEq.critical ? "Critique A" : "Standard"} - Atelier: ${newEq.workshop}`,
       "equipment"
     );
+
+    // Email alert for breakdowns & anomalies
+    if (newEq.status === "En Panne" || newEq.status === "Hors Service") {
+      sendEmailAlert({
+        triggerType: "PANNE",
+        subject: `🚨 [PANNE] Nouvel Équipement ${newEq.code} en Panne`,
+        message: `L'équipement ${newEq.code} (${newEq.name}) créé dans l'atelier "${newEq.workshop}" a été enregistré au statut En Panne.`,
+        details: { equipmentCode: newEq.code, equipmentName: newEq.name, workshop: newEq.workshop }
+      });
+    } else if (newEq.status === "Dégradé") {
+      sendEmailAlert({
+        triggerType: "ANOMALIE",
+        subject: `⚠️ [ANOMALIE] Nouvel Équipement ${newEq.code} en État Dégradé`,
+        message: `L'équipement ${newEq.code} (${newEq.name}) créé dans l'atelier "${newEq.workshop}" signale une anomalie (État Dégradé).`,
+        details: { equipmentCode: newEq.code, equipmentName: newEq.name, workshop: newEq.workshop }
+      });
+    }
   };
 
   // A1. Update an existing Equipment Asset (supports code modification by Admin)
@@ -809,6 +1100,23 @@ export default function App() {
       `Mise à jour des informations de l'équipement : ${updatedEq.name} (${oldCode && oldCode !== updatedEq.code ? `${oldCode} ➔ ${updatedEq.code}` : updatedEq.code}) - Statut: ${updatedEq.status}`,
       "equipment"
     );
+
+    // Alert if updated to breakdown or anomaly
+    if (updatedEq.status === "En Panne" || updatedEq.status === "Hors Service") {
+      sendEmailAlert({
+        triggerType: "PANNE",
+        subject: `🚨 [PANNE] Équipement ${updatedEq.code} passé en Panne`,
+        message: `L'équipement ${updatedEq.code} (${updatedEq.name}) dans l'atelier "${updatedEq.workshop}" a été basculé au statut EN PANNE.`,
+        details: { equipmentCode: updatedEq.code, equipmentName: updatedEq.name, workshop: updatedEq.workshop }
+      });
+    } else if (updatedEq.status === "Dégradé") {
+      sendEmailAlert({
+        triggerType: "ANOMALIE",
+        subject: `⚠️ [ANOMALIE] Équipement ${updatedEq.code} en État Dégradé`,
+        message: `L'équipement ${updatedEq.code} (${updatedEq.name}) dans l'atelier "${updatedEq.workshop}" présente une anomalie (État Dégradé).`,
+        details: { equipmentCode: updatedEq.code, equipmentName: updatedEq.name, workshop: updatedEq.workshop }
+      });
+    }
   };
 
   // A2. Delete an Equipment Asset
@@ -827,6 +1135,10 @@ export default function App() {
 
   // B. Update Equipment Operational Status
   const handleUpdateEquipmentStatus = (code: string, status: EquipmentStatus) => {
+    const targetEq = equipments.find((eq) => eq.code === code);
+    const eqName = targetEq ? targetEq.name : code;
+    const workshop = targetEq ? targetEq.workshop : "Atelier STA";
+
     setEquipments((prev) =>
       prev.map((eq) => (eq.code === code ? { ...eq, status } : eq))
     );
@@ -835,6 +1147,23 @@ export default function App() {
       `Équipement ${code} passé au statut : ${status}`,
       "equipment"
     );
+
+    // Auto email alerts
+    if (status === "En Panne" || status === "Hors Service") {
+      sendEmailAlert({
+        triggerType: "PANNE",
+        subject: `🚨 [PANNE] Signalement de Panne sur ${code} (${eqName})`,
+        message: `L'équipement ${code} (${eqName}) dans l'atelier "${workshop}" a été déclaré EN PANNE / HORS SERVICE.`,
+        details: { equipmentCode: code, equipmentName: eqName, workshop, urgency: "Haute" }
+      });
+    } else if (status === "Dégradé") {
+      sendEmailAlert({
+        triggerType: "ANOMALIE",
+        subject: `⚠️ [ANOMALIE] État Dégradé relevé sur ${code} (${eqName})`,
+        message: `Une anomalie a été signalée sur l'équipement ${code} (${eqName}) dans l'atelier "${workshop}".`,
+        details: { equipmentCode: code, equipmentName: eqName, workshop, urgency: "Moyenne" }
+      });
+    }
   };
 
   // C. Log a new Intervention (With automatic Warehouse Stock & Budget consumptions!)
@@ -893,32 +1222,54 @@ export default function App() {
       `Création d'une intervention ${newInt.type} pour l'équipement ${newInt.equipmentCode} (${newInt.title}) - Statut: ${newInt.status}`,
       "intervention"
     );
+
+    // Trigger email alert for corrective/urgent interventions or breakdowns
+    if (
+      newInt.type === "Correctif" ||
+      newInt.priority === "Haute" ||
+      newInt.priority === "Critique" ||
+      newInt.title.toLowerCase().includes("panne") ||
+      newInt.title.toLowerCase().includes("anomalie")
+    ) {
+      sendEmailAlert({
+        triggerType: newInt.type === "Correctif" ? "PANNE" : "ANOMALIE",
+        subject: `🚨 [INTERVENTION] ${newInt.id} - ${newInt.title}`,
+        message: `Une intervention de type ${newInt.type} (${newInt.id}) a été créée pour l'équipement ${newInt.equipmentCode}.\nPriorité: ${newInt.priority || "Moyenne"}.\nTechnicien: ${newInt.technician}.\nDescription: ${newInt.description}`,
+        details: { equipmentCode: newInt.equipmentCode, urgency: newInt.priority || "Haute", author: newInt.technician }
+      });
+    }
   };
 
   // D. Update Intervention Status (and sync Equipment status back)
   const handleUpdateInterventionStatus = (id: string, newStatus: InterventionStatus) => {
-    let intRecord: Intervention | undefined;
-    setInterventions((prev) =>
-      prev.map((int) => {
-        if (int.id === id) {
-          intRecord = int;
-          return { ...int, status: newStatus };
-        }
-        return int;
-      })
-    );
-
-    // If changing to "Terminé", restore equipment back to "Opérationnel"
-    if (newStatus === "Terminé" && intRecord) {
-      handleUpdateEquipmentStatus(intRecord.equipmentCode, "Opérationnel");
-    } else if (newStatus === "En cours" && intRecord) {
-      handleUpdateEquipmentStatus(intRecord.equipmentCode, "En Maintenance");
+    const targetInt = interventions.find((i) => i.id === id);
+    if (targetInt && allowedWorkshop) {
+      const targetEq = equipments.find((e) => e.code === targetInt.equipmentCode);
+      if (targetEq && targetEq.workshop !== allowedWorkshop) {
+        alert(`⛔ Action non autorisée : Vous pouvez uniquement valider et traiter les interventions de votre propre atelier (${allowedWorkshop}).`);
+        return;
+      }
     }
 
-    if (intRecord) {
+    setInterventions((prev) =>
+      prev.map((int) => (int.id === id ? { ...int, status: newStatus } : int))
+    );
+
+    if (targetInt) {
+      // If changing to "Terminée", "Clôturée" or "Terminé", restore equipment back to "Opérationnel"
+      if (newStatus === "Terminée" || newStatus === "Clôturée" || newStatus === "Terminé") {
+        handleUpdateEquipmentStatus(targetInt.equipmentCode, "Opérationnel");
+      } else if (newStatus === "En cours") {
+        handleUpdateEquipmentStatus(targetInt.equipmentCode, "En Maintenance");
+      } else if (newStatus === "Nouvelle" || newStatus === "Planifiée" || newStatus === "Planifié") {
+        if (targetInt.type === "Correctif") {
+          handleUpdateEquipmentStatus(targetInt.equipmentCode, "En Panne");
+        }
+      }
+
       logActivity(
         "Statut Intervention",
-        `Intervention sur ${intRecord.equipmentCode} mise à jour vers le statut : ${newStatus}`,
+        `Intervention sur ${targetInt.equipmentCode} mise à jour vers le statut : ${newStatus}`,
         "intervention"
       );
     }
@@ -926,6 +1277,14 @@ export default function App() {
 
   // D2. Update entire Intervention record (signature, checklist, etc.)
   const handleUpdateIntervention = (updatedInt: Intervention) => {
+    if (allowedWorkshop) {
+      const targetEq = equipments.find((e) => e.code === updatedInt.equipmentCode);
+      if (targetEq && targetEq.workshop !== allowedWorkshop) {
+        alert(`⛔ Action non autorisée : Vous pouvez uniquement modifier les interventions de votre propre atelier (${allowedWorkshop}).`);
+        return;
+      }
+    }
+
     setInterventions((prev) =>
       prev.map((int) => (int.id === updatedInt.id ? updatedInt : int))
     );
@@ -984,6 +1343,18 @@ export default function App() {
       `Création de la Demande d'Achat (DA #${newReq.id}) pour : ${newReq.equipmentName} - Quantité: ${newReq.quantity} - Urgence: ${newReq.urgency} - Coût estimé: ${newReq.estimatedCost} TND`,
       "purchase"
     );
+
+    sendEmailAlert({
+      triggerType: "DEMANDE_ACHAT",
+      subject: `🛒 [DEMANDE D'ACHAT] DA #${newReq.id} - ${newReq.equipmentName}`,
+      message: `Une nouvelle Demande d'Achat (DA #${newReq.id}) a été soumise pour "${newReq.equipmentName}".\nQuantité: ${newReq.quantity}\nUrgence: ${newReq.urgency}\nCoût estimé: ${newReq.estimatedCost} TND\nDemandeur: ${newReq.requestedBy}`,
+      details: {
+        equipmentName: newReq.equipmentName,
+        urgency: newReq.urgency,
+        cost: newReq.estimatedCost,
+        author: newReq.requestedBy
+      }
+    });
   };
 
   const handleUpdatePurchaseRequestStatus = (id: string, nextStatus: PurchaseRequest["status"]) => {
@@ -1277,7 +1648,7 @@ export default function App() {
         <header className="border-b border-white/5 bg-neutral-900/40 backdrop-blur-md shrink-0 py-4 z-10">
           <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
             <div className="flex items-center gap-4 select-none mx-auto sm:mx-0">
-              <div className="bg-white px-4 py-2 rounded-xl shadow-lg border border-slate-200 flex items-center">
+              <div className="bg-white px-3.5 py-1.5 rounded-xl shadow-lg border border-slate-200 flex items-center">
                 <CheryStaLogo className="h-9 w-auto" />
               </div>
               <div className="border-l border-white/10 pl-3.5 hidden sm:block">
@@ -1653,25 +2024,7 @@ export default function App() {
                 )}
               </div>
 
-              {/* Helper to show default codes in a clean expandable bar */}
-              <div className="bg-white/5 rounded-xl border border-white/5 p-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => setShowHelperCodes(!showHelperCodes)}
-                  className="text-[10px] text-neutral-400 font-bold hover:text-white transition-colors cursor-pointer w-full flex items-center justify-center gap-1"
-                >
-                  <span>{showHelperCodes ? "Masquer" : "Afficher"} les codes PIN par défaut</span>
-                  <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showHelperCodes ? "rotate-180" : ""}`} />
-                </button>
-                {showHelperCodes && (
-                  <div className="mt-2 text-[10px] text-left text-neutral-300 font-mono space-y-1 border-t border-white/5 pt-2 pl-1 grid grid-cols-2 gap-1">
-                    <div>Admin : <span className="text-chery-red font-bold">1924</span></div>
-                    <div>Magasin : <span className="text-emerald-400 font-bold">2026</span></div>
-                    <div>Supervis : <span className="text-amber-400 font-bold">1234</span></div>
-                    <div>Ateliers : <span className="text-blue-400 font-bold">0000</span></div>
-                  </div>
-                )}
-              </div>
+
 
               <div className="flex gap-3 pt-1">
                 <button
@@ -1724,7 +2077,7 @@ export default function App() {
 
             {/* Official STA Chery Logo */}
             <div className="flex items-center gap-3 select-none">
-              <div className="bg-white px-3.5 py-1.5 rounded-xl shadow-md border border-slate-200 flex items-center">
+              <div className="bg-white px-3 py-1 rounded-xl shadow-md border border-slate-200 flex items-center">
                 <CheryStaLogo className="h-7 w-auto" />
               </div>
               <div className="hidden lg:block border-l border-white/20 pl-3">
@@ -1785,18 +2138,6 @@ export default function App() {
             <span className="text-[10px] font-mono bg-slate-900/90 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 ml-0.5">
               ⌘K
             </span>
-          </button>
-
-          {/* ⚡ Pro Developer Console Trigger Button */}
-          <button
-            type="button"
-            onClick={() => setDevConsoleOpen(true)}
-            title="Console Développeur Pro & Télémétrie System (Ctrl+Shift+D)"
-            className="hidden xl:flex items-center gap-1.5 bg-slate-900/90 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 px-2.5 py-1.5 rounded-xl border border-emerald-500/30 transition-all cursor-pointer text-xs font-mono font-bold shadow-xs shrink-0"
-          >
-            <Terminal className="h-3.5 w-3.5 text-emerald-400" />
-            <span>DEV CONSOLE</span>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           </button>
 
           <button
@@ -2056,6 +2397,42 @@ export default function App() {
               )}
             </div>
 
+            {/* 📌 Projets & Investissements */}
+            <button
+              onClick={() => {
+                setActiveTab("projets");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "projets"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Presentation className="h-4 w-4" />
+                <span>📌 Projets & Chantier</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "projets" ? "opacity-100" : ""}`} />
+            </button>
+
+            {/* 🌱 Amélioration Continue */}
+            <button
+              onClick={() => {
+                setActiveTab("amelioration");
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "amelioration"
+                  ? "bg-chery-red text-white shadow-md shadow-red-500/10"
+                  : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="h-4 w-4" />
+                <span>🌱 Amélioration Continue</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "amelioration" ? "opacity-100" : ""}`} />
+            </button>
+
             {/* 📚 Centre Documentaire */}
             <button
               onClick={() => {
@@ -2199,6 +2576,8 @@ export default function App() {
                     { id: "dashboard", label: "🏠 Tableau de Bord", icon: LayoutDashboard },
                     { id: "equipements", label: "🏭 Parc Équipements", icon: Wrench },
                     { id: "interventions", label: "📋 Interventions & Maintenance", icon: FileText },
+                    { id: "projets", label: "📌 Projets & Chantier", icon: Presentation },
+                    { id: "amelioration", label: "🌱 Amélioration Continue", icon: Sparkles },
                     { id: "documentation", label: "📚 Centre Documentaire", icon: FileText },
                     { id: "achats", label: "🛒 Achats", icon: ShoppingCart },
                     { id: "contracts", label: "📑 Contrats & Conformité", icon: ShieldCheck },
@@ -2285,6 +2664,7 @@ export default function App() {
               onUpdateStatus={handleUpdateEquipmentStatus}
               onUpdateEquipment={handleUpdateEquipment}
               onDeleteEquipment={handleDeleteEquipment}
+              onAddIntervention={handleAddIntervention}
               initialWorkshop={selectedWorkshopFilter}
               isReadOnly={isEquipmentsReadOnly}
               allowedWorkshop={allowedWorkshop}
@@ -2325,11 +2705,50 @@ export default function App() {
             />
           )}
 
+          {activeTab === "projets" && (
+            <ProjectsManager
+              projects={projects}
+              onAddProject={handleAddProject}
+              onUpdateProject={handleUpdateProject}
+              onDeleteProject={handleDeleteProject}
+              isReadOnly={isEquipmentsReadOnly}
+              currentUserRole={currentUserRole}
+            />
+          )}
+
+          {activeTab === "amelioration" && (
+            <ContinuousImprovementManager
+              audits5s={audits5s}
+              leanItems={leanItems}
+              safetyRecords={safetyRecords}
+              qualityRecords={qualityRecords}
+              environmentLogs={environmentLogs}
+              onAddAudit5S={handleAddAudit5S}
+              onUpdateAudit5S={handleUpdateAudit5S}
+              onDeleteAudit5S={handleDeleteAudit5S}
+              onAddLeanItem={handleAddLeanItem}
+              onUpdateLeanItem={handleUpdateLeanItem}
+              onDeleteLeanItem={handleDeleteLeanItem}
+              onAddSafetyRecord={handleAddSafetyRecord}
+              onUpdateSafetyRecord={handleUpdateSafetyRecord}
+              onDeleteSafetyRecord={handleDeleteSafetyRecord}
+              onAddQualityRecord={handleAddQualityRecord}
+              onUpdateQualityRecord={handleUpdateQualityRecord}
+              onDeleteQualityRecord={handleDeleteQualityRecord}
+              onAddEnvironmentLog={handleAddEnvironmentLog}
+              onUpdateEnvironmentLog={handleUpdateEnvironmentLog}
+              onDeleteEnvironmentLog={handleDeleteEnvironmentLog}
+              isReadOnly={isEquipmentsReadOnly}
+              currentUserRole={currentUserRole}
+            />
+          )}
+
           {activeTab === "documentation" && (
             <DocumentationManager
               equipments={equipments}
               isReadOnly={isEquipmentsReadOnly}
               currentUserRole={currentUserRole}
+              allowedWorkshop={allowedWorkshop}
             />
           )}
 
@@ -2337,6 +2756,7 @@ export default function App() {
             <PurchasesManager
               purchaseRequests={purchaseRequests}
               vendors={vendors}
+              equipments={equipments}
               onAddPurchaseRequest={handleAddPurchaseRequest}
               onUpdatePurchaseRequestStatus={handleUpdatePurchaseRequestStatus}
               onUpdatePurchaseRequest={handleUpdatePurchaseRequest}
@@ -2344,6 +2764,7 @@ export default function App() {
               onAddVendor={handleAddVendor}
               isReadOnly={isPurchasesReadOnly}
               currentRole={currentUserRole}
+              allowedWorkshop={allowedWorkshop}
             />
           )}
 
@@ -2358,6 +2779,7 @@ export default function App() {
               onUpdateContract={handleUpdateContract}
               onDeleteContract={handleDeleteContract}
               currentRole={currentUserRole}
+              allowedWorkshop={allowedWorkshop}
             />
           )}
 
@@ -2388,6 +2810,7 @@ export default function App() {
               onAddRoleProfile={handleAddRoleProfile}
               onUpdateRoleProfile={handleUpdateRoleProfile}
               onDeleteRoleProfile={handleDeleteRoleProfile}
+              showToast={showToast}
             />
           )}
 
@@ -2490,31 +2913,7 @@ export default function App() {
               )}
             </div>
 
-            {pendingRole === "admin" && (
-              <>
-                <div className="text-center pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowHelperCodes(!showHelperCodes)}
-                    className="text-[10px] text-neutral-400 hover:text-neutral-600 font-semibold underline transition-colors"
-                  >
-                    {showHelperCodes ? "Masquer l'aide d'accès" : "Afficher l'aide d'accès (Démo)"}
-                  </button>
-                </div>
 
-                {showHelperCodes && (
-                  <div className="text-center py-2 text-[10px] text-neutral-500 font-medium space-y-1 bg-amber-50 rounded-xl border border-amber-100 p-2.5 animate-fade-in">
-                    <span className="font-semibold text-amber-800">💡 Code Démo de Secours :</span>
-                    <div className="grid grid-cols-2 gap-1 text-[9px] text-neutral-600">
-                      <div>Admin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.admin}</code></div>
-                      <div>Superviseur: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.supervisor}</code></div>
-                      <div>Magasin: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.magasin}</code></div>
-                      <div>Ateliers: <code className="font-bold font-mono bg-amber-100 px-1 rounded">{passwords.service_rapide}</code></div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
 
             <div className="flex gap-3 pt-1">
               <button
@@ -2755,6 +3154,40 @@ export default function App() {
         purchaseRequestsCount={purchaseRequests.length}
         contractsCount={contracts.length}
       />
+
+      {/* 📧 Email Alert Floating Toast */}
+      {emailAlertToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md bg-neutral-900 text-white p-4 rounded-2xl shadow-2xl border border-red-500/50 animate-bounce-short flex items-start gap-3">
+          <div className="p-2.5 bg-red-600/20 rounded-xl text-red-500 shrink-0">
+            <Bell className="h-5 w-5 animate-pulse" />
+          </div>
+          <div className="space-y-1 text-xs flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-extrabold text-red-400 uppercase tracking-wider text-[10px] bg-red-950 px-2 py-0.5 rounded border border-red-800">
+                📧 EMAIL D'ALERTE ENVOYÉ
+              </span>
+              <span className="text-[10px] text-neutral-400 font-mono">
+                {new Date(emailAlertToast.sentAt).toLocaleTimeString()}
+              </span>
+            </div>
+            <p className="font-bold text-white text-xs leading-tight">
+              {emailAlertToast.subject}
+            </p>
+            <p className="text-[11px] text-amber-300 font-mono font-semibold">
+              Destinataire : {emailAlertToast.recipient}
+            </p>
+            <p className="text-[10px] text-neutral-300 bg-neutral-800 p-2 rounded-lg border border-neutral-700 mt-1 leading-relaxed">
+              {emailAlertToast.message}
+            </p>
+          </div>
+          <button
+            onClick={() => setEmailAlertToast(null)}
+            className="text-neutral-400 hover:text-white p-1 text-xs font-bold cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 🔔 Global Toast Notification */}
       <ToastNotification

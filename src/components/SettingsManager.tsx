@@ -37,10 +37,25 @@ import {
   UserPlus,
   X,
   Check,
-  Star
+  Star,
+  Save,
+  ChevronDown,
+  ChevronUp,
+  Server
 } from "lucide-react";
 import { BudgetYear, Workshop, Vendor, ActivityLog, UserRoleProfile } from "../types";
 import { WORKSHOPS } from "../data";
+import {
+  sendEmailAlert,
+  getStoredEmailAlerts,
+  getStoredAlertEmailRecipient,
+  setStoredAlertEmailRecipient,
+  DEFAULT_ALERT_EMAIL_RECIPIENT,
+  EmailAlert,
+  getStoredSmtpConfig,
+  setStoredSmtpConfig,
+  SmtpConfig
+} from "../utils/emailAlerts";
 
 interface SettingsManagerProps {
   budget: BudgetYear;
@@ -68,6 +83,7 @@ interface SettingsManagerProps {
   onAddRoleProfile?: (profile: UserRoleProfile) => void;
   onUpdateRoleProfile?: (profile: UserRoleProfile) => void;
   onDeleteRoleProfile?: (profileId: string) => void;
+  showToast?: (message: string, type?: "success" | "error" | "info") => void;
 }
 
 export default function SettingsManager({
@@ -95,13 +111,21 @@ export default function SettingsManager({
   userProfiles = [],
   onAddRoleProfile,
   onUpdateRoleProfile,
-  onDeleteRoleProfile
+  onDeleteRoleProfile,
+  showToast
 }: SettingsManagerProps) {
   const isAdmin = currentRole === "admin";
   const isWritable = !isReadOnly && isAdmin;
 
   // Active Sub-Tab State
   const [activeSubTab, setActiveSubTab] = useState<"parameters" | "users" | "docs" | "vendors" | "notifications" | "audit">("parameters");
+
+  // Safety guard: redirect non-admin away from admin-only subtabs
+  useEffect(() => {
+    if (!isAdmin && (activeSubTab === "notifications" || activeSubTab === "users")) {
+      setActiveSubTab("parameters");
+    }
+  }, [isAdmin, activeSubTab]);
 
   // General parameters states
   const [hourlyRate, setHourlyRate] = useState<number>(() => {
@@ -115,6 +139,20 @@ export default function SettingsManager({
   const [currency, setCurrency] = useState<string>(() => {
     return localStorage.getItem("chery_gmao_currency") || "TND";
   });
+
+  // Editable Alert Email Recipient
+  const [alertEmailInput, setAlertEmailInput] = useState<string>(getStoredAlertEmailRecipient());
+  const [emailSavedSuccess, setEmailSavedSuccess] = useState<boolean>(false);
+
+  // SMTP Configuration State
+  const [showSmtpConfig, setShowSmtpConfig] = useState<boolean>(false);
+  const [smtpHost, setSmtpHost] = useState<string>(() => getStoredSmtpConfig()?.host || "smtp.office365.com");
+  const [smtpPort, setSmtpPort] = useState<number>(() => getStoredSmtpConfig()?.port || 587);
+  const [smtpUser, setSmtpUser] = useState<string>(() => getStoredSmtpConfig()?.user || "");
+  const [smtpPass, setSmtpPass] = useState<string>(() => getStoredSmtpConfig()?.pass || "");
+  const [smtpFrom, setSmtpFrom] = useState<string>(() => getStoredSmtpConfig()?.from || "");
+  const [smtpSavedSuccess, setSmtpSavedSuccess] = useState<boolean>(false);
+  const [isTestingEmail, setIsTestingEmail] = useState<boolean>(false);
 
   // Save general parameters locally
   useEffect(() => {
@@ -458,6 +496,7 @@ export default function SettingsManager({
   // --- 6. HISTORIQUE DES MODIFICATIONS (AUDIT) STATE ---
   const [auditSearch, setAuditSearch] = useState("");
   const [auditTypeFilter, setAuditTypeFilter] = useState("All");
+  const [onlyMyAuditLogs, setOnlyMyAuditLogs] = useState<boolean>(true);
 
   const filteredAuditLogs = useMemo(() => {
     return activityLogs.filter((log) => {
@@ -467,9 +506,15 @@ export default function SettingsManager({
         log.userRole.toLowerCase().includes(auditSearch.toLowerCase());
 
       const matchesType = auditTypeFilter === "All" || log.type === auditTypeFilter;
-      return matchesSearch && matchesType;
+
+      const matchesUser = isAdmin
+        ? (!onlyMyAuditLogs || (log.userRole && log.userRole.toLowerCase().includes(currentRole.toLowerCase())))
+        : ((log.userRole && log.userRole.toLowerCase().includes(currentRole.toLowerCase())) ||
+           (currentRole && currentRole.toLowerCase().includes(log.userRole ? log.userRole.toLowerCase() : "")));
+
+      return matchesSearch && matchesType && matchesUser;
     });
-  }, [activityLogs, auditSearch, auditTypeFilter]);
+  }, [activityLogs, auditSearch, auditTypeFilter, onlyMyAuditLogs, currentRole, isAdmin]);
 
   // Quick stats computed on the fly
   const activeAlertsCount = useMemo(() => {
@@ -519,10 +564,10 @@ export default function SettingsManager({
           </span>
           {[
             { id: "parameters", label: "⚙️ Paramètres généraux", icon: Sliders },
-            { id: "users", label: "👥 Gestion des utilisateurs", icon: Users },
+            ...(isAdmin ? [{ id: "users", label: "👥 Gestion des utilisateurs", icon: Users }] : []),
             { id: "docs", label: "📚 Gestion documentaire", icon: FileText },
             { id: "vendors", label: "🏢 Prestataires & Partenaires", icon: Building2 },
-            { id: "notifications", label: "🔔 Alertes & Notifications", icon: Bell },
+            ...(isAdmin ? [{ id: "notifications", label: "🔔 Alertes & Notifications", icon: Bell }] : []),
             { id: "audit", label: "📜 Historique des modifications", icon: History }
           ].map((item) => {
             const Icon = item.icon;
@@ -751,8 +796,8 @@ export default function SettingsManager({
             </div>
           )}
 
-          {/* TAB 2: USER MANAGEMENT */}
-          {activeSubTab === "users" && (
+          {/* TAB 2: USER MANAGEMENT (ADMIN ONLY) */}
+          {activeSubTab === "users" && isAdmin && (
             <div className="space-y-6 animate-fade-in">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Users Role List */}
@@ -1523,12 +1568,282 @@ export default function SettingsManager({
           {activeSubTab === "notifications" && (
             <div className="space-y-6 animate-fade-in">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Configuration parameters */}
+                {/* Configuration parameters & Email destination */}
                 <div className="md:col-span-1 bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
                   <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 flex items-center gap-1.5">
-                    <Sliders className="h-4 w-4 text-chery-red" />
-                    Paramètres d'Alertes
+                    <Mail className="h-4 w-4 text-chery-red" />
+                    Alerte Email Automatique (Pannes & Achats)
                   </h3>
+
+                  <div className="bg-red-50/80 p-3.5 rounded-xl border border-red-100 space-y-3 text-xs">
+                    <div className="flex items-center justify-between gap-1 text-chery-red font-extrabold text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+                        <span>Email Destinataire des Alertes :</span>
+                      </div>
+                      {emailSavedSuccess && (
+                        <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded animate-pulse">
+                          Saved ✓
+                        </span>
+                      )}
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const saved = setStoredAlertEmailRecipient(alertEmailInput);
+                        setAlertEmailInput(saved);
+                        setEmailSavedSuccess(true);
+                        setTimeout(() => setEmailSavedSuccess(false), 3000);
+                        showToast?.(`Adresse email modifiée avec succès : ${saved}`, "success");
+                      }}
+                      className="space-y-2"
+                    >
+                      <input
+                        type="email"
+                        required
+                        value={alertEmailInput}
+                        onChange={(e) => setAlertEmailInput(e.target.value)}
+                        placeholder="ex: ahmedamine.bensalah@sta-tunisie.com"
+                        className="w-full font-mono font-bold text-neutral-900 bg-white p-2.5 rounded-xl border border-red-200 text-xs focus:ring-2 focus:ring-chery-red outline-none"
+                      />
+
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          className="flex-1 bg-chery-red hover:bg-chery-dark text-white font-bold py-2 px-3 rounded-lg text-xs cursor-pointer transition-colors shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <Save className="h-3.5 w-3.5" />
+                          Enregistrer l'Email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const def = setStoredAlertEmailRecipient(DEFAULT_ALERT_EMAIL_RECIPIENT);
+                            setAlertEmailInput(def);
+                            showToast?.(`Email réinitialisé à par défaut : ${def}`, "info");
+                          }}
+                          className="bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-semibold py-2 px-2.5 rounded-lg text-[10px] cursor-pointer transition-colors"
+                          title="Réinitialiser"
+                        >
+                          Par défaut
+                        </button>
+                      </div>
+                    </form>
+
+                    <p className="text-[10px] text-neutral-500 leading-relaxed">
+                      Chaque signalement de <strong>panne</strong>, <strong>anomalie</strong> ou création de <strong>demande d'achat (DA)</strong> envoie immédiatement une alerte à cette adresse.
+                    </p>
+
+                    {/* Expandable SMTP Server Settings for Real Outlook Delivery */}
+                    <div className="pt-2 border-t border-red-200/60 mt-3 space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowSmtpConfig(!showSmtpConfig)}
+                        className="w-full flex items-center justify-between text-[11px] font-bold text-neutral-700 bg-white p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Server className="h-3.5 w-3.5 text-chery-red" />
+                          <span>Configuration Serveur SMTP (Gmail / Outlook / Office 365)</span>
+                        </div>
+                        {showSmtpConfig ? <ChevronUp className="h-3.5 w-3.5 text-neutral-500" /> : <ChevronDown className="h-3.5 w-3.5 text-neutral-500" />}
+                      </button>
+
+                      {showSmtpConfig && (
+                        <div className="bg-white p-3 rounded-xl border border-neutral-200 space-y-2.5 animate-fade-in text-[11px]">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-neutral-800">Serveur de messagerie sortante :</span>
+                            {smtpSavedSuccess && (
+                              <span className="text-[10px] bg-green-100 text-green-800 font-bold px-1.5 py-0.5 rounded">Config Sauvegardée ✓</span>
+                            )}
+                          </div>
+
+                          {/* Presets rapides Gmail & Outlook */}
+                          <div className="flex flex-wrap gap-2 text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSmtpHost("smtp.gmail.com");
+                                setSmtpPort(587);
+                                setSmtpUser("ahmedaminebensalah1@gmail.com");
+                                setSmtpFrom("ahmedaminebensalah1@gmail.com");
+                                showToast?.("Champs configurés pour Gmail (smtp.gmail.com). Saisissez le mot de passe d'application.", "info");
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 font-bold cursor-pointer transition-colors"
+                            >
+                              ⚡ Pré-remplir pour Gmail (ahmedaminebensalah1@gmail.com)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSmtpHost("smtp.office365.com");
+                                setSmtpPort(587);
+                                setSmtpUser("ahmedamine.bensalah@sta-tunisie.com");
+                                setSmtpFrom("ahmedamine.bensalah@sta-tunisie.com");
+                                showToast?.("Champs configurés pour Outlook (smtp.office365.com)", "info");
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold cursor-pointer transition-colors"
+                            >
+                              ⚡ Pré-remplir pour Outlook
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-neutral-500 font-medium mb-0.5">Serveur SMTP</label>
+                              <input
+                                type="text"
+                                value={smtpHost}
+                                onChange={(e) => setSmtpHost(e.target.value)}
+                                placeholder="smtp.gmail.com"
+                                className="w-full font-mono text-[11px] bg-neutral-50 p-1.5 rounded border border-neutral-200 outline-none focus:border-chery-red"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-neutral-500 font-medium mb-0.5">Port SMTP</label>
+                              <input
+                                type="number"
+                                value={smtpPort}
+                                onChange={(e) => setSmtpPort(Number(e.target.value))}
+                                placeholder="587"
+                                className="w-full font-mono text-[11px] bg-neutral-50 p-1.5 rounded border border-neutral-200 outline-none focus:border-chery-red"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] text-neutral-500 font-medium mb-0.5">Compte / Adresse d'envoi (Gmail ou Outlook)</label>
+                            <input
+                              type="email"
+                              value={smtpUser}
+                              onChange={(e) => {
+                                setSmtpUser(e.target.value);
+                                if (!smtpFrom) setSmtpFrom(e.target.value);
+                              }}
+                              placeholder="ex: ahmedaminebensalah1@gmail.com"
+                              className="w-full font-mono text-[11px] bg-neutral-50 p-1.5 rounded border border-neutral-200 outline-none focus:border-chery-red"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] text-neutral-500 font-medium mb-0.5">Mot de passe d'application (16 caractères)</label>
+                            <input
+                              type="password"
+                              value={smtpPass}
+                              onChange={(e) => setSmtpPass(e.target.value)}
+                              placeholder="••••••••••••••••"
+                              className="w-full font-mono text-[11px] bg-neutral-50 p-1.5 rounded border border-neutral-200 outline-none focus:border-chery-red"
+                            />
+                          </div>
+
+                          {/* 💡 Guide d'obtention des identifiants Gmail & Outlook */}
+                          <div className="bg-red-50/80 border border-red-200 rounded-xl p-3 space-y-2 text-[11px] text-slate-900 shadow-2xs">
+                            <div className="font-bold flex items-center gap-1.5 text-red-950 text-xs">
+                              <span>✉️ Guide rapide pour le mot de passe d'application Gmail ({smtpUser || "ahmedaminebensalah1@gmail.com"}) :</span>
+                            </div>
+                            
+                            <div className="space-y-2 text-slate-800 leading-relaxed">
+                              <div className="bg-white p-2.5 rounded-lg border border-red-100 shadow-2xs">
+                                <ol className="list-decimal list-inside space-y-1 pl-1 text-[11px]">
+                                  <li>
+                                    Activez la <strong>Validation en deux étapes</strong> sur votre compte Google : <a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer" className="underline font-bold text-blue-700 hover:text-chery-red">myaccount.google.com/security</a>.
+                                  </li>
+                                  <li>
+                                    Ouvrez la page Mots de passe d'application : <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="underline font-bold text-blue-700 hover:text-chery-red">myaccount.google.com/apppasswords</a>.
+                                  </li>
+                                  <li>
+                                    Nommez l'application <strong>"GMAO"</strong>, cliquez sur <strong>Créer</strong>, puis copiez-collez le mot de passe à 16 lettres généré dans le champ ci-dessus.
+                                  </li>
+                                </ol>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const isGmail = smtpUser.trim().toLowerCase().includes("@gmail.com");
+                                const effectiveHost = isGmail && (smtpHost.includes("office365") || smtpHost.includes("outlook") || !smtpHost) ? "smtp.gmail.com" : smtpHost.trim();
+                                const cleanPass = smtpPass.trim().replace(/\s+/g, '');
+
+                                if (isGmail && effectiveHost !== smtpHost) {
+                                  setSmtpHost(effectiveHost);
+                                }
+
+                                const newConfig: SmtpConfig = {
+                                  host: effectiveHost,
+                                  port: Number(smtpPort) || 587,
+                                  user: smtpUser.trim(),
+                                  pass: cleanPass,
+                                  from: smtpFrom.trim() || smtpUser.trim()
+                                };
+                                setStoredSmtpConfig(newConfig);
+                                setSmtpSavedSuccess(true);
+                                setTimeout(() => setSmtpSavedSuccess(false), 3000);
+                                showToast?.("Configuration SMTP enregistrée.", "success");
+                              }}
+                              className="flex-1 bg-neutral-800 hover:bg-neutral-900 text-white font-bold py-1.5 px-2 rounded text-[10px] cursor-pointer transition-colors flex items-center justify-center gap-1"
+                            >
+                              <Save className="h-3 w-3" />
+                              Sauvegarder la Config SMTP
+                            </button>
+
+                             <button
+                              type="button"
+                              disabled={isTestingEmail}
+                              onClick={async () => {
+                                setIsTestingEmail(true);
+                                try {
+                                  const currentRecipient = alertEmailInput.trim() || getStoredAlertEmailRecipient();
+                                  const activeSmtpConfig: SmtpConfig = {
+                                    host: smtpHost.trim() || "smtp.office365.com",
+                                    port: Number(smtpPort) || 587,
+                                    user: smtpUser.trim(),
+                                    pass: smtpPass.trim(),
+                                    from: smtpFrom.trim() || smtpUser.trim()
+                                  };
+
+                                  const res = await fetch("/api/send-email", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      recipient: currentRecipient,
+                                      subject: "🧪 Test d'envoi d'Email GMAO STA Chery",
+                                      message: `Ceci est un email de test généré le ${new Date().toLocaleString('fr-FR')} depuis l'application GMAO STA Chery.\n\nSi vous recevez ce message sur votre boîte Outlook (${currentRecipient}), la configuration est à 100% fonctionnelle !`,
+                                      details: {
+                                        equipmentCode: "TEST-01",
+                                        equipmentName: "Test de connexion Outlook",
+                                        workshop: "Administration",
+                                        urgency: "Normale",
+                                        author: "Ahmed Amine"
+                                      },
+                                      smtpConfig: activeSmtpConfig
+                                    })
+                                  });
+
+                                  const data = await res.json();
+                                  if (data.success) {
+                                    showToast?.(`✅ ${data.message}`, "success");
+                                  } else {
+                                    showToast?.(`❌ ${data.error}`, "error");
+                                  }
+                                } catch (e: any) {
+                                  showToast?.(`Erreur de connexion API : ${e?.message || 'Échec'}`, "error");
+                                } finally {
+                                  setIsTestingEmail(false);
+                                }
+                              }}
+                              className="bg-chery-red hover:bg-chery-dark text-white font-bold py-1.5 px-3 rounded text-[10px] cursor-pointer transition-colors flex items-center justify-center gap-1 shadow-xs"
+                            >
+                              <Send className="h-3 w-3" />
+                              {isTestingEmail ? "Envoi..." : "Tester l'Envoi Réel"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <div className="space-y-3 text-xs font-semibold text-neutral-600">
                     <label className="flex items-center gap-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100 hover:bg-neutral-100/50 cursor-pointer transition-colors">
@@ -1538,59 +1853,91 @@ export default function SettingsManager({
                         onChange={(e) => setNotifSound(e.target.checked)}
                         className="rounded border-neutral-300 text-chery-red focus:ring-chery-red"
                       />
-                      <span>Signaux sonores d'alertes en temps réel</span>
+                      <span>Signaux sonores & pop-up d'alertes en temps réel</span>
                     </label>
 
                     <label className="flex items-center gap-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100 hover:bg-neutral-100/50 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
-                        checked={notifEmailThreshold}
-                        onChange={(e) => setNotifEmailThreshold(e.target.checked)}
+                        checked={true}
+                        readOnly
                         className="rounded border-neutral-300 text-chery-red focus:ring-chery-red"
                       />
-                      <span>Envoi automatique d'Emails pour les pannes</span>
+                      <span>Envoi automatique Email pour chaque Panne</span>
                     </label>
 
                     <label className="flex items-center gap-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100 hover:bg-neutral-100/50 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
-                        checked={notifSMSThreshold}
-                        onChange={(e) => setNotifSMSThreshold(e.target.checked)}
+                        checked={true}
+                        readOnly
                         className="rounded border-neutral-300 text-chery-red focus:ring-chery-red"
                       />
-                      <span>Notifications SMS pour l'administrateur</span>
+                      <span>Envoi automatique Email pour chaque Demande d'Achat</span>
                     </label>
                   </div>
                 </div>
 
-                {/* Alarm Board and simulator */}
+                {/* Alarm Board, simulator & Live Email Log */}
                 <div className="md:col-span-2 bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
-                  <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider border-b border-neutral-100 pb-2 flex items-center gap-1.5">
-                    <Bell className="h-4.5 w-4.5 text-chery-red" />
-                    Simulateur d'Astreinte Technique
-                  </h3>
+                  <div className="flex justify-between items-center border-b border-neutral-100 pb-2">
+                    <h3 className="text-xs font-black text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Bell className="h-4.5 w-4.5 text-chery-red" />
+                      Journal des Emails d'Alerte Envoyés
+                    </h3>
+                    <button
+                      onClick={() => {
+                        sendEmailAlert({
+                          triggerType: "PANNE",
+                          subject: "🚨 [TEST ALERTE] Signalement de Panne Test sur Pont Élévateur #01",
+                          message: "Ceci est une alerte de test générée manuellement pour vérifier la transmission par email.",
+                          details: { equipmentCode: "EQ-TEST", equipmentName: "Pont Élévateur #01", workshop: "Service Rapide" }
+                        });
+                      }}
+                      className="text-[10px] font-bold text-white bg-chery-red hover:bg-chery-dark px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                    >
+                      <Send className="h-3 w-3" />
+                      Tester un Envoi d'Email
+                    </button>
+                  </div>
+
                   <p className="text-xs text-neutral-400 leading-normal">
-                    La GMAO intègre un système d'alerte automatisé. Lors de la saisie d'un signalement de panne par un Chef d'Atelier, les ingénieurs d'astreinte reçoivent instantanément un message.
+                    Historique en temps réel des notifications envoyées par email à <strong>ahmedamine.bensalah@sta-tunisie.com</strong> pour toutes les pannes, anomalies et demandes d'achat.
                   </p>
 
-                  <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200/50 space-y-3 text-xs">
-                    <span className="font-extrabold text-neutral-700 block">Dépêche d'Assistance Interactive</span>
-                    <p className="text-neutral-400 text-[11px] leading-relaxed">
-                      Cliquez sur le bouton ci-dessous pour lancer une simulation d'envoi d'alerte critique sur les serveurs d'assistance de la STA Chery Tunisie.
-                    </p>
-
-                    <button
-                      onClick={handleSimulateAlert}
-                      className="flex items-center justify-center gap-2 bg-chery-red hover:bg-chery-dark text-white font-bold px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      Simuler un SMS & Email de panne d'urgence
-                    </button>
-
-                    {simulatedDispatch && (
-                      <div className="p-3 bg-red-50 text-red-950 font-bold border border-red-100 rounded-xl text-[10px] leading-relaxed animate-pulse">
-                        {simulatedDispatch}
+                  <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+                    {getStoredEmailAlerts().length === 0 ? (
+                      <div className="p-8 text-center bg-neutral-50 rounded-xl border border-neutral-100 text-xs text-neutral-400 italic">
+                        Aucun email d'alerte enregistré pour le moment. Signalez une panne ou créez une demande d'achat pour déclencher un envoi automatique.
                       </div>
+                    ) : (
+                      getStoredEmailAlerts().map((alert) => (
+                        <div key={alert.id} className="p-3 bg-neutral-50/80 hover:bg-white border border-neutral-200/60 rounded-xl text-xs transition-colors space-y-1">
+                          <div className="flex justify-between items-center flex-wrap gap-2">
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                              alert.triggerType === "PANNE"
+                                ? "bg-red-100 text-red-700"
+                                : alert.triggerType === "ANOMALIE"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}>
+                              {alert.triggerType}
+                            </span>
+                            <span className="text-[10px] text-neutral-400 font-mono">
+                              {new Date(alert.sentAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="font-bold text-neutral-800 text-xs">
+                            {alert.subject}
+                          </div>
+                          <div className="text-[11px] text-neutral-600 font-mono">
+                            Destinataire: <strong className="text-blue-700">{alert.recipient}</strong>
+                          </div>
+                          <p className="text-[11px] text-neutral-500 bg-white p-2 rounded-lg border border-neutral-100 mt-1">
+                            {alert.message}
+                          </p>
+                        </div>
+                      ))
                     )}
                   </div>
                 </div>
@@ -1654,6 +2001,24 @@ export default function SettingsManager({
                     <option value="budget">Allocations Budgétaires</option>
                     <option value="other">Système & Initialisation</option>
                   </select>
+
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => setOnlyMyAuditLogs(!onlyMyAuditLogs)}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer shrink-0 ${
+                        onlyMyAuditLogs
+                          ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {onlyMyAuditLogs ? "🔒 Mes modifications uniquement" : "👁️ Tous les utilisateurs"}
+                    </button>
+                  ) : (
+                    <span className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 shrink-0 flex items-center">
+                      🔒 Vos modifications uniquement
+                    </span>
+                  )}
                 </div>
 
                 {/* Logs Listing Table */}

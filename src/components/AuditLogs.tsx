@@ -32,8 +32,10 @@ interface AuditLogsProps {
 export default function AuditLogs({ logs, onClearLogs, currentUserRole }: AuditLogsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<string>("All");
+  const [onlyMyUserLogs, setOnlyMyUserLogs] = useState<boolean>(true);
 
   const filteredLogs = useMemo(() => {
+    const isAdmin = currentUserRole === "admin";
     return logs.filter((log) => {
       const matchesSearch =
         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -41,10 +43,15 @@ export default function AuditLogs({ logs, onClearLogs, currentUserRole }: AuditL
         log.userRole.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesType = selectedType === "All" || log.type === selectedType;
+
+      const matchesUser = isAdmin
+        ? (!onlyMyUserLogs || (log.userRole && log.userRole.toLowerCase().includes(currentUserRole.toLowerCase())))
+        : ((log.userRole && log.userRole.toLowerCase().includes(currentUserRole.toLowerCase())) ||
+           (currentUserRole && currentUserRole.toLowerCase().includes(log.userRole ? log.userRole.toLowerCase() : "")));
       
-      return matchesSearch && matchesType;
+      return matchesSearch && matchesType && matchesUser;
     });
-  }, [logs, searchTerm, selectedType]);
+  }, [logs, searchTerm, selectedType, onlyMyUserLogs, currentUserRole]);
 
   const getLogIcon = (type: ActivityLog["type"]) => {
     switch (type) {
@@ -180,10 +187,28 @@ export default function AuditLogs({ logs, onClearLogs, currentUserRole }: AuditL
           </select>
         </div>
 
-        {/* Stats counter badge */}
-        <div className="flex items-center justify-end text-xs text-neutral-500 font-mono pr-2">
-          <Layers className="h-4 w-4 text-neutral-400 mr-2" />
-          <span>{filteredLogs.length} modifications trouvées</span>
+        {/* User filter toggle & counter */}
+        <div className="flex items-center justify-between gap-2 text-xs">
+          {currentUserRole === "admin" ? (
+            <button
+              type="button"
+              onClick={() => setOnlyMyUserLogs(!onlyMyUserLogs)}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all border cursor-pointer text-xs flex items-center gap-1.5 ${
+                onlyMyUserLogs
+                  ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {onlyMyUserLogs ? "🔒 Mes modifications uniquement" : "👁️ Tous les utilisateurs"}
+            </button>
+          ) : (
+            <span className="px-3 py-1.5 rounded-xl font-bold text-xs bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5">
+              🔒 Vos modifications uniquement
+            </span>
+          )}
+          <div className="text-neutral-500 font-mono text-[11px] shrink-0">
+            {filteredLogs.length} logs
+          </div>
         </div>
       </div>
 

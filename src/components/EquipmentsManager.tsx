@@ -57,6 +57,7 @@ import { Equipment, EquipmentStatus, Workshop, Intervention, SparePart, Vendor }
 import { WORKSHOPS } from "../data";
 import { generateEquipmentBreakdownPDF } from "../utils/pdfGenerator";
 import { generateEquipmentImportTemplate, parseEquipmentExcelFile } from "../utils/excelGenerator";
+import { sendEmailAlert } from "../utils/emailAlerts";
 
 interface EquipmentsManagerProps {
   equipments: Equipment[];
@@ -472,7 +473,8 @@ export default function EquipmentsManager({
   // Create Corrective Intervention (Déclarer une panne)
   const handleDeclarePanneSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEquipment || !onAddIntervention || !quickTitle || !quickTech) return;
+    if (!selectedEquipment || !onAddIntervention || !quickTitle) return;
+    const techName = quickTech || "Technicien STA";
 
     const newInt: Intervention = {
       id: `INT-PANNE-${Date.now()}`,
@@ -481,25 +483,39 @@ export default function EquipmentsManager({
       title: quickTitle,
       description: quickDesc || "Panne signalée en urgence depuis la fiche équipement.",
       dateIntervention: new Date().toISOString().split("T")[0],
-      durationHours: Number(quickDuration),
+      durationHours: Number(quickDuration) || 2,
       costParts: 0,
-      costLabor: Number(quickLaborCost),
-      technician: quickTech,
+      costLabor: Number(quickLaborCost) || 120,
+      technician: techName,
       status: "Nouvelle",
       partsUsed: [],
-      priority: quickPriority
+      priority: quickPriority || "Haute"
     };
 
-    // Update equipment status to En Panne
+    // Update equipment status to En Panne & create ticket
     onUpdateStatus(selectedEquipment.code, "En Panne");
     onAddIntervention(newInt);
+
+    // Send automatic email alert
+    sendEmailAlert({
+      triggerType: "PANNE",
+      subject: `🚨 [PANNE] Signalement de Panne sur ${selectedEquipment.code} (${selectedEquipment.name})`,
+      message: `Une panne à haut risque a été déclarée sur l'équipement ${selectedEquipment.name} (${selectedEquipment.code}) dans l'atelier ${selectedEquipment.workshop}.\n\nPriorité: ${newInt.priority}\nSymptôme / Symptômes: ${newInt.title}\nDescription: ${newInt.description}\nDéclaré par: ${techName}`,
+      details: {
+        equipmentCode: selectedEquipment.code,
+        equipmentName: selectedEquipment.name,
+        workshop: selectedEquipment.workshop,
+        urgency: newInt.priority,
+        author: techName
+      }
+    });
 
     setShowDeclarePanneModal(false);
     setQuickTitle("");
     setQuickDesc("");
     setQuickTech("");
     setDetailTab("history");
-    alert(`Panne déclarée avec succès pour l'équipement ${selectedEquipment.code}. Un ticket d'intervention Corrective a été créé.`);
+    alert(`Panne déclarée avec succès pour l'équipement ${selectedEquipment.code}. Un ticket d'intervention Corrective a été créé et l'email d'alerte a été transmis.`);
   };
 
   // Create Preventive Maintenance (Planifier une maintenance)

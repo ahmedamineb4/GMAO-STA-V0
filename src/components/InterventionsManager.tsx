@@ -195,9 +195,12 @@ export default function InterventionsManager({
       const pLevel = int.priority || "Moyenne";
       const matchesPriority = selectedPriority === "All" || pLevel === selectedPriority;
 
-      return matchesSearch && matchesType && matchesStatus && matchesPriority;
+      const targetEq = equipments.find((e) => e.code === int.equipmentCode);
+      const matchesWorkshop = !allowedWorkshop || (targetEq && targetEq.workshop === allowedWorkshop);
+
+      return matchesSearch && matchesType && matchesStatus && matchesPriority && matchesWorkshop;
     });
-  }, [interventions, searchQuery, selectedType, selectedStatus, selectedPriority]);
+  }, [interventions, searchQuery, selectedType, selectedStatus, selectedPriority, allowedWorkshop, equipments]);
 
   const selectedIntervention = useMemo(() => {
     return interventions.find((i) => i.id === selectedIntId) || null;

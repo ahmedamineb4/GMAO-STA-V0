@@ -35,6 +35,7 @@ interface ContractsManagerProps {
   onUpdateContract?: (contract: MaintenanceContract) => void;
   onDeleteContract?: (id: string) => void;
   currentRole?: string;
+  allowedWorkshop?: string;
 }
 
 export default function ContractsManager({
@@ -46,9 +47,30 @@ export default function ContractsManager({
   onAddContract,
   onUpdateContract,
   onDeleteContract,
-  currentRole = "admin"
+  currentRole = "admin",
+  allowedWorkshop
 }: ContractsManagerProps) {
   const TODAY = "2026-07-01";
+
+  // Filtered compliance checks and contracts for workshop isolation
+  const filteredCompliance = useMemo(() => {
+    if (!allowedWorkshop) return compliance;
+    return compliance.filter((c) => {
+      const eq = equipments.find((e) => e.code === c.equipmentCode);
+      return eq && eq.workshop === allowedWorkshop;
+    });
+  }, [compliance, allowedWorkshop, equipments]);
+
+  const filteredContracts = useMemo(() => {
+    if (!allowedWorkshop) return contracts;
+    return contracts.filter((contract) => {
+      if (contract.coveredEquipments.includes("EQ-ALL")) return true;
+      return contract.coveredEquipments.some((eqCode) => {
+        const eq = equipments.find((e) => e.code === eqCode);
+        return eq && eq.workshop === allowedWorkshop;
+      });
+    });
+  }, [contracts, allowedWorkshop, equipments]);
 
   // Modal State for Regulatory check
   const [showAddCheck, setShowAddCheck] = useState(false);
@@ -223,7 +245,7 @@ export default function ContractsManager({
               Engagements Annuels
             </span>
             <span className="text-2xl font-bold font-mono tracking-tight text-neutral-800">
-              {(activeContractsCost ?? 0).toLocaleString()} TND / an
+              {filteredContracts.reduce((sum, c) => sum + c.costAnnual, 0).toLocaleString()} TND / an
             </span>
             <span className="text-xs text-neutral-500 font-medium block mt-0.5">
               Maintenance contractuelle externe
@@ -241,7 +263,7 @@ export default function ContractsManager({
               Contrôles Périodiques
             </span>
             <span className="text-2xl font-bold font-mono tracking-tight text-neutral-800">
-              {compliance.filter((c) => c.status === "Conforme").length} / {compliance.length} Conformes
+              {filteredCompliance.filter((c) => c.status === "Conforme").length} / {filteredCompliance.length} Conformes
             </span>
             <span className="text-xs text-blue-600 font-medium block mt-0.5">
               Inspections de sécurité valides
@@ -260,7 +282,7 @@ export default function ContractsManager({
                 <Award className="h-5 w-5 text-chery-red" />
                 Contrats d'Assistance & Maintenance Externe
               </h3>
-              {onAddContract && (
+              {onAddContract && (currentRole === "admin" || currentRole === "magasin") && (
                 <button
                   onClick={() => setShowAddContract(true)}
                   className="flex items-center gap-1 bg-chery-red hover:bg-chery-dark text-white text-[11px] py-1.5 px-3 rounded-lg font-bold cursor-pointer transition-colors shadow-xs"
@@ -272,10 +294,10 @@ export default function ContractsManager({
             </div>
 
             <div className="space-y-4">
-              {contracts.length === 0 ? (
+              {filteredContracts.length === 0 ? (
                 <p className="text-xs text-neutral-400 italic text-center py-4">Aucun contrat d'assistance répertorié.</p>
               ) : (
-                contracts.map((c) => {
+                filteredContracts.map((c) => {
                   const vendor = vendors.find((v) => v.id === c.vendorId);
                   const hasExpired = new Date(c.endDate) < new Date(TODAY);
 
@@ -418,7 +440,7 @@ export default function ContractsManager({
             </div>
 
             <div className="space-y-4">
-              {compliance.map((cmp) => {
+              {filteredCompliance.map((cmp) => {
                 const nextDate = new Date(cmp.nextInspectionDate);
                 const todayDate = new Date(TODAY);
                 const isOverdue = nextDate < todayDate;

@@ -1709,3 +1709,291 @@ export const INITIAL_PURCHASE_REQUESTS: PurchaseRequest[] = [
     estimatedCost: 290
   }
 ];
+
+// ==========================================
+// DEMO DATA: MODULE PROJETS
+// ==========================================
+
+import {
+  Project,
+  Audit5S,
+  LeanItem,
+  SafetyRecord,
+  QualityRecord,
+  EnvironmentLog
+} from "./types";
+
+export const INITIAL_PROJECTS: Project[] = [
+  {
+    id: "PRJ-2026-01",
+    name: "Modernisation & Automatisation de la Cabine de Peinture",
+    description: "Installation d'un système de ventilation intelligent à variateur de fréquence et passage aux peintures hydrodiluables écologiques.",
+    manager: "M. Ahmed Amine",
+    department: "Carrosserie & Peinture",
+    priority: "Urgent",
+    status: "En cours",
+    startDate: "2026-05-01",
+    endDate: "2026-09-30",
+    budgetPlanned: 85000,
+    budgetReal: 52000,
+    progressPercent: 65,
+    suppliers: ["Blowtherm SRL", "Socomex Tunisie", "EPI Sécurité"],
+    documents: [
+      { id: "doc-1", projectId: "PRJ-2026-01", name: "Cahier_des_charges_cabine_v2.pdf", type: "Cahier des charges", uploadDate: "2026-04-15", author: "Ahmed Amine", fileSize: "2.4 MB" },
+      { id: "doc-2", projectId: "PRJ-2026-01", name: "Plan_Aspiration_Génie_Civil.dwg", type: "Plan", uploadDate: "2026-05-02", author: "Ingénieur Bureau d'étude", fileSize: "8.1 MB" },
+      { id: "doc-3", projectId: "PRJ-2026-01", name: "PV_Reception_Provisoire_Extraction.pdf", type: "PV de réception", uploadDate: "2026-06-20", author: "Ahmed Amine", fileSize: "1.1 MB" }
+    ],
+    photos: [
+      "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=800&auto=format&fit=crop"
+    ],
+    tasks: [
+      { id: "task-101", projectId: "PRJ-2026-01", name: "Étude d'impact & dimensions génie civil", manager: "Bâtiment & Sûreté", startDate: "2026-05-01", endDate: "2026-05-15", durationDays: 15, dependencies: [], priority: "Haute", status: "Terminé", progressPercent: 100 },
+      { id: "task-102", projectId: "PRJ-2026-01", name: "Démontage anciens filtres et gaines", manager: "Atelier Carrosserie", startDate: "2026-05-16", endDate: "2026-05-31", durationDays: 15, dependencies: ["task-101"], priority: "Haute", status: "Terminé", progressPercent: 100 },
+      { id: "task-103", projectId: "PRJ-2026-01", name: "Pose des nouveaux brûleurs à veine d'air", manager: "Prestataire Externe Blowtherm", startDate: "2026-06-01", endDate: "2026-07-15", durationDays: 45, dependencies: ["task-102"], priority: "Urgent", status: "Terminé", progressPercent: 100 },
+      { id: "task-104", projectId: "PRJ-2026-01", name: "Raccordement électrique & Automates VFD", manager: "Karim Gharbi", startDate: "2026-07-16", endDate: "2026-08-20", durationDays: 35, dependencies: ["task-103"], priority: "Haute", status: "En cours", progressPercent: 50 },
+      { id: "task-105", projectId: "PRJ-2026-01", name: "Tests d'étanchéité & Certification Afnor", manager: "Bureau Contrôle Apave", startDate: "2026-08-21", endDate: "2026-09-15", durationDays: 25, dependencies: ["task-104"], priority: "Moyenne", status: "À faire", progressPercent: 0 },
+      { id: "task-106", projectId: "PRJ-2026-01", name: "Formation des peintres aux produits hydro", manager: "Formateur Chery STA", startDate: "2026-09-16", endDate: "2026-09-30", durationDays: 14, dependencies: ["task-105"], priority: "Moyenne", status: "À faire", progressPercent: 0 }
+    ],
+    budgetItems: [
+      { id: "bgt-1", projectId: "PRJ-2026-01", type: "Devis", title: "Brûleur & Gaines d'aspiration Blowtherm", supplier: "Socomex Tunisie", amount: 48000, date: "2026-04-10", roiEstimatedMonths: 18, status: "Validé" },
+      { id: "bgt-2", projectId: "PRJ-2026-01", type: "CAPEX", title: "Projet d'investissement Cabine (Fond propre)", supplier: "Direction Financière STA", amount: 85000, date: "2026-04-01", status: "Validé" },
+      { id: "bgt-3", projectId: "PRJ-2026-01", type: "Dépense", title: "Acompte 50% Matériel & Installation", supplier: "Socomex Tunisie", amount: 24000, date: "2026-05-10", status: "Payé" },
+      { id: "bgt-4", projectId: "PRJ-2026-01", type: "Dépense", title: "Génie civil & Socle béton", supplier: "Entreprise Bâtiment Trabelsi", amount: 12000, date: "2026-05-25", status: "Payé" },
+      { id: "bgt-5", projectId: "PRJ-2026-01", type: "Dépense", title: "Câblage blindé & Variateurs de vitesse Schneider", supplier: "GEP Électrique", amount: 16000, date: "2026-07-10", status: "Payé" }
+    ],
+    risks: [
+      { id: "risk-1", projectId: "PRJ-2026-01", risk: "Retard de livraison du variateur de vitesse VFD depuis l'Europe", probability: "Moyenne", impact: "Fort", priority: "Haute", preventiveAction: "Passage de commande anticipé chez distributeur local Schneider", responsible: "Sami Ben Ali", state: "Mitigé" },
+      { id: "risk-2", projectId: "PRJ-2026-01", risk: "Arrêt temporaire de l'activité carrosserie lors de la coupure de courant", probability: "Élevée", impact: "Moyen", priority: "Modérée", preventiveAction: "Réalisation du raccordement durant le week-end et la nuit", responsible: "Karim Gharbi", state: "En cours" },
+      { id: "risk-3", projectId: "PRJ-2026-01", risk: "Dépassement du niveau sonore réglementaire (>80 dB)", probability: "Faible", impact: "Moyen", priority: "Basse", preventiveAction: "Pose d'un piège à son sur le caisson d'extraction supérieur", responsible: "Bâtiment", state: "Identifié" }
+    ]
+  },
+  {
+    id: "PRJ-2026-02",
+    name: "Mise en place d'une Ligne de Contrôle Technique & Diagnostic Rapide",
+    description: "Aménagement d'un banc de freinage, ripage et suspensions certifié pour la réception active des véhicules clients.",
+    manager: "Mohamed Ben Amor",
+    department: "Service Rapide & Réception",
+    priority: "Haute",
+    status: "En cours",
+    startDate: "2026-06-01",
+    endDate: "2026-10-15",
+    budgetPlanned: 42000,
+    budgetReal: 18500,
+    progressPercent: 40,
+    suppliers: ["Maha Maschinenbau", "AutoEquip Tunisie"],
+    documents: [
+      { id: "doc-201", projectId: "PRJ-2026-02", name: "Projet_Implantation_Banc_Diagnostic.pdf", type: "Plan", uploadDate: "2026-05-20", author: "Mohamed Ben Amor", fileSize: "3.5 MB" }
+    ],
+    photos: [
+      "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?w=800&auto=format&fit=crop"
+    ],
+    tasks: [
+      { id: "task-201", projectId: "PRJ-2026-02", name: "Genie civil & Découpe de la dalle béton", manager: "Ali Trabelsi", startDate: "2026-06-01", endDate: "2026-06-25", durationDays: 25, dependencies: [], priority: "Haute", status: "Terminé", progressPercent: 100 },
+      { id: "task-202", projectId: "PRJ-2026-02", name: "Livraison & Intégration du banc MAHA", manager: "AutoEquip Tunisie", startDate: "2026-07-01", endDate: "2026-08-10", durationDays: 40, dependencies: ["task-201"], priority: "Urgent", status: "En cours", progressPercent: 60 },
+      { id: "task-203", projectId: "PRJ-2026-02", name: "Câblage réseau Ethernet & Écran géant Réception", manager: "Service IT", startDate: "2026-08-11", endDate: "2026-09-05", durationDays: 25, dependencies: ["task-202"], priority: "Moyenne", status: "À faire", progressPercent: 0 }
+    ],
+    budgetItems: [
+      { id: "bgt-201", projectId: "PRJ-2026-02", type: "Devis", title: "Banc de freinage & Plaque de ripage MAHA", supplier: "AutoEquip Tunisie", amount: 32000, date: "2026-05-10", status: "Validé" },
+      { id: "bgt-202", projectId: "PRJ-2026-02", type: "Dépense", title: "Acompte Génie Civil & Réservation fosse", supplier: "Entreprise Trabelsi", amount: 18500, date: "2026-06-05", status: "Payé" }
+    ],
+    risks: [
+      { id: "risk-201", projectId: "PRJ-2026-02", risk: "Infiltration d'eau sous la dalle du fossé", probability: "Moyenne", impact: "Critique", priority: "Critique", preventiveAction: "Application d'une résine époxy d'étanchéité renforcée", responsible: "Ali Trabelsi", state: "En cours" }
+    ]
+  }
+];
+
+// ==========================================
+// DEMO DATA: AMÉLIORATION CONTINUE
+// ==========================================
+
+export const INITIAL_AUDITS_5S: Audit5S[] = [
+  {
+    id: "AUD-5S-2026-01",
+    date: "2026-07-15",
+    workshop: "Service Rapide",
+    auditor: "Ahmed Amine (Consultant TPM/5S)",
+    seiriScore: 18,
+    seitonScore: 17,
+    seisoScore: 19,
+    seiketsuScore: 16,
+    shitsukeScore: 18,
+    totalScore: 88,
+    beforePhoto: "https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?w=600&auto=format&fit=crop",
+    afterPhoto: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop",
+    actionPlan: "1. Marquage au sol de l'emplacement des bacs d'huile usagée.\n2. Étiquetage révisé sur les servantes Facom.",
+    status: "Conforme",
+    comments: "Très bel effort de rangement des outils d'appoint et nettoyage de la fosse."
+  },
+  {
+    id: "AUD-5S-2026-02",
+    date: "2026-07-20",
+    workshop: "Carrosserie",
+    auditor: "Khaled Khelifi",
+    seiriScore: 12,
+    seitonScore: 11,
+    seisoScore: 10,
+    seiketsuScore: 13,
+    shitsukeScore: 12,
+    totalScore: 58,
+    actionPlan: "Evacuation immédiate des anciennes pièces tôlerie métalliques accumulées au fond du poste brossage.",
+    status: "À corriger",
+    comments: "Accumulation de cartons et débris de ponçage près du marbre de redressage."
+  },
+  {
+    id: "AUD-5S-2026-03",
+    date: "2026-07-25",
+    workshop: "Atelier Mécanique",
+    auditor: "Karim Gharbi",
+    seiriScore: 19,
+    seitonScore: 18,
+    seisoScore: 18,
+    seiketsuScore: 18,
+    shitsukeScore: 19,
+    totalScore: 92,
+    status: "Conforme",
+    actionPlan: "Maintien de la dynamique de nettoyage quotidien 10 min avant la fin de journée.",
+    comments: "Excellente tenue de l'atelier, tableau d'outillage spécial Chery parfaitement ordonné."
+  }
+];
+
+export const INITIAL_LEAN_ITEMS: LeanItem[] = [
+  {
+    id: "LEAN-001",
+    type: "Gaspillage (Muda)",
+    mudaCategory: "Mouvements",
+    title: "Trajets inutiles pour récupérer l'outillage spécial diagnostic",
+    workshop: "Atelier Diagnostic",
+    description: "Les techniciens parcourent 120m A/R jusqu'au magasin pour chaque valise de diagnostic Chery iSmart.",
+    author: "Youssef Tounsi",
+    dateAdded: "2026-07-10",
+    status: "En cours",
+    impactScore: "Fort",
+    estimatedSavingTnd: 2400
+  },
+  {
+    id: "LEAN-002",
+    type: "Kaizen",
+    title: "Chariot mobile de vidange rapide multiflux",
+    workshop: "Service Rapide",
+    description: "Création d'un support roulant intégrant la poignée de distribution d'huile et la clé à filtre pour éliminer l'attente.",
+    author: "Mohamed Ben Amor",
+    dateAdded: "2026-07-12",
+    status: "Standardisé",
+    impactScore: "Moyen",
+    estimatedSavingTnd: 1800
+  },
+  {
+    id: "LEAN-003",
+    type: "TPM",
+    title: "Auto-maintenance quotidienne des ponts élévateurs (Niveau 1)",
+    workshop: "Atelier Mécanique",
+    description: "Check-list visuelle 2 min par le technicien avant démarrage : niveau d'huile centrale + graissage des câbles.",
+    author: "Ahmed Amine",
+    dateAdded: "2026-07-18",
+    status: "Appliqué",
+    impactScore: "Fort",
+    estimatedSavingTnd: 5000
+  }
+];
+
+export const INITIAL_SAFETY_RECORDS: SafetyRecord[] = [
+  {
+    id: "SAF-2026-001",
+    type: "Vérification Extincteurs",
+    date: "2026-07-01",
+    location: "Tous les ateliers STA",
+    description: "Contrôle annuel de pression et plombs des 24 extincteurs CO2 & Poudre.",
+    severity: "Mineure",
+    actionPlan: "Remplacement de 2 extincteurs CO2 périmés au niveau du pôle peinture.",
+    responsible: "Ali Trabelsi",
+    status: "Sous contrôle",
+    checkExtinguishersCount: 24
+  },
+  {
+    id: "SAF-2026-002",
+    type: "Quasi-accident",
+    date: "2026-07-14",
+    location: "Atelier Carrosserie",
+    description: "Glissade d'un opérateur due à une flaque de solvant dégraissant non nettoyée au sol.",
+    severity: "Grave",
+    actionPlan: "Fourniture de kits d'absorbant minéral et formation obligatoire au port des chaussures antidérapantes.",
+    responsible: "Khaled Khelifi",
+    status: "Réglé"
+  },
+  {
+    id: "SAF-2026-003",
+    type: "Vérification EPI",
+    date: "2026-07-22",
+    location: "Atelier Diagnostic & Mécanique",
+    description: "Audits du port des lunettes de protection lors des opérations de meulage et soufflage air comprimé.",
+    severity: "Moyenne",
+    actionPlan: "Remplacement systématique des visières rayées.",
+    responsible: "Responsable HSE",
+    status: "Sous contrôle",
+    checkEpiCompliantPercent: 95
+  }
+];
+
+export const INITIAL_QUALITY_RECORDS: QualityRecord[] = [
+  {
+    id: "QUAL-2026-01",
+    type: "Non-conformité",
+    title: "Couple de serrage des roues non tracé sur fiche de réception",
+    workshop: "Service Rapide",
+    date: "2026-07-08",
+    details: "Un technicien a omis de faire valider le double contrôle dynamométrique avant restitution véhicule client.",
+    responsible: "Mohamed Ben Amor",
+    status: "Résolu"
+  },
+  {
+    id: "QUAL-2026-02",
+    type: "Action corrective",
+    title: "Calibrage obligatoire de la clé dynamométrique Facom 40-200Nm",
+    workshop: "Atelier Mécanique",
+    date: "2026-07-19",
+    details: "Certificat d'étalonnage métrologique renouvelé auprès du laboratoire national LNM.",
+    responsible: "Karim Gharbi",
+    status: "Validé"
+  }
+];
+
+export const INITIAL_ENV_LOGS: EnvironmentLog[] = [
+  {
+    id: "ENV-2026-01",
+    category: "Huiles usagées",
+    date: "2026-07-20",
+    value: 850,
+    unit: "Litre",
+    costOrSavingTnd: 425,
+    notes: "Collecte agréée effectuée par l'ECO-LUB Tunisie pour recyclage huiles de vidange."
+  },
+  {
+    id: "ENV-2026-02",
+    category: "Batteries",
+    date: "2026-07-22",
+    value: 18,
+    unit: "Unités",
+    costOrSavingTnd: 270,
+    notes: "Restitution au circuit de recyclage plomb agréé."
+  },
+  {
+    id: "ENV-2026-03",
+    category: "Énergie (Électricité)",
+    date: "2026-07-25",
+    value: 14200,
+    unit: "kWh",
+    costOrSavingTnd: 3550,
+    notes: "Facture mensuelle d'électricité globale pour les 8 ateliers et le showroom."
+  },
+  {
+    id: "ENV-2026-04",
+    category: "Air Comprimé",
+    date: "2026-07-28",
+    value: 8.5,
+    unit: "Bar",
+    costOrSavingTnd: 0,
+    notes: "Contrôle des fuites sur le réseau pneumatique : 3 raccords étanchéifiés sur poste carrosserie."
+  }
+];
+

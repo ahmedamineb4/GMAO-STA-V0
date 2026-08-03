@@ -23,11 +23,12 @@ import {
   Edit2,
   Trash2
 } from "lucide-react";
-import { Vendor, PurchaseRequest } from "../types";
+import { Vendor, PurchaseRequest, Equipment, Workshop } from "../types";
 
 interface PurchasesManagerProps {
   vendors: Vendor[];
   purchaseRequests: PurchaseRequest[];
+  equipments?: Equipment[];
   onAddPurchaseRequest: (req: PurchaseRequest) => void;
   onUpdatePurchaseRequestStatus: (id: string, status: PurchaseRequest["status"]) => void;
   onUpdatePurchaseRequest?: (req: PurchaseRequest) => void;
@@ -35,18 +36,21 @@ interface PurchasesManagerProps {
   onAddVendor: (vendor: Vendor) => void;
   isReadOnly?: boolean;
   currentRole?: string;
+  allowedWorkshop?: Workshop;
 }
 
 export default function PurchasesManager({
   vendors,
   purchaseRequests,
+  equipments = [],
   onAddPurchaseRequest,
   onUpdatePurchaseRequestStatus,
   onUpdatePurchaseRequest,
   onDeletePurchaseRequest,
   onAddVendor,
   isReadOnly = false,
-  currentRole = "admin"
+  currentRole = "admin",
+  allowedWorkshop
 }: PurchasesManagerProps) {
   // Navigation tabs inside Purchases Manager
   const [activeSubTab, setActiveSubTab] = useState<"requests" | "vendors">("requests");
@@ -174,9 +178,14 @@ export default function PurchasesManager({
 
       const matchesStatus = statusFilter === "All" || req.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      const matchesWorkshop =
+        !allowedWorkshop ||
+        req.requestedBy.toLowerCase().includes(allowedWorkshop.toLowerCase()) ||
+        equipments.some((eq) => eq.workshop === allowedWorkshop && eq.name.toLowerCase() === req.equipmentName.toLowerCase());
+
+      return matchesSearch && matchesStatus && matchesWorkshop;
     });
-  }, [purchaseRequests, vendors, searchQuery, statusFilter]);
+  }, [purchaseRequests, vendors, searchQuery, statusFilter, allowedWorkshop, equipments]);
 
   // Filtered vendors
   const filteredVendors = useMemo(() => {
