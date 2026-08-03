@@ -26,8 +26,20 @@ async function findAvailablePort(startPort = 3000) {
 }
 
 async function main() {
-  // 1. Installation et vérification automatique des dépendances
-  const requiredPackages = ['jspdf', 'lucide-react', 'vite', 'react', 'recharts'];
+  // 1. Installation et vérification automatique des dépendances (lecture dynamique de package.json)
+  let requiredPackages = ['express', 'nodemailer', 'jspdf', 'lucide-react', 'vite', 'react', 'recharts', 'dotenv', 'xlsx'];
+  try {
+    const pkgPath = path.join(__dirname, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      const pkgJson = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      if (pkgJson.dependencies) {
+        requiredPackages = Object.keys(pkgJson.dependencies);
+      }
+    }
+  } catch (e) {
+    // Fallback aux packages par défaut
+  }
+
   const missingPackages = requiredPackages.filter(
     pkg => !fs.existsSync(path.join(__dirname, 'node_modules', pkg))
   );
@@ -62,11 +74,38 @@ async function main() {
     }
   }
 
-  // 1b. Verification et compilation automatique du dossier dist si absent
+  // 1b. Verification et compilation automatique du dossier dist si absent ou obsolète
   const distIndexPath = path.join(__dirname, 'dist', 'index.html');
-  if (!fs.existsSync(distIndexPath)) {
+  let needsRebuild = !fs.existsSync(distIndexPath);
+
+  if (!needsRebuild) {
+    try {
+      const distTime = fs.statSync(distIndexPath).mtimeMs;
+      const srcDir = path.join(__dirname, 'src');
+      if (fs.existsSync(srcDir)) {
+        const checkNewer = (dir) => {
+          const files = fs.readdirSync(dir);
+          for (const f of files) {
+            const fullPath = path.join(dir, f);
+            const stat = fs.statSync(fullPath);
+            if (stat.isDirectory()) {
+              if (checkNewer(fullPath)) return true;
+            } else if (stat.mtimeMs > distTime) {
+              return true;
+            }
+          }
+          return false;
+        };
+        needsRebuild = checkNewer(srcDir);
+      }
+    } catch (e) {
+      // Ignorer
+    }
+  }
+
+  if (needsRebuild) {
     console.log("======================================================================");
-    console.log("[INFO] Generation des fichiers d'application (Compilation build)...");
+    console.log("[INFO] Generation des fichiers d'application mis a jour (Compilation build)...");
     console.log("======================================================================");
     try {
       let npmCmd = 'npm';
