@@ -186,7 +186,7 @@ export default function GmaoDashboard({
       }
     });
 
-    // Apave Regulatory Inspections next warning (Contrôles réglementaires)
+    // Regulatory Inspections next warning (Contrôles réglementaires)
     compliance.forEach((comp) => {
       const isExpired = comp.nextInspectionDate < TODAY;
       const isClose = !isExpired && (comp.nextInspectionDate < "2026-08-21" || comp.status === "En attente d'action"); // close within 30 days
@@ -351,7 +351,7 @@ export default function GmaoDashboard({
             Tableau de Bord de Performance Maintenance
           </h1>
           <p className="text-xs text-neutral-300 leading-relaxed max-w-2xl">
-            Suivi en temps réel de la conformité Apave, de la disponibilité opérationnelle du parc machines et du respect des budgets d'atelier.
+            Suivi en temps réel de la conformité réglementaire, de la disponibilité opérationnelle du parc machines et du respect des budgets d'atelier.
           </p>
         </div>
       </div>

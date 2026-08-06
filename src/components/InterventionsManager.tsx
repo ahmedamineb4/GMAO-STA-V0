@@ -34,10 +34,12 @@ import {
   CheckCircle2,
   Lock,
   ThumbsUp,
-  Download
+  Download,
+  ZoomIn
 } from "lucide-react";
 import { Equipment, Intervention, InterventionStatus, InterventionType, SparePart, PartUsed } from "../types";
 import { generateInterventionReportPDF } from "../utils/pdfGenerator";
+import ImageLightboxModal from "./ImageLightboxModal";
 
 interface InterventionsManagerProps {
   interventions: Intervention[];
@@ -111,6 +113,14 @@ export default function InterventionsManager({
 
   // Toast Notifications state (Simulated)
   const [toastNotification, setToastNotification] = useState<{ id: string; text: string; type: "info" | "success" | "warning" } | null>(null);
+
+  // 🖼️ Lightbox Modal state for full-screen photo zoom
+  const [lightboxState, setLightboxState] = useState<{
+    isOpen: boolean;
+    images: string[];
+    initialIndex: number;
+    title?: string;
+  } | null>(null);
 
   const showToast = (text: string, type: "info" | "success" | "warning" = "info") => {
     setToastNotification({ id: String(Date.now()), text, type });
@@ -968,15 +978,29 @@ export default function InterventionsManager({
                   </div>
                   
                   {inspectedPhotos.length > 0 && (
-                    <div className="flex gap-1 overflow-x-auto py-1">
+                    <div className="flex gap-1.5 overflow-x-auto py-1">
                       {inspectedPhotos.map((ph, i) => (
-                        <img
+                        <div
                           key={i}
-                          src={ph}
-                          alt="Preuve"
-                          referrerPolicy="no-referrer"
-                          className="h-10 w-16 object-cover rounded border border-neutral-200 shrink-0 bg-neutral-50"
-                        />
+                          onClick={() => setLightboxState({
+                            isOpen: true,
+                            images: inspectedPhotos,
+                            initialIndex: i,
+                            title: `Intervention ${selectedIntervention.id} - Photo ${i + 1}`
+                          })}
+                          className="relative group h-11 w-16 rounded-lg overflow-hidden border border-neutral-200 shrink-0 bg-neutral-900 cursor-pointer shadow-2xs hover:border-chery-red transition-all"
+                          title="Cliquer pour agrandir et zoomer la photo"
+                        >
+                          <img
+                            src={ph}
+                            alt="Preuve"
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-200"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ZoomIn className="h-3.5 w-3.5 text-white drop-shadow-md" />
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -1274,6 +1298,17 @@ export default function InterventionsManager({
             </form>
           </div>
         </div>
+      )}
+
+      {/* 🖼️ High-Res Image Lightbox Modal */}
+      {lightboxState && (
+        <ImageLightboxModal
+          isOpen={lightboxState.isOpen}
+          onClose={() => setLightboxState(null)}
+          images={lightboxState.images}
+          initialIndex={lightboxState.initialIndex}
+          title={lightboxState.title}
+        />
       )}
     </div>
   );

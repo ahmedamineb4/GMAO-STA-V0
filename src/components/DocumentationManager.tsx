@@ -71,7 +71,7 @@ export default function DocumentationManager({
       size: "1.4 MB",
       description: "Instructions détaillées de sécurité et d'inspection pour les ponts élévateurs de marque Ravaglioli en zone Service Rapide.",
       versions: [
-        { version: "V2.1", date: "2026-02-15", comment: "Mise à jour suite aux recommandations de l'Apave Tunisie.", author: "M. Ahmed Amine" },
+        { version: "V2.1", date: "2026-02-15", comment: "Mise à jour suite aux recommandations de l'organisme de contrôle agréé.", author: "M. Ahmed Amine" },
         { version: "V1.0", date: "2024-05-10", comment: "Création initiale de la procédure.", author: "M. Ahmed Amine" }
       ]
     },

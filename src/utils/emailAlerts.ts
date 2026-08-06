@@ -111,8 +111,28 @@ export function sendEmailAlert(params: {
     })
   }).then(res => res.json()).then(data => {
     console.log("[EMAIL DISPATCH RESULT]", data);
+    if (!data.success) {
+      window.dispatchEvent(
+        new CustomEvent("chery_email_alert_error", {
+          detail: {
+            recipient: targetRecipient,
+            error: data.error || data.message || "Échec SMTP",
+            alertId: newAlert.id
+          }
+        })
+      );
+    }
   }).catch(err => {
     console.warn("[EMAIL DISPATCH API ERROR]", err);
+    window.dispatchEvent(
+      new CustomEvent("chery_email_alert_error", {
+        detail: {
+          recipient: targetRecipient,
+          error: "Impossible de contacter le serveur d'envoi d'emails API.",
+          alertId: newAlert.id
+        }
+      })
+    );
   });
 
   return newAlert;

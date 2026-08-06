@@ -21,7 +21,8 @@ import {
   Clock,
   Edit2,
   Trash2,
-  X
+  X,
+  Lock
 } from "lucide-react";
 import { Vendor, MaintenanceContract, ComplianceCheck, Equipment } from "../types";
 
@@ -51,6 +52,14 @@ export default function ContractsManager({
   allowedWorkshop
 }: ContractsManagerProps) {
   const TODAY = "2026-07-01";
+
+  // Chefs d'atelier CANNOT modify "Contrats d'Assistance & Maintenance Externe"
+  const canModifyContracts = useMemo(() => {
+    if (allowedWorkshop) return false;
+    // Chefs d'atelier roles or any non-admin/non-magasin roles
+    const isChefAtelier = currentRole !== "admin" && currentRole !== "magasin";
+    return !isChefAtelier;
+  }, [currentRole, allowedWorkshop]);
 
   // Filtered compliance checks and contracts for workshop isolation
   const filteredCompliance = useMemo(() => {
@@ -100,6 +109,10 @@ export default function ContractsManager({
   const [editEquipments, setEditEquipments] = useState<string>("");
 
   const handleStartEditContract = (c: MaintenanceContract) => {
+    if (!canModifyContracts) {
+      alert("⛔ Accès restreint : Les Chefs d'Atelier ne sont pas autorisés à modifier les Contrats d'Assistance & Maintenance Externe.");
+      return;
+    }
     setEditingContract(c);
     setEditTitle(c.title);
     setEditVendorId(c.vendorId);
@@ -113,6 +126,10 @@ export default function ContractsManager({
 
   const handleAddContractSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canModifyContracts) {
+      alert("⛔ Accès restreint : Les Chefs d'Atelier ne sont pas autorisés à créer des Contrats d'Assistance & Maintenance Externe.");
+      return;
+    }
     if (!contractTitle || !contractVendorId || !onAddContract) return;
     const eqList = contractEquipments
       .split(",")
@@ -139,6 +156,10 @@ export default function ContractsManager({
 
   const handleEditContractSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canModifyContracts) {
+      alert("⛔ Accès restreint : Les Chefs d'Atelier ne sont pas autorisés à modifier les Contrats d'Assistance & Maintenance Externe.");
+      return;
+    }
     if (!editingContract || !onUpdateContract) return;
     const eqList = editEquipments
       .split(",")
@@ -160,7 +181,7 @@ export default function ContractsManager({
   };
 
   const handleDeleteContractAction = (c: MaintenanceContract) => {
-    if (currentRole !== "admin") {
+    if (!canModifyContracts || currentRole !== "admin") {
       alert("⛔ Seul l'Administrateur est autorisé à supprimer un contrat de maintenance.");
       return;
     }
@@ -277,19 +298,26 @@ export default function ContractsManager({
         <div className="space-y-6">
           {/* Contracts Section */}
           <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
               <h3 className="text-sm font-bold text-neutral-800 flex items-center gap-2">
                 <Award className="h-5 w-5 text-chery-red" />
                 Contrats d'Assistance & Maintenance Externe
               </h3>
-              {onAddContract && (currentRole === "admin" || currentRole === "magasin") && (
-                <button
-                  onClick={() => setShowAddContract(true)}
-                  className="flex items-center gap-1 bg-chery-red hover:bg-chery-dark text-white text-[11px] py-1.5 px-3 rounded-lg font-bold cursor-pointer transition-colors shadow-xs"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Nouveau Contrat
-                </button>
+              {canModifyContracts ? (
+                onAddContract && (
+                  <button
+                    onClick={() => setShowAddContract(true)}
+                    className="flex items-center gap-1 bg-chery-red hover:bg-chery-dark text-white text-[11px] py-1.5 px-3 rounded-lg font-bold cursor-pointer transition-colors shadow-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Nouveau Contrat
+                  </button>
+                )
+              ) : (
+                <span className="text-[11px] font-semibold text-neutral-600 bg-amber-50/80 text-amber-800 px-2.5 py-1 rounded-md border border-amber-200/80 flex items-center gap-1.5 shadow-2xs" title="Les Chefs d'Atelier ne peuvent pas modifier les contrats d'assistance">
+                  <Lock className="h-3.5 w-3.5 text-amber-600" />
+                  Lecture seule (Chefs d'Atelier)
+                </span>
               )}
             </div>
 
@@ -324,8 +352,8 @@ export default function ContractsManager({
                             {hasExpired ? "Expiré" : c.status}
                           </span>
 
-                          {/* Edit Contract */}
-                          {onUpdateContract && (
+                          {/* Edit Contract (Restricted for Chefs d'Atelier) */}
+                          {canModifyContracts && onUpdateContract && (
                             <button
                               onClick={() => handleStartEditContract(c)}
                               className="bg-neutral-100 hover:bg-neutral-200 text-neutral-700 p-1 rounded text-[10px] border border-neutral-200 cursor-pointer transition-colors"
@@ -428,7 +456,7 @@ export default function ContractsManager({
                   <FileCheck className="h-5 w-5 text-blue-600" />
                   Sécurité & Contrôles Réglementaires Obligatoires
                 </h3>
-                <p className="text-xs text-neutral-500">Inspections techniques (Apave, SGS) de la concession</p>
+                <p className="text-xs text-neutral-500">Inspections techniques & organismes de contrôle agréés</p>
               </div>
               <button
                 onClick={() => setShowAddCheck(true)}

@@ -1460,15 +1460,6 @@ export const INITIAL_INTERVENTIONS: Intervention[] = [
 
 export const INITIAL_VENDORS: Vendor[] = [
   {
-    id: "VND-APAVE",
-    name: "Apave Tunisie",
-    serviceType: "Organisme d'Inspection Réglementaire",
-    phone: "+216 71 889 400",
-    email: "contact@apave.com.tn",
-    contactPerson: "Kamel Ben Amor",
-    rating: 5
-  },
-  {
     id: "VND-SGS",
     name: "SGS Tunisie",
     serviceType: "Contrôles réglementaires et Étalonnage",
@@ -1532,7 +1523,7 @@ export const INITIAL_CONTRACTS: MaintenanceContract[] = [
   {
     id: "CON-2026-03",
     title: "Contrat d'inspection périodique obligatoire (Ponts élévateurs)",
-    vendorId: "VND-APAVE",
+    vendorId: "VND-SGS",
     costAnnual: 1800,
     startDate: "2026-03-01",
     endDate: "2027-03-01",
@@ -1547,21 +1538,21 @@ export const INITIAL_COMPLIANCE_CHECKS: ComplianceCheck[] = [
     id: "CMP-2026-01",
     equipmentCode: "EQ-SR-05",
     title: "Contrôle d'épreuve de charge de pont élévateur",
-    bodyName: "Apave Tunisie",
+    bodyName: "SGS Tunisie",
     inspectionDate: "2026-04-10",
     nextInspectionDate: "2026-10-10",
     status: "Conforme",
-    reportRef: "AP-PV-9921/2026"
+    reportRef: "PV-CTRL-9921/2026"
   },
   {
     id: "CMP-2026-02",
     equipmentCode: "EQ-AM-13",
     title: "Contrôle électrique et organes de sécurité de pont",
-    bodyName: "Apave Tunisie",
+    bodyName: "SGS Tunisie",
     inspectionDate: "2026-04-10",
     nextInspectionDate: "2026-10-10",
     status: "Conforme",
-    reportRef: "AP-PV-9922/2026"
+    reportRef: "PV-CTRL-9922/2026"
   },
   {
     id: "CMP-2026-03",

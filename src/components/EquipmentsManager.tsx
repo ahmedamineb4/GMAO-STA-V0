@@ -58,6 +58,7 @@ import { WORKSHOPS } from "../data";
 import { generateEquipmentBreakdownPDF } from "../utils/pdfGenerator";
 import { generateEquipmentImportTemplate, parseEquipmentExcelFile } from "../utils/excelGenerator";
 import { sendEmailAlert } from "../utils/emailAlerts";
+import ImageLightboxModal from "./ImageLightboxModal";
 
 interface EquipmentsManagerProps {
   equipments: Equipment[];
@@ -174,6 +175,7 @@ export default function EquipmentsManager({
   const [quickPriority, setQuickPriority] = useState<"Faible" | "Moyenne" | "Haute" | "Critique">("Moyenne");
   const [quickDuration, setQuickDuration] = useState(2);
   const [quickLaborCost, setQuickLaborCost] = useState(120);
+  const [quickPhotos, setQuickPhotos] = useState<string[]>([]);
 
   // Associated Document Form State inside sheet
   const [showAddDocForm, setShowAddDocForm] = useState(false);
@@ -183,6 +185,12 @@ export default function EquipmentsManager({
 
   // Simulated photos store & management
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [lightboxState, setLightboxState] = useState<{
+    isOpen: boolean;
+    images: string[];
+    initialIndex: number;
+    title?: string;
+  } | null>(null);
   const [showUrlPhotoInput, setShowUrlPhotoInput] = useState(false);
   const [urlPhotoInput, setUrlPhotoInput] = useState("");
   const [replaceTargetIndex, setReplaceTargetIndex] = useState<number | null>(null);
@@ -510,7 +518,8 @@ export default function EquipmentsManager({
       technician: techName,
       status: "Nouvelle",
       partsUsed: [],
-      priority: quickPriority || "Haute"
+      priority: quickPriority || "Haute",
+      photos: quickPhotos
     };
 
     // Update equipment status to En Panne & create ticket
@@ -535,6 +544,7 @@ export default function EquipmentsManager({
     setQuickTitle("");
     setQuickDesc("");
     setQuickTech("");
+    setQuickPhotos([]);
     setDetailTab("history");
     alert(`Panne déclarée avec succès pour l'équipement ${selectedEquipment.code}. Un ticket d'intervention Corrective a été créé et l'email d'alerte a été transmis.`);
   };
@@ -785,7 +795,12 @@ export default function EquipmentsManager({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (firstPhoto) {
-                              setPreviewPhotoUrl(firstPhoto);
+                              setLightboxState({
+                                isOpen: true,
+                                images: activePhotos,
+                                initialIndex: 0,
+                                title: `Photo - ${eq.name} (${eq.code})`
+                              });
                             } else {
                               setSelectedEqCode(eq.code);
                               setDetailTab("photos");
@@ -1432,11 +1447,16 @@ export default function EquipmentsManager({
                               {/* Zoom / Fullscreen */}
                               <button
                                 type="button"
-                                onClick={() => setPreviewPhotoUrl(photo)}
+                                onClick={() => setLightboxState({
+                                  isOpen: true,
+                                  images: getActivePhotos(selectedEquipment.code),
+                                  initialIndex: index,
+                                  title: `Équipement ${selectedEquipment.code} - Photo ${index + 1}`
+                                })}
                                 className="p-1.5 rounded-lg bg-white/90 text-slate-800 hover:bg-white transition-all cursor-pointer shadow-md"
-                                title="Agrandir la photo"
+                                title="Agrandir et zoomer la photo"
                               >
-                                <Eye className="h-3.5 w-3.5" />
+                                <ZoomIn className="h-3.5 w-3.5" />
                               </button>
 
                               {/* Replace / Edit photo */}
@@ -1899,10 +1919,88 @@ export default function EquipmentsManager({
                 </div>
               </div>
 
+              {/* Photo Attachment */}
+              <div className="space-y-1.5">
+                <label className="block font-bold text-neutral-600 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Camera className="h-4 w-4 text-chery-red" />
+                    <span>Photo de la panne / Dégât (Optionnel) :</span>
+                  </span>
+                  {quickPhotos.length > 0 && (
+                    <span className="text-[10px] text-chery-red font-bold">
+                      {quickPhotos.length} photo(s)
+                    </span>
+                  )}
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 border border-dashed border-neutral-300 text-neutral-700 font-bold text-xs py-2 px-3 rounded-lg cursor-pointer transition-colors">
+                    <ImageIcon className="h-4 w-4 text-chery-red" />
+                    <span>Prendre / Joindre Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        if (!files || files.length === 0) return;
+                        (Array.from(files) as File[]).forEach((file) => {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            if (ev.target?.result) {
+                              setQuickPhotos((prev) => [...prev, ev.target!.result as string]);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        });
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+
+                  {quickPhotos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {quickPhotos.map((img, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => setLightboxState({
+                            isOpen: true,
+                            images: quickPhotos,
+                            initialIndex: idx,
+                            title: `Déclaration Panne - Photo ${idx + 1}`
+                          })}
+                          className="relative group h-10 w-14 rounded-md overflow-hidden border border-neutral-200 bg-black/5 shrink-0 cursor-pointer"
+                          title="Cliquer pour agrandir et zoomer la photo"
+                        >
+                          <img src={img} alt={`Panne ${idx}`} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-200" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ZoomIn className="h-3 w-3 text-white drop-shadow-sm" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQuickPhotos((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="absolute top-0.5 right-0.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-0.5 shadow-md cursor-pointer transition-transform hover:scale-110 z-10"
+                            title="Supprimer la photo"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowDeclarePanneModal(false)}
+                  onClick={() => {
+                    setShowDeclarePanneModal(false);
+                    setQuickPhotos([]);
+                  }}
                   className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 py-2.5 rounded-xl cursor-pointer"
                 >
                   Annuler
@@ -2373,38 +2471,25 @@ export default function EquipmentsManager({
       )}
 
       {/* 🖼️ High-Res Photo Lightbox Preview Modal */}
-      {previewPhotoUrl && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setPreviewPhotoUrl(null)}
-        >
-          <div
-            className="relative max-w-4xl w-full bg-slate-900 border border-slate-700/80 rounded-2xl overflow-hidden shadow-2xl p-2 flex flex-col items-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-full flex justify-between items-center px-4 py-2 text-white border-b border-slate-800">
-              <span className="text-xs font-bold flex items-center gap-2">
-                <Camera className="h-4 w-4 text-blue-400" />
-                Aperçu Photo Équipement ({selectedEquipment?.code})
-              </span>
-              <button
-                type="button"
-                onClick={() => setPreviewPhotoUrl(null)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="p-4 max-h-[80vh] overflow-auto flex items-center justify-center w-full bg-slate-950/50">
-              <img
-                src={previewPhotoUrl}
-                alt="Agrandissement photo machine"
-                referrerPolicy="no-referrer"
-                className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl border border-slate-800"
-              />
-            </div>
-          </div>
-        </div>
+      {lightboxState && (
+        <ImageLightboxModal
+          isOpen={lightboxState.isOpen}
+          onClose={() => setLightboxState(null)}
+          images={lightboxState.images}
+          initialIndex={lightboxState.initialIndex}
+          title={lightboxState.title}
+        />
+      )}
+
+      {/* Fallback legacy previewPhotoUrl if still triggered */}
+      {previewPhotoUrl && !lightboxState && (
+        <ImageLightboxModal
+          isOpen={true}
+          onClose={() => setPreviewPhotoUrl(null)}
+          images={[previewPhotoUrl]}
+          initialIndex={0}
+          title={`Aperçu Photo - ${selectedEquipment?.code || "Équipement"}`}
+        />
       )}
     </div>
   );

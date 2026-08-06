@@ -19,13 +19,13 @@ import {
   ChevronDown,
   ShoppingCart,
   Building,
+  FolderKanban,
   Calendar,
   Sliders,
   ShieldCheck,
   HelpCircle,
   Menu,
   X,
-  Presentation,
   LogOut,
   History,
   AlertTriangle,
@@ -34,7 +34,10 @@ import {
   Search,
   Command,
   Sparkles,
-  Terminal
+  Terminal,
+  Camera,
+  Image as ImageIcon,
+  ZoomIn
 } from "lucide-react";
 
 // Types & Initial Data
@@ -92,6 +95,7 @@ import CheryStaLogo from "./components/CheryStaLogo";
 import DeveloperConsoleModal from "./components/DeveloperConsoleModal";
 import ProjectsManager from "./components/ProjectsManager";
 import ContinuousImprovementManager from "./components/ContinuousImprovementManager";
+import ImageLightboxModal from "./components/ImageLightboxModal";
 
 export default function App() {
   // Navigation State
@@ -107,6 +111,14 @@ export default function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
   const [devConsoleOpen, setDevConsoleOpen] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
+
+  // 🖼️ Lightbox Modal state for full-screen photo zoom
+  const [lightboxState, setLightboxState] = useState<{
+    isOpen: boolean;
+    images: string[];
+    initialIndex: number;
+    title?: string;
+  } | null>(null);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -132,6 +144,7 @@ export default function App() {
   const [alertTitle, setAlertTitle] = useState<string>("");
   const [alertDesc, setAlertDesc] = useState<string>("");
   const [alertPriority, setAlertPriority] = useState<"Faible" | "Moyenne" | "Haute" | "Critique">("Moyenne");
+  const [alertPhotos, setAlertPhotos] = useState<string[]>([]);
 
   // 🏢 State for Building Anomaly Reporting Modal (Authentication Page & Quick Portal)
   const [showBuildingAnomalyModal, setShowBuildingAnomalyModal] = useState<boolean>(false);
@@ -142,6 +155,7 @@ export default function App() {
   const [anomalyReporter, setAnomalyReporter] = useState<string>("");
   const [anomalyPhone, setAnomalyPhone] = useState<string>("");
   const [anomalyPriority, setAnomalyPriority] = useState<"Faible" | "Moyenne" | "Haute" | "Critique">("Moyenne");
+  const [anomalyPhotos, setAnomalyPhotos] = useState<string[]>([]);
 
   // Status of disk database synchronization
   const [diskSyncStatus, setDiskSyncStatus] = useState<"synced" | "syncing" | "error" | "idle">("idle");
@@ -467,8 +481,18 @@ export default function App() {
         }, 8000);
       }
     };
+    const handleEmailAlertError = (e: Event) => {
+      const customEv = e as CustomEvent<{ recipient: string; error: string; alertId: string }>;
+      if (customEv.detail) {
+        showToast(`⚠️ Diagnostic Email : ${customEv.detail.error}`, "error");
+      }
+    };
     window.addEventListener("chery_email_alert_triggered", handleEmailAlert);
-    return () => window.removeEventListener("chery_email_alert_triggered", handleEmailAlert);
+    window.addEventListener("chery_email_alert_error", handleEmailAlertError);
+    return () => {
+      window.removeEventListener("chery_email_alert_triggered", handleEmailAlert);
+      window.removeEventListener("chery_email_alert_error", handleEmailAlertError);
+    };
   }, []);
 
   useEffect(() => {
@@ -952,7 +976,8 @@ export default function App() {
       technician: alertTech || "Technicien STA",
       status: "Nouvelle",
       partsUsed: [],
-      priority: alertPriority
+      priority: alertPriority,
+      photos: alertPhotos
     };
 
     // 2. Add intervention
@@ -976,6 +1001,7 @@ export default function App() {
     setAlertTitle("");
     setAlertDesc("");
     setAlertPriority("Moyenne");
+    setAlertPhotos([]);
 
     // Navigate to the equipment list to show the panne state
     setActiveTab("equipements");
@@ -1022,7 +1048,8 @@ export default function App() {
       status: "Nouvelle",
       partsUsed: [],
       priority: anomalyPriority,
-      executorType: "Interne"
+      executorType: "Interne",
+      photos: anomalyPhotos
     };
 
     // Add intervention
@@ -1042,6 +1069,7 @@ export default function App() {
 
     // Set success view
     setBuildingAnomalySuccess(ticketNumber);
+    setAnomalyPhotos([]);
   };
 
   // -------------------------------------------------------------
@@ -1962,10 +1990,88 @@ export default function App() {
                     </select>
                   </div>
 
+                  {/* Photo Attachment / Capture */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-neutral-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Camera className="h-4 w-4 text-blue-400" />
+                        <span>Photo / Preuve visuelle de l'anomalie (Optionnel) :</span>
+                      </span>
+                      {anomalyPhotos.length > 0 && (
+                        <span className="text-[10px] text-blue-300 font-bold">
+                          {anomalyPhotos.length} photo(s)
+                        </span>
+                      )}
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-dashed border-neutral-600 text-neutral-200 font-semibold text-xs py-2 px-3 rounded-xl cursor-pointer transition-colors shadow-xs">
+                        <ImageIcon className="h-4 w-4 text-blue-400" />
+                        <span>Prendre / Joindre Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = e.target.files;
+                            if (!files || files.length === 0) return;
+                            (Array.from(files) as File[]).forEach((file) => {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                if (ev.target?.result) {
+                                  setAnomalyPhotos((prev) => [...prev, ev.target!.result as string]);
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            });
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+
+                      {anomalyPhotos.length > 0 && (
+                        <div className="flex flex-wrap gap-2 items-center">
+                          {anomalyPhotos.map((img, idx) => (
+                            <div
+                              key={idx}
+                              onClick={() => setLightboxState({
+                                isOpen: true,
+                                images: anomalyPhotos,
+                                initialIndex: idx,
+                                title: `Anomalie Bâtiment - Photo ${idx + 1}`
+                              })}
+                              className="relative group h-11 w-14 rounded-lg overflow-hidden border border-white/20 bg-black/40 shadow-xs shrink-0 cursor-pointer"
+                              title="Cliquer pour agrandir et zoomer la photo"
+                            >
+                              <img src={img} alt={`Anomalie ${idx}`} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-200" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <ZoomIn className="h-3.5 w-3.5 text-white drop-shadow-sm" />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAnomalyPhotos((prev) => prev.filter((_, i) => i !== idx));
+                                }}
+                                className="absolute top-0.5 right-0.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-0.5 shadow-md cursor-pointer transition-transform hover:scale-110 z-10"
+                                title="Supprimer la photo"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="flex gap-3 pt-2 border-t border-white/10">
                     <button
                       type="button"
-                      onClick={() => setShowBuildingAnomalyModal(false)}
+                      onClick={() => {
+                        setShowBuildingAnomalyModal(false);
+                        setAnomalyPhotos([]);
+                      }}
                       className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 text-xs font-bold py-3 rounded-2xl cursor-pointer transition-colors"
                     >
                       Annuler
@@ -2412,7 +2518,7 @@ export default function App() {
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <Presentation className="h-4 w-4" />
+                  <FolderKanban className="h-4 w-4" />
                   <span>📌 Projets & Chantier</span>
                 </div>
                 <ChevronRight className={`h-3 w-3 opacity-30 ${activeTab === "projets" ? "opacity-100" : ""}`} />
@@ -2584,7 +2690,7 @@ export default function App() {
                     { id: "interventions", label: "📋 Interventions & Maintenance", icon: FileText },
                     ...(canAccessProjetsAndAmelioration
                       ? [
-                          { id: "projets", label: "📌 Projets & Chantier", icon: Presentation },
+                          { id: "projets", label: "📌 Projets & Chantier", icon: FolderKanban },
                           { id: "amelioration", label: "🌱 Amélioration Continue", icon: Sparkles }
                         ]
                       : []),
@@ -3096,6 +3202,81 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Photo Attachment / Capture */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-neutral-600 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Camera className="h-4 w-4 text-chery-red" />
+                    <span>Photo de la panne / Dégât constaté (Optionnel) :</span>
+                  </span>
+                  {alertPhotos.length > 0 && (
+                    <span className="text-[10px] text-chery-red font-bold">
+                      {alertPhotos.length} photo(s)
+                    </span>
+                  )}
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 bg-neutral-100 hover:bg-neutral-200 border border-dashed border-neutral-300 text-neutral-700 hover:text-black font-bold text-xs py-2.5 px-4 rounded-xl cursor-pointer transition-colors shadow-xs">
+                    <ImageIcon className="h-4 w-4 text-chery-red" />
+                    <span>Prendre / Choisir Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        if (!files || files.length === 0) return;
+                        (Array.from(files) as File[]).forEach((file) => {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            if (ev.target?.result) {
+                              setAlertPhotos((prev) => [...prev, ev.target!.result as string]);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        });
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+
+                  {alertPhotos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {alertPhotos.map((img, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => setLightboxState({
+                            isOpen: true,
+                            images: alertPhotos,
+                            initialIndex: idx,
+                            title: `Panne & Dégât - Photo ${idx + 1}`
+                          })}
+                          className="relative group h-12 w-16 rounded-lg overflow-hidden border border-neutral-300 bg-black/5 shadow-xs shrink-0 cursor-pointer"
+                          title="Cliquer pour agrandir et zoomer la photo"
+                        >
+                          <img src={img} alt={`Panne ${idx}`} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-200" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ZoomIn className="h-3.5 w-3.5 text-white drop-shadow-sm" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAlertPhotos((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="absolute top-0.5 right-0.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-0.5 shadow-md cursor-pointer transition-transform hover:scale-110 z-10"
+                            title="Supprimer la photo"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Form Action Buttons */}
               <div className="flex gap-3 pt-3 border-t border-neutral-100">
                 <button
@@ -3104,6 +3285,7 @@ export default function App() {
                     setShowGlobalAlertModal(false);
                     setAlertTitle("");
                     setAlertDesc("");
+                    setAlertPhotos([]);
                   }}
                   className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-bold py-3 rounded-xl cursor-pointer transition-colors"
                 >
@@ -3221,6 +3403,17 @@ export default function App() {
           </p>
         </div>
       </footer>
+
+      {/* 🖼️ High-Res Image Lightbox Modal */}
+      {lightboxState && (
+        <ImageLightboxModal
+          isOpen={lightboxState.isOpen}
+          onClose={() => setLightboxState(null)}
+          images={lightboxState.images}
+          initialIndex={lightboxState.initialIndex}
+          title={lightboxState.title}
+        />
+      )}
     </div>
   );
 }
