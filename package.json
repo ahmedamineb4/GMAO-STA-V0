@@ -1,14 +1,43 @@
 {
-  "name": "react-example",
+  "name": "gmao-sta-chery",
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "main": "electron-main.js",
   "scripts": {
     "dev": "node server.js",
     "build": "vite build",
     "start": "node server.js",
+    "electron": "electron .",
+    "build:exe": "vite build && npx electron-builder --win nsis",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
+  },
+  "build": {
+    "appId": "com.sta.gmao",
+    "productName": "GMAO STA Chery Tunisie",
+    "directories": {
+      "output": "dist-exe"
+    },
+    "files": [
+      "dist/**/*",
+      "server.js",
+      "electron-main.js",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GMAO STA Chery"
+    }
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
