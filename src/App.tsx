@@ -2824,6 +2824,11 @@ export default function App() {
           {activeTab === "projets" && canAccessProjetsAndAmelioration && (
             <ProjectsManager
               projects={projects}
+              audits5s={audits5s}
+              leanItems={leanItems}
+              safetyRecords={safetyRecords}
+              qualityRecords={qualityRecords}
+              environmentLogs={environmentLogs}
               onAddProject={handleAddProject}
               onUpdateProject={handleUpdateProject}
               onDeleteProject={handleDeleteProject}
@@ -2834,6 +2839,7 @@ export default function App() {
 
           {activeTab === "amelioration" && canAccessProjetsAndAmelioration && (
             <ContinuousImprovementManager
+              projects={projects}
               audits5s={audits5s}
               leanItems={leanItems}
               safetyRecords={safetyRecords}

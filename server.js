@@ -15,13 +15,18 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
 
   // Dossier local pour stocker les sauvegardes de secours
-  const backupFolder = path.join(process.cwd(), "sauvegardes");
+  let backupFolder = path.join(process.cwd(), "sauvegardes");
   try {
     if (!fs.existsSync(backupFolder)) {
       fs.mkdirSync(backupFolder, { recursive: true });
     }
   } catch (err) {
-    console.warn("[GMAO SERVER] Impossible de creer le dossier de sauvegarde:", err);
+    // Si process.cwd() est en lecture seule (ex: Program Files), utiliser AppData
+    const appData = process.env.APPDATA || process.env.HOME || ".";
+    backupFolder = path.join(appData, "GMAO-STA-Chery", "sauvegardes");
+    if (!fs.existsSync(backupFolder)) {
+      fs.mkdirSync(backupFolder, { recursive: true });
+    }
   }
 
   // 1. Endpoint pour enregistrer la sauvegarde automatique sur le disque dur
@@ -359,11 +364,17 @@ async function startServer() {
 
 
   // Serveur de fichiers de production (dist) ou fallback Vite
-  const distPath = path.join(process.cwd(), "dist");
+  const possibleDistPaths = [
+    path.join(__dirname, "dist"),
+    path.join(process.cwd(), "dist"),
+    path.join(__dirname, "../dist")
+  ];
+
+  const distPath = possibleDistPaths.find(p => fs.existsSync(path.join(p, "index.html"))) || path.join(__dirname, "dist");
   const hasDist = fs.existsSync(path.join(distPath, "index.html"));
 
-  if (hasDist || process.env.NODE_ENV === "production") {
-    console.log("[GMAO SERVER] Mode Production : Fichiers compiles detectes (dist). Zero plantage.");
+  if (hasDist) {
+    console.log("[GMAO SERVER] Mode Production : Fichiers compiles detectes dans", distPath);
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
@@ -381,7 +392,11 @@ async function startServer() {
       console.warn("[GMAO SERVER] Vite indisponible. Service du dossier dist par defaut.");
       app.use(express.static(distPath));
       app.get("*", (req, res) => {
-        res.sendFile(path.join(distPath, "index.html"));
+        if (fs.existsSync(path.join(distPath, "index.html"))) {
+          res.sendFile(path.join(distPath, "index.html"));
+        } else {
+          res.status(404).send("<h1>Erreur : Fichier index.html introuvable</h1><p>Veuillez exécuter <code>npm run build</code> avant de démarrer l'application.</p>");
+        }
       });
     }
   }

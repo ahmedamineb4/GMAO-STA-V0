@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -41,7 +41,13 @@ import {
   Download,
   FileSpreadsheet,
   Database,
-  FileCode
+  FileCode,
+  Search,
+  Calendar,
+  Filter,
+  X,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { Equipment, Intervention, SparePart, ComplianceCheck, BudgetYear, Workshop, PurchaseRequest, MaintenanceContract, Vendor } from "../types";
 import { generateSTAExcelFile } from "../utils/excelGenerator";
@@ -79,6 +85,63 @@ export default function GmaoDashboard({
   // Current static reference date (July 2026)
   const TODAY = "2026-07-21";
 
+  // State for dynamic period filter & intelligent omnibar search & alerts pagination
+  const [periodFilter, setPeriodFilter] = useState<"all" | "month" | "quarter" | "year">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
+
+  // Filter interventions dynamically by selected date period
+  const filteredInterventions = useMemo(() => {
+    if (periodFilter === "all") return interventions;
+
+    return interventions.filter((int) => {
+      const date = int.dateIntervention;
+      if (!date) return true;
+
+      if (periodFilter === "month") {
+        // Current month (2026-07)
+        return date.startsWith("2026-07");
+      }
+      if (periodFilter === "quarter") {
+        // Q3 2026 (July, August, September)
+        return date.startsWith("2026-07") || date.startsWith("2026-08") || date.startsWith("2026-09");
+      }
+      if (periodFilter === "year") {
+        // Year 2026
+        return date.startsWith("2026");
+      }
+      return true;
+    });
+  }, [interventions, periodFilter]);
+
+  // Intelligent Search (Omnibar) across Equipments, Interventions, Spare Parts
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return { equipments: [], interventions: [], spareParts: [] };
+
+    const matchingEquipments = equipments.filter(
+      (e) => e.code.toLowerCase().includes(q) || e.name.toLowerCase().includes(q) || e.workshop.toLowerCase().includes(q)
+    ).slice(0, 3);
+
+    const matchingInterventions = interventions.filter(
+      (i) =>
+        i.id.toLowerCase().includes(q) ||
+        i.title.toLowerCase().includes(q) ||
+        i.equipmentCode.toLowerCase().includes(q) ||
+        i.technician.toLowerCase().includes(q)
+    ).slice(0, 3);
+
+    const matchingSpareParts = spareParts.filter(
+      (p) => p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
+    ).slice(0, 3);
+
+    return {
+      equipments: matchingEquipments,
+      interventions: matchingInterventions,
+      spareParts: matchingSpareParts
+    };
+  }, [searchQuery, equipments, interventions, spareParts]);
+
   // 1. Calculations & Metrics
   const metrics = useMemo(() => {
     // Exclude "Hors Service" (Out of Service) equipments from calculations
@@ -97,7 +160,7 @@ export default function GmaoDashboard({
 
     // MTTR (Mean Time To Repair)
     // Dynamic calculation from real duration in minutes if specified, or standard duration hours
-    const completedCorrectives = interventions.filter(
+    const completedCorrectives = filteredInterventions.filter(
       (int) => int.type === "Correctif" && (int.status === "Terminée" || int.status === "Clôturée" || int.status === "Terminé")
     );
     const totalMinutes = completedCorrectives.reduce((acc, c) => {
@@ -109,7 +172,7 @@ export default function GmaoDashboard({
 
     // MTBF (Mean Time Between Failures)
     // Approximate using active equipments target MTBF plus failure count adjustments
-    const failureCount = interventions.filter((int) => int.type === "Correctif").length;
+    const failureCount = filteredInterventions.filter((int) => int.type === "Correctif").length;
     const mtbf = activeEquipments.length
       ? Math.round(
           activeEquipments.reduce((acc, eq) => acc + (eq.mtbfTargetHours || 1200), 0) /
@@ -119,9 +182,9 @@ export default function GmaoDashboard({
       : 1150;
 
     // Preventive vs Corrective Distribution Rates
-    const preventives = interventions.filter((int) => int.type === "Préventif");
-    const correctives = interventions.filter((int) => int.type === "Correctif");
-    const totalMaintenanceActions = interventions.length;
+    const preventives = filteredInterventions.filter((int) => int.type === "Préventif");
+    const correctives = filteredInterventions.filter((int) => int.type === "Correctif");
+    const totalMaintenanceActions = filteredInterventions.length;
 
     const completedPrev = preventives.filter((int) => int.status === "Terminée" || int.status === "Clôturée" || int.status === "Terminé").length;
     const prevRate = preventives.length
@@ -129,7 +192,7 @@ export default function GmaoDashboard({
       : 0;
 
     // Financial calculations
-    const costLabor = interventions.reduce((acc, int) => acc + (int.costLabor || 0), 0);
+    const costLabor = filteredInterventions.reduce((acc, int) => acc + (int.costLabor || 0), 0);
     const totalSpent = costLabor;
     const budgetRemaining = budget.totalBudget - totalSpent;
 
@@ -144,16 +207,16 @@ export default function GmaoDashboard({
       totalEquipments,
       preventiveCount: preventives.length,
       correctiveCount: correctives.length,
-      regulatoryCount: interventions.filter((int) => int.type === "Réglementaire").length,
+      regulatoryCount: filteredInterventions.filter((int) => int.type === "Réglementaire").length,
       totalCount: totalMaintenanceActions
     };
-  }, [equipments, interventions, budget]);
+  }, [equipments, filteredInterventions, budget]);
 
   // 2. Generate Real-time Alerts
   const alerts = useMemo(() => {
     const list: Array<{
       id: string;
-      category: "Pneu" | "Garantie" | "Budget" | "Réglementaire" | "Panne" | "Achat" | "Retard";
+      category: "Pneu" | "Garantie" | "Budget" | "Réglementaire" | "Panne" | "Achat" | "Retard" | "Stock";
       title: string;
       desc: string;
       severity: "critical" | "warning" | "info";
@@ -172,8 +235,21 @@ export default function GmaoDashboard({
       }
     });
 
+    // Stock shortage alerts (Ruptures de stock)
+    spareParts.forEach((sp) => {
+      if (sp.currentStock <= (sp.reorderPoint || 1)) {
+        list.push({
+          id: `sp-${sp.code}`,
+          category: "Stock",
+          title: `Rupture / Seuil Alerte Stock : ${sp.code}`,
+          desc: `${sp.name} - Stock actuel: ${sp.currentStock} / Seuil min: ${sp.reorderPoint || 1} (Emplacement: ${sp.location || "Magasin Central"})`,
+          severity: sp.currentStock === 0 ? "critical" : "warning"
+        });
+      }
+    });
+
     // Overdue planned maintenance (Maintenances en retard)
-    interventions.forEach((int) => {
+    filteredInterventions.forEach((int) => {
       const isPending = int.status === "Nouvelle" || int.status === "Planifiée" || int.status === "En cours";
       if (isPending && int.dateIntervention < TODAY) {
         list.push({
@@ -231,7 +307,7 @@ export default function GmaoDashboard({
     }
 
     return list;
-  }, [equipments, interventions, compliance, metrics]);
+  }, [equipments, filteredInterventions, spareParts, compliance, metrics]);
 
   // 3. Interventions in progress
   const activeInterventionsList = useMemo(() => {
@@ -337,9 +413,9 @@ export default function GmaoDashboard({
 
   return (
     <div className="space-y-6">
-      {/* 1. Brand Greeting Banner */}
-      <div className="bg-neutral-800 text-white rounded-2xl p-6 shadow-md border border-neutral-700 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="space-y-1.5 z-10">
+      {/* 1. Brand Greeting Banner with Period Filter & Omnibar Search */}
+      <div className="bg-neutral-800 text-white rounded-2xl p-6 shadow-md border border-neutral-700 relative overflow-hidden flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div className="space-y-1.5 z-10 max-w-xl">
           <div className="flex items-center gap-2">
             <span className="bg-chery-red text-white text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider">
               STA CHERY TUNISIE
@@ -350,9 +426,156 @@ export default function GmaoDashboard({
             <HeartPulse className="h-5 w-5 text-chery-red animate-pulse" />
             Tableau de Bord de Performance Maintenance
           </h1>
-          <p className="text-xs text-neutral-300 leading-relaxed max-w-2xl">
+          <p className="text-xs text-neutral-300 leading-relaxed">
             Suivi en temps réel de la conformité réglementaire, de la disponibilité opérationnelle du parc machines et du respect des budgets d'atelier.
           </p>
+        </div>
+
+        {/* Dynamic Period Filter & Omnibar Search Box */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 z-10 w-full lg:w-auto">
+          {/* Period Selector */}
+          <div className="bg-neutral-900/90 border border-neutral-700 p-1 rounded-xl flex items-center text-xs">
+            <button
+              type="button"
+              onClick={() => setPeriodFilter("month")}
+              className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                periodFilter === "month" ? "bg-chery-red text-white shadow-sm" : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Ce Mois
+            </button>
+            <button
+              type="button"
+              onClick={() => setPeriodFilter("quarter")}
+              className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                periodFilter === "quarter" ? "bg-chery-red text-white shadow-sm" : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Trimestre
+            </button>
+            <button
+              type="button"
+              onClick={() => setPeriodFilter("year")}
+              className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                periodFilter === "year" ? "bg-chery-red text-white shadow-sm" : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Année 2026
+            </button>
+            <button
+              type="button"
+              onClick={() => setPeriodFilter("all")}
+              className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                periodFilter === "all" ? "bg-chery-red text-white shadow-sm" : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Tout
+            </button>
+          </div>
+
+          {/* Omnibar Search Box */}
+          <div className="relative min-w-[220px]">
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Recherche rapide (Matériel, Bon, Pièce)..."
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-xl pl-8 pr-7 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-chery-red transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Omnibar Search Results Dropdown */}
+            {searchQuery.trim() !== "" && (
+              <div className="absolute top-full right-0 left-0 mt-2 bg-neutral-900 border border-neutral-700 rounded-2xl p-3 shadow-2xl z-50 space-y-3 text-xs max-h-80 overflow-y-auto">
+                {searchResults.equipments.length === 0 &&
+                searchResults.interventions.length === 0 &&
+                searchResults.spareParts.length === 0 ? (
+                  <p className="text-neutral-400 text-center py-2 text-[11px]">Aucun résultat trouvé pour "{searchQuery}"</p>
+                ) : (
+                  <>
+                    {searchResults.equipments.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-neutral-400 font-black uppercase tracking-wider block mb-1">
+                          Équipements
+                        </span>
+                        <div className="space-y-1">
+                          {searchResults.equipments.map((eq) => (
+                            <button
+                              key={eq.code}
+                              onClick={() => {
+                                onNavigate("equipements");
+                                setSearchQuery("");
+                              }}
+                              className="w-full text-left p-1.5 hover:bg-neutral-800 rounded-lg flex items-center justify-between cursor-pointer"
+                            >
+                              <span className="font-mono font-bold text-white">{eq.code}</span>
+                              <span className="text-neutral-400 text-[10px] truncate max-w-[120px]">{eq.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {searchResults.interventions.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-neutral-400 font-black uppercase tracking-wider block mb-1">
+                          Interventions
+                        </span>
+                        <div className="space-y-1">
+                          {searchResults.interventions.map((i) => (
+                            <button
+                              key={i.id}
+                              onClick={() => {
+                                onNavigate("interventions");
+                                setSearchQuery("");
+                              }}
+                              className="w-full text-left p-1.5 hover:bg-neutral-800 rounded-lg flex items-center justify-between cursor-pointer"
+                            >
+                              <span className="font-mono font-bold text-chery-red">{i.id}</span>
+                              <span className="text-neutral-300 text-[10px] truncate max-w-[130px]">{i.title}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {searchResults.spareParts.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-neutral-400 font-black uppercase tracking-wider block mb-1">
+                          Stock & Pièces
+                        </span>
+                        <div className="space-y-1">
+                          {searchResults.spareParts.map((sp) => (
+                            <button
+                              key={sp.code}
+                              onClick={() => {
+                                onNavigate("magasin");
+                                setSearchQuery("");
+                              }}
+                              className="w-full text-left p-1.5 hover:bg-neutral-800 rounded-lg flex items-center justify-between cursor-pointer"
+                            >
+                              <span className="font-mono font-bold text-amber-400">{sp.code}</span>
+                              <span className="text-neutral-300 text-[10px] truncate max-w-[120px]">{sp.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -475,34 +698,58 @@ export default function GmaoDashboard({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {alerts.map((al) => (
-              <div
-                key={al.id}
-                className={`p-3.5 rounded-xl border text-xs flex gap-3 items-start justify-between ${
-                  al.severity === "critical"
-                    ? "bg-red-50/60 border-red-100 text-red-950"
-                    : "bg-amber-50/60 border-amber-100 text-amber-950"
-                }`}
-              >
-                <div className="flex gap-2.5 items-start">
-                  <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${al.severity === "critical" ? "bg-red-100 text-chery-red" : "bg-amber-100 text-amber-600"}`}>
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-black tracking-tight">{al.title}</span>
-                      <span className={`text-[8px] px-1 rounded uppercase font-black font-mono ${al.severity === "critical" ? "bg-red-100 text-chery-red" : "bg-amber-100 text-amber-700"}`}>
-                        {al.category}
-                      </span>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {(showAllAlerts ? alerts : alerts.slice(0, 3)).map((al) => (
+                <div
+                  key={al.id}
+                  className={`p-3.5 rounded-xl border text-xs flex gap-3 items-start justify-between transition-all ${
+                    al.severity === "critical"
+                      ? "bg-red-50/60 border-red-100 text-red-950"
+                      : "bg-amber-50/60 border-amber-100 text-amber-950"
+                  }`}
+                >
+                  <div className="flex gap-2.5 items-start">
+                    <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${al.severity === "critical" ? "bg-red-100 text-chery-red" : "bg-amber-100 text-amber-600"}`}>
+                      <AlertTriangle className="h-3.5 w-3.5" />
                     </div>
-                    <p className="text-[10px] text-neutral-500 mt-1 leading-normal">
-                      {al.desc}
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-black tracking-tight">{al.title}</span>
+                        <span className={`text-[8px] px-1 rounded uppercase font-black font-mono ${al.severity === "critical" ? "bg-red-100 text-chery-red" : "bg-amber-100 text-amber-700"}`}>
+                          {al.category}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-neutral-500 mt-1 leading-normal">
+                        {al.desc}
+                      </p>
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+
+            {alerts.length > 3 && (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAllAlerts(!showAllAlerts)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs border border-neutral-200"
+                >
+                  {showAllAlerts ? (
+                    <>
+                      <span>Réduire l'affichage</span>
+                      <ChevronUp className="h-4 w-4 text-neutral-500" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Afficher la suite ({alerts.length - 3} alerte{alerts.length - 3 > 1 ? "s" : ""} ancienne{alerts.length - 3 > 1 ? "s" : ""})</span>
+                      <ChevronDown className="h-4 w-4 text-neutral-500" />
+                    </>
+                  )}
+                </button>
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>

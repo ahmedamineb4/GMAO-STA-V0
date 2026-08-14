@@ -4,7 +4,21 @@
  */
 
 import * as XLSX from "xlsx";
-import { Equipment, Intervention, SparePart, MaintenanceContract, BudgetYear, ComplianceCheck, Vendor } from "../types";
+import {
+  Equipment,
+  Intervention,
+  SparePart,
+  MaintenanceContract,
+  BudgetYear,
+  ComplianceCheck,
+  Vendor,
+  Project,
+  Audit5S,
+  LeanItem,
+  SafetyRecord,
+  QualityRecord,
+  EnvironmentLog
+} from "../types";
 
 /**
  * Automatically adjusts column widths so that no content is clipped/truncated.
@@ -441,6 +455,491 @@ export function generateEquipmentImportTemplate(): void {
   const link = document.createElement("a");
   link.href = url;
   link.setAttribute("download", `MODELE_IMPORT_EQUIPEMENTS_STA_CHERY.xlsx`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Generates and downloads a complete Excel report (.xlsx) for Projects & Continuous Improvement.
+ */
+export function generateProjectsAndImprovementExcelFile(
+  projects: Project[],
+  audits5s: Audit5S[] = [],
+  leanItems: LeanItem[] = [],
+  safetyRecords: SafetyRecord[] = [],
+  qualityRecords: QualityRecord[] = [],
+  environmentLogs: EnvironmentLog[] = []
+) {
+  const wb = XLSX.utils.book_new();
+  const currentDateStr = new Date().toLocaleDateString("fr-FR") + " " + new Date().toLocaleTimeString("fr-FR");
+
+  // Summary Metrics
+  const activeProjects = projects.filter((p) => p.status === "En cours").length;
+  const completedProjects = projects.filter((p) => p.status === "Terminé").length;
+  const totalPlannedBudget = projects.reduce((acc, p) => acc + (p.budgetPlanned || 0), 0);
+  const totalRealBudget = projects.reduce((acc, p) => acc + (p.budgetReal || 0), 0);
+  const avgProgress = projects.length > 0 ? Math.round(projects.reduce((acc, p) => acc + (p.progressPercent || 0), 0) / projects.length) : 0;
+
+  // =========================================================================
+  // 1. SHEET: SOMMAIRE / EXECUTIVE DASHBOARD
+  // =========================================================================
+  const summaryAoa = [
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", ""],
+    ["RAPPORT D'ÉTAT DES PROJETS ET DE L'AMÉLIORATION CONTINUE", ""],
+    ["Date de génération de l'export :", currentDateStr],
+    ["", ""],
+    ["1. INDICATEURS CLÉS DES PROJETS STRATÉGIQUES", ""],
+    ["Nombre Total de Projets Référencés", { v: projects.length, t: "n", z: '#,##0" projets"' }],
+    ["Projets En Cours d'Exécution", { v: activeProjects, t: "n", z: '#,##0" projets"' }],
+    ["Projets Clôturés / Terminés", { v: completedProjects, t: "n", z: '#,##0" projets"' }],
+    ["Budget Global Prévu (CAPEX / OPEX)", { v: totalPlannedBudget, t: "n", z: '#,##0.00" TND"' }],
+    ["Budget Réel Engagé / Consommé", { v: totalRealBudget, t: "n", z: '#,##0.00" TND"' }],
+    ["Écart Budgétaire Global", { v: totalPlannedBudget - totalRealBudget, t: "n", z: '#,##0.00" TND"' }],
+    ["Taux d'Avancement Moyen des Projets", { v: avgProgress / 100, t: "n", z: "0.0%" }],
+    ["", ""],
+    ["2. SYNTHÈSE AMÉLIORATION CONTINUE & QUALITÉ/SST", ""],
+    ["Audits 5S Réalisés", { v: audits5s.length, t: "n", z: '#,##0" audits"' }],
+    ["Actions LEAN & Chantiers Kaizen", { v: leanItems.length, t: "n", z: '#,##0" actions"' }],
+    ["Fiches Sécurité & SST (Prévention)", { v: safetyRecords.length, t: "n", z: '#,##0" fiches"' }],
+    ["Fiches Qualité & Non-Conformités", { v: qualityRecords.length, t: "n", z: '#,##0" fiches"' }],
+    ["Suivi Environnemental & Énergie", { v: environmentLogs.length, t: "n", z: '#,##0" relevés"' }],
+    ["", ""],
+    ["INDEX DES ONGLETS DU CLASSEUR EXCEL", ""],
+    ["Nom de l'onglet", "Description des données contenues"],
+    ["SOMMAIRE", "Synthèse globale des indicateurs de projets et amélioration continue"],
+    ["ETAT_DES_PROJETS", "Registre complet des projets, statuts, budgets prévus vs réels et responsables"],
+    ["TACHES_ET_PLANNING", "Détail des tâches, plannings, priorités et avancement individuel"],
+    ["MATRICE_DES_RISQUES", "Inventaire des risques identifiés, probabilité, impact et plans d'action"],
+    ["BUDGETS_PROJETS", "Lignes de dépenses, devis, commandes CAPEX/OPEX par projet"],
+    ["AUDITS_5S", "Résultats détaillés des audits 5S par atelier (Seiri, Seiton, Seiso, etc.)"],
+    ["LEAN_KAIZEN", "Actions de réduction des gaspillages (Muda) et chantiers Kaizen"],
+    ["SECURITE_SST", "Registre des contrôles de sécurité, EPI, extincteurs et incidents"],
+    ["QUALITE_ENVIRONNEMENT", "Suivi des non-conformités, traçabilité et bilans environnementaux"]
+  ];
+
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoa);
+  autoFitColumns(wsSummary, 25);
+  setProfessionalRowHeights(wsSummary, 4);
+  XLSX.utils.book_append_sheet(wb, wsSummary, "SOMMAIRE");
+
+  // =========================================================================
+  // 2. SHEET: ETAT_DES_PROJETS
+  // =========================================================================
+  const projectRows = projects.map((p) => {
+    const taskCount = (p.tasks || []).length;
+    const completedTaskCount = (p.tasks || []).filter((t) => t.status === "Terminé").length;
+    const riskCount = (p.risks || []).length;
+    const highRiskCount = (p.risks || []).filter((r) => r.impact === "Fort" || r.impact === "Critique").length;
+    const suppliersStr = (p.suppliers || []).join(", ") || "N/A";
+    const budgetGap = (p.budgetPlanned || 0) - (p.budgetReal || 0);
+
+    return [
+      p.id,
+      p.name,
+      p.status,
+      p.priority,
+      p.manager,
+      p.department,
+      p.startDate,
+      p.endDate,
+      (p.progressPercent || 0) / 100,
+      p.budgetPlanned || 0,
+      p.budgetReal || 0,
+      budgetGap,
+      `${completedTaskCount} / ${taskCount}`,
+      `${highRiskCount} / ${riskCount}`,
+      suppliersStr,
+      p.description || ""
+    ];
+  });
+
+  const wsProjects = XLSX.utils.aoa_to_sheet([
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["REGISTRE GÉNÉRAL D'ÉTAT DES PROJETS & MODERNISATION", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["Export du : " + currentDateStr, "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    [
+      "Code Projet",
+      "Nom du Projet",
+      "Statut",
+      "Priorité",
+      "Chef de Projet",
+      "Département / Atelier",
+      "Date Début",
+      "Fin Prévue",
+      "Avancement (%)",
+      "Budget Prévu (TND)",
+      "Budget Réel (TND)",
+      "Écart Budgétaire (TND)",
+      "Tâches (Réalisées / Total)",
+      "Risques Majeurs (Fort-Critique / Total)",
+      "Fournisseurs & Prestataires",
+      "Description / Objectif"
+    ],
+    ...projectRows
+  ]);
+
+  if (wsProjects["!ref"]) {
+    const range = XLSX.utils.decode_range(wsProjects["!ref"]);
+    for (let R = 4; R <= range.e.r; ++R) {
+      const cellProg = wsProjects[XLSX.utils.encode_cell({ r: R, c: 8 })];
+      if (cellProg) cellProg.z = "0.0%";
+
+      const cellPlanned = wsProjects[XLSX.utils.encode_cell({ r: R, c: 9 })];
+      if (cellPlanned) cellPlanned.z = '#,##0.00" TND"';
+
+      const cellReal = wsProjects[XLSX.utils.encode_cell({ r: R, c: 10 })];
+      if (cellReal) cellReal.z = '#,##0.00" TND"';
+
+      const cellGap = wsProjects[XLSX.utils.encode_cell({ r: R, c: 11 })];
+      if (cellGap) cellGap.z = '#,##0.00" TND"';
+    }
+  }
+
+  autoFitColumns(wsProjects, 15);
+  setProfessionalRowHeights(wsProjects, 4);
+  XLSX.utils.book_append_sheet(wb, wsProjects, "ETAT_DES_PROJETS");
+
+  // =========================================================================
+  // 3. SHEET: TACHES_ET_PLANNING
+  // =========================================================================
+  const taskRows: any[] = [];
+  projects.forEach((p) => {
+    (p.tasks || []).forEach((t) => {
+      taskRows.push([
+        p.id,
+        p.name,
+        t.name,
+        t.manager || p.manager,
+        t.priority,
+        t.status,
+        t.startDate,
+        t.endDate,
+        t.durationDays || 0,
+        (t.progressPercent || 0) / 100
+      ]);
+    });
+  });
+
+  const wsTasks = XLSX.utils.aoa_to_sheet([
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", "", "", "", "", "", "", "", "", ""],
+    ["DÉTAIL DES TÂCHES ET PLANNING DE PROJETS", "", "", "", "", "", "", "", "", ""],
+    ["Export du : " + currentDateStr, "", "", "", "", "", "", "", "", ""],
+    [
+      "Code Projet",
+      "Nom du Projet",
+      "Intitulé de la Tâche",
+      "Responsable",
+      "Priorité",
+      "Statut Tâche",
+      "Date Début",
+      "Date Fin",
+      "Durée (Jours)",
+      "Progression (%)"
+    ],
+    ...(taskRows.length > 0 ? taskRows : [["N/A", "Aucune tâche enregistrée", "", "", "", "", "", "", 0, 0]])
+  ]);
+
+  if (wsTasks["!ref"]) {
+    const range = XLSX.utils.decode_range(wsTasks["!ref"]);
+    for (let R = 4; R <= range.e.r; ++R) {
+      const cellProg = wsTasks[XLSX.utils.encode_cell({ r: R, c: 9 })];
+      if (cellProg) cellProg.z = "0.0%";
+    }
+  }
+
+  autoFitColumns(wsTasks, 15);
+  setProfessionalRowHeights(wsTasks, 4);
+  XLSX.utils.book_append_sheet(wb, wsTasks, "TACHES_ET_PLANNING");
+
+  // =========================================================================
+  // 4. SHEET: MATRICE_DES_RISQUES
+  // =========================================================================
+  const riskRows: any[] = [];
+  projects.forEach((p) => {
+    (p.risks || []).forEach((r) => {
+      riskRows.push([
+        p.id,
+        p.name,
+        r.risk,
+        r.probability,
+        r.impact,
+        r.priority || "Modérée",
+        r.preventiveAction || "N/A",
+        r.responsible || p.manager,
+        r.state || "Identifié"
+      ]);
+    });
+  });
+
+  const wsRisks = XLSX.utils.aoa_to_sheet([
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", "", "", "", "", "", "", "", ""],
+    ["MATRICE ET SUIVI DES RISQUES PROJETS", "", "", "", "", "", "", "", ""],
+    ["Export du : " + currentDateStr, "", "", "", "", "", "", "", ""],
+    [
+      "Code Projet",
+      "Nom du Projet",
+      "Risque Identifié",
+      "Probabilité",
+      "Impact",
+      "Niveau de Priorité",
+      "Mesures Préventives & Plan d'Action",
+      "Responsable du Risque",
+      "État du Risque"
+    ],
+    ...(riskRows.length > 0 ? riskRows : [["N/A", "Aucun risque enregistré", "", "", "", "", "", "", ""]])
+  ]);
+
+  autoFitColumns(wsRisks, 15);
+  setProfessionalRowHeights(wsRisks, 4);
+  XLSX.utils.book_append_sheet(wb, wsRisks, "MATRICE_DES_RISQUES");
+
+  // =========================================================================
+  // 5. SHEET: BUDGETS_PROJETS
+  // =========================================================================
+  const budgetItemRows: any[] = [];
+  projects.forEach((p) => {
+    (p.budgetItems || []).forEach((b) => {
+      budgetItemRows.push([
+        p.id,
+        p.name,
+        b.title,
+        b.type,
+        b.supplier || "N/A",
+        b.amount || 0,
+        b.date || p.startDate,
+        b.status || "Validé"
+      ]);
+    });
+  });
+
+  const wsBudgets = XLSX.utils.aoa_to_sheet([
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", "", "", "", "", "", "", ""],
+    ["DÉTAIL DES POSTES BUDGÉTAIRES PROJETS (CAPEX/OPEX)", "", "", "", "", "", "", ""],
+    ["Export du : " + currentDateStr, "", "", "", "", "", "", ""],
+    [
+      "Code Projet",
+      "Nom du Projet",
+      "Intitulé de la Dépense / Devis",
+      "Type de Dépense",
+      "Fournisseur / Prestataire",
+      "Montant (TND)",
+      "Date Enregistrement",
+      "Statut"
+    ],
+    ...(budgetItemRows.length > 0 ? budgetItemRows : [["N/A", "Aucun poste de dépense enregistré", "", "", "", 0, "", ""]])
+  ]);
+
+  if (wsBudgets["!ref"]) {
+    const range = XLSX.utils.decode_range(wsBudgets["!ref"]);
+    for (let R = 4; R <= range.e.r; ++R) {
+      const cellAmount = wsBudgets[XLSX.utils.encode_cell({ r: R, c: 5 })];
+      if (cellAmount) cellAmount.z = '#,##0.00" TND"';
+    }
+  }
+
+  autoFitColumns(wsBudgets, 15);
+  setProfessionalRowHeights(wsBudgets, 4);
+  XLSX.utils.book_append_sheet(wb, wsBudgets, "BUDGETS_PROJETS");
+
+  // =========================================================================
+  // 6. SHEET: AUDITS_5S
+  // =========================================================================
+  const audit5sRows = audits5s.map((a) => [
+    a.id,
+    a.date,
+    a.workshop,
+    a.auditor,
+    a.seiriScore,
+    a.seitonScore,
+    a.seisoScore,
+    a.seiketsuScore,
+    a.shitsukeScore,
+    (a.totalScore || 0) / 100,
+    a.status,
+    a.actionPlan || "",
+    a.comments || ""
+  ]);
+
+  const ws5s = XLSX.utils.aoa_to_sheet([
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["SUIVI DES AUDITS 5S (RANGEMENT ET STANDARDISATION)", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["Export du : " + currentDateStr, "", "", "", "", "", "", "", "", "", "", "", ""],
+    [
+      "Code Audit",
+      "Date",
+      "Atelier / Zone",
+      "Auditeur",
+      "1S Seiri (/20)",
+      "2S Seiton (/20)",
+      "3S Seiso (/20)",
+      "4S Seiketsu (/20)",
+      "5S Shitsuke (/20)",
+      "Score Total (%)",
+      "Conformité",
+      "Plan d'Action Correctif",
+      "Commentaires"
+    ],
+    ...(audit5sRows.length > 0 ? audit5sRows : [["N/A", "", "", "", 0, 0, 0, 0, 0, 0, "N/A", "Aucun audit 5S", ""]])
+  ]);
+
+  if (ws5s["!ref"]) {
+    const range = XLSX.utils.decode_range(ws5s["!ref"]);
+    for (let R = 4; R <= range.e.r; ++R) {
+      const cellScore = ws5s[XLSX.utils.encode_cell({ r: R, c: 9 })];
+      if (cellScore) cellScore.z = "0.0%";
+    }
+  }
+
+  autoFitColumns(ws5s, 14);
+  setProfessionalRowHeights(ws5s, 4);
+  XLSX.utils.book_append_sheet(wb, ws5s, "AUDITS_5S");
+
+  // =========================================================================
+  // 7. SHEET: LEAN_KAIZEN
+  // =========================================================================
+  const leanRows = leanItems.map((l) => [
+    l.id,
+    l.type,
+    l.title,
+    l.workshop,
+    l.author,
+    l.dateAdded,
+    l.mudaCategory || "N/A",
+    l.impactScore || "Moyen",
+    l.estimatedSavingTnd || 0,
+    l.status,
+    l.description || ""
+  ]);
+
+  const wsLean = XLSX.utils.aoa_to_sheet([
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", "", "", "", "", "", "", "", "", "", ""],
+    ["REGISTRE CHANTIERS LEAN, KAIZEN ET CHASSE AUX GASPILLAGES (MUDA)", "", "", "", "", "", "", "", "", "", ""],
+    ["Export du : " + currentDateStr, "", "", "", "", "", "", "", "", "", ""],
+    [
+      "Code Action",
+      "Type de Chantier",
+      "Intitulé de l'Action / Suggestion",
+      "Atelier",
+      "Auteur / Porteur",
+      "Date Création",
+      "Catégorie Gaspillage (Muda)",
+      "Impact Estimé",
+      "Gains Potentiels (TND)",
+      "Statut d'Avancement",
+      "Description"
+    ],
+    ...(leanRows.length > 0 ? leanRows : [["N/A", "", "Aucune action LEAN enregistrée", "", "", "", "", "", 0, "N/A", ""]])
+  ]);
+
+  if (wsLean["!ref"]) {
+    const range = XLSX.utils.decode_range(wsLean["!ref"]);
+    for (let R = 4; R <= range.e.r; ++R) {
+      const cellSaving = wsLean[XLSX.utils.encode_cell({ r: R, c: 8 })];
+      if (cellSaving) cellSaving.z = '#,##0.00" TND"';
+    }
+  }
+
+  autoFitColumns(wsLean, 15);
+  setProfessionalRowHeights(wsLean, 4);
+  XLSX.utils.book_append_sheet(wb, wsLean, "LEAN_KAIZEN");
+
+  // =========================================================================
+  // 8. SHEET: SECURITE_SST
+  // =========================================================================
+  const safetyRows = safetyRecords.map((s) => [
+    s.id,
+    s.type,
+    s.date,
+    s.location,
+    s.severity,
+    s.responsible,
+    s.status,
+    s.actionPlan || "",
+    s.description || ""
+  ]);
+
+  const wsSafety = XLSX.utils.aoa_to_sheet([
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", "", "", "", "", "", "", "", ""],
+    ["REGISTRE DE SÉCURITÉ, PRÉVENTION SST ET CONTRÔLES D'ÉQUIPEMENTS", "", "", "", "", "", "", "", ""],
+    ["Export du : " + currentDateStr, "", "", "", "", "", "", "", ""],
+    [
+      "Code Fiche",
+      "Type de Contrôle / Incident",
+      "Date",
+      "Emplacement / Zone",
+      "Niveau de Gravité",
+      "Responsable Suivi",
+      "Statut",
+      "Plan d'Action Correctif",
+      "Description / Constat"
+    ],
+    ...(safetyRows.length > 0 ? safetyRows : [["N/A", "", "", "", "", "", "N/A", "Aucune fiche sécurité", ""]])
+  ]);
+
+  autoFitColumns(wsSafety, 15);
+  setProfessionalRowHeights(wsSafety, 4);
+  XLSX.utils.book_append_sheet(wb, wsSafety, "SECURITE_SST");
+
+  // =========================================================================
+  // 9. SHEET: QUALITE_ENVIRONNEMENT
+  // =========================================================================
+  const qualityRows = qualityRecords.map((q) => [
+    q.id,
+    "Qualité",
+    q.type,
+    q.title,
+    q.workshop,
+    q.date,
+    q.responsible,
+    q.status,
+    q.details || ""
+  ]);
+
+  const envRows = environmentLogs.map((e) => [
+    e.id,
+    "Environnement",
+    e.category,
+    `Suivi ${e.category}`,
+    "Atelier / Site Central",
+    e.date,
+    "Responsable HSE",
+    `${e.value} ${e.unit}`,
+    `Coût/Économie: ${e.costOrSavingTnd} TND - ${e.notes || ""}`
+  ]);
+
+  const combinedQualEnvRows = [...qualityRows, ...envRows];
+
+  const wsQualEnv = XLSX.utils.aoa_to_sheet([
+    ["SOCIÉTÉ TUNISIENNE D'AUTOMOBILES (STA CHERY)", "", "", "", "", "", "", "", ""],
+    ["SUIVI ASSURANCE QUALITÉ, NON-CONFORMITÉS ET IMPACT ENVIRONNEMENTAL", "", "", "", "", "", "", "", ""],
+    ["Export du : " + currentDateStr, "", "", "", "", "", "", "", ""],
+    [
+      "Code Fiche",
+      "Domaine",
+      "Type / Catégorie",
+      "Titre / Objet",
+      "Atelier / Zone",
+      "Date",
+      "Responsable",
+      "Statut / Valeur",
+      "Détails / Relevés"
+    ],
+    ...(combinedQualEnvRows.length > 0 ? combinedQualEnvRows : [["N/A", "N/A", "", "Aucun enregistrement qualité/environnement", "", "", "", "", ""]])
+  ]);
+
+  autoFitColumns(wsQualEnv, 15);
+  setProfessionalRowHeights(wsQualEnv, 4);
+  XLSX.utils.book_append_sheet(wb, wsQualEnv, "QUALITE_ENVIRONNEMENT");
+
+  // Write and download XLSX file
+  const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([buffer], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  const fileNameDate = new Date().toISOString().split("T")[0];
+  link.setAttribute("download", `ETAT_PROJETS_ET_AMELIORATION_CONTINUE_STA_CHERY_${fileNameDate}.xlsx`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

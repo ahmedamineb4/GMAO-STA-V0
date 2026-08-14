@@ -25,6 +25,12 @@ import {
   BarChart3,
   Calculator,
   ArrowUpRight,
+  FileSpreadsheet,
+  Upload,
+  Eye,
+  File,
+  Search,
+  Check,
   X
 } from "lucide-react";
 import {
@@ -34,11 +40,22 @@ import {
   ProjectRisk,
   ProjectDoc,
   ProjectPriority,
-  ProjectStatus
+  ProjectStatus,
+  Audit5S,
+  LeanItem,
+  SafetyRecord,
+  QualityRecord,
+  EnvironmentLog
 } from "../types";
+import { generateProjectsAndImprovementExcelFile } from "../utils/excelGenerator";
 
 interface ProjectsManagerProps {
   projects: Project[];
+  audits5s?: Audit5S[];
+  leanItems?: LeanItem[];
+  safetyRecords?: SafetyRecord[];
+  qualityRecords?: QualityRecord[];
+  environmentLogs?: EnvironmentLog[];
   onAddProject: (project: Project) => void;
   onUpdateProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
@@ -48,6 +65,11 @@ interface ProjectsManagerProps {
 
 export default function ProjectsManager({
   projects,
+  audits5s = [],
+  leanItems = [],
+  safetyRecords = [],
+  qualityRecords = [],
+  environmentLogs = [],
   onAddProject,
   onUpdateProject,
   onDeleteProject,
@@ -112,6 +134,17 @@ export default function ProjectsManager({
   // New Document Form State
   const [dName, setDName] = useState("");
   const [dType, setDType] = useState<"Cahier des charges" | "Plan" | "Photo" | "Compte rendu" | "PV de réception">("Cahier des charges");
+  const [dFile, setDFile] = useState<File | null>(null);
+  const [dFileData, setDFileData] = useState<string | null>(null);
+  const [dFileName, setDFileName] = useState<string>("");
+  const [dFileSize, setDFileSize] = useState<string>("");
+  const [dFileMime, setDFileMime] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [docSearch, setDocSearch] = useState("");
+  const [docCategoryFilter, setDocCategoryFilter] = useState<string>("Tous");
+  const [previewDoc, setPreviewDoc] = useState<ProjectDoc | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const quickFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const currentProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
 
@@ -365,24 +398,126 @@ export default function ProjectsManager({
   };
 
   // --- Handlers: Documents ---
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
+
+  const handleProcessFile = (file: File) => {
+    setDFile(file);
+    setDFileName(file.name);
+    setDFileMime(file.type);
+    const sizeStr = formatFileSize(file.size);
+    setDFileSize(sizeStr);
+
+    // Auto fill clean document title from filename
+    const lastDotIndex = file.name.lastIndexOf(".");
+    const cleanTitle = lastDotIndex > 0 ? file.name.substring(0, lastDotIndex) : file.name;
+    setDName(cleanTitle);
+
+    // Auto detect document type from file extension
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (ext === "pdf" || ext === "doc" || ext === "docx") {
+      setDType("Cahier des charges");
+    } else if (["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext)) {
+      setDType("Photo");
+    } else if (["dwg", "dxf", "cad"].includes(ext)) {
+      setDType("Plan");
+    } else if (["xls", "xlsx", "csv", "txt"].includes(ext)) {
+      setDType("Compte rendu");
+    }
+
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setDFileData(e.target?.result as string);
+      setIsUploading(false);
+    };
+    reader.onerror = () => {
+      setIsUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleProcessFile(e.target.files[0]);
+    }
+  };
+
+  const handleQuickDropUpload = (file: File) => {
+    if (!currentProject) return;
+
+    const sizeStr = formatFileSize(file.size);
+    const lastDotIndex = file.name.lastIndexOf(".");
+    const cleanTitle = lastDotIndex > 0 ? file.name.substring(0, lastDotIndex) : file.name;
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+
+    let inferredType: "Cahier des charges" | "Plan" | "Photo" | "Compte rendu" | "PV de réception" = "Cahier des charges";
+    if (ext === "pdf" || ext === "doc" || ext === "docx") {
+      inferredType = "Cahier des charges";
+    } else if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
+      inferredType = "Photo";
+    } else if (["dwg", "dxf"].includes(ext)) {
+      inferredType = "Plan";
+    } else if (["xls", "xlsx", "csv"].includes(ext)) {
+      inferredType = "Compte rendu";
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      const newDoc: ProjectDoc = {
+        id: `doc-${Date.now()}`,
+        projectId: currentProject.id,
+        name: cleanTitle,
+        type: inferredType,
+        uploadDate: new Date().toISOString().split("T")[0],
+        author: currentUserRole || "Ingénieur Projets",
+        fileSize: sizeStr,
+        fileData: dataUrl,
+        fileName: file.name,
+        fileMimeType: file.type
+      };
+
+      const updatedDocs = [...(currentProject.documents || []), newDoc];
+      onUpdateProject({ ...currentProject, documents: updatedDocs });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleAddDocument = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentProject || !dName.trim()) return;
+    if (!currentProject) return;
+
+    const docTitle = dName.trim() || dFileName || "Document sans titre";
 
     const newDoc: ProjectDoc = {
       id: `doc-${Date.now()}`,
       projectId: currentProject.id,
-      name: dName.trim(),
+      name: docTitle,
       type: dType,
       uploadDate: new Date().toISOString().split("T")[0],
-      author: currentUserRole,
-      fileSize: "1.5 MB"
+      author: currentUserRole || "Ingénieur Projets",
+      fileSize: dFileSize || "1.0 MB",
+      fileData: dFileData || undefined,
+      fileName: dFileName || docTitle,
+      fileMimeType: dFileMime || undefined
     };
 
     const updatedDocs = [...(currentProject.documents || []), newDoc];
     onUpdateProject({ ...currentProject, documents: updatedDocs });
+
     setShowNewDocModal(false);
     setDName("");
+    setDFile(null);
+    setDFileData(null);
+    setDFileName("");
+    setDFileSize("");
+    setDFileMime("");
   };
 
   const handleDeleteDocument = (docId: string) => {
@@ -408,26 +543,47 @@ export default function ProjectsManager({
           </p>
         </div>
 
-        {!isReadOnly && (
-          <div className="flex items-center gap-2">
-            {currentProject && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              generateProjectsAndImprovementExcelFile(
+                projects,
+                audits5s,
+                leanItems,
+                safetyRecords,
+                qualityRecords,
+                environmentLogs
+              )
+            }
+            className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all shadow-md shadow-emerald-700/10 active:scale-95"
+            title="Télécharger l'état complet des projets et de l'amélioration continue au format Excel (.xlsx)"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            <span>Exporter État des Projets (Excel)</span>
+          </button>
+
+          {!isReadOnly && (
+            <>
+              {currentProject && (
+                <button
+                  onClick={openEditProjectModal}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all border border-slate-300"
+                >
+                  <Edit className="h-4 w-4 text-slate-600" />
+                  <span>Modifier le Projet</span>
+                </button>
+              )}
               <button
-                onClick={openEditProjectModal}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all border border-slate-300"
+                onClick={() => setShowNewProjectModal(true)}
+                className="bg-chery-red hover:bg-chery-dark text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all shadow-md shadow-red-500/10 shrink-0 active:scale-95"
               >
-                <Edit className="h-4 w-4 text-slate-600" />
-                <span>Modifier le Projet</span>
+                <Plus className="h-4 w-4" />
+                <span>Nouveau Projet</span>
               </button>
-            )}
-            <button
-              onClick={() => setShowNewProjectModal(true)}
-              className="bg-chery-red hover:bg-chery-dark text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all shadow-md shadow-red-500/10 shrink-0 active:scale-95"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Nouveau Projet</span>
-            </button>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Global Stat Metrics Bar */}
@@ -918,56 +1074,216 @@ export default function ProjectsManager({
           {/* TAB 4: DOCUMENTS */}
           {activeTab === "documents" && (
             <div className="p-6 space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Documents, Cahier des charges & PV</h3>
-                  <p className="text-xs text-slate-500">Stockage centralisé des pièces jointes et plans techniques.</p>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-chery-red" />
+                    <span>Documents, Cahier des charges & Plans Techniques</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Téléversement et gestion des pièces jointes, fichiers PDF, devis et schémas du projet.
+                  </p>
                 </div>
                 {!isReadOnly && (
                   <button
-                    onClick={() => setShowNewDocModal(true)}
-                    className="bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    onClick={() => {
+                      setDName("");
+                      setDFile(null);
+                      setDFileData(null);
+                      setDFileName("");
+                      setDFileSize("");
+                      setShowNewDocModal(true);
+                    }}
+                    className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md shadow-slate-900/10 active:scale-95 transition-all self-start sm:self-auto"
                   >
-                    <Plus className="h-4 w-4" />
-                    <span>Ajouter un Document</span>
+                    <Upload className="h-4 w-4" />
+                    <span>Téléverser un Document</span>
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentProject.documents && currentProject.documents.length > 0 ? (
-                  currentProject.documents.map((doc) => (
-                    <div key={doc.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-2.5 bg-white border border-slate-200 rounded-xl text-chery-red shrink-0">
-                          <FileText className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <span className="font-bold text-xs text-slate-900 block truncate">{doc.name}</span>
-                          <span className="text-[10px] text-slate-500 block">{doc.type} • {doc.uploadDate}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-mono text-slate-400 bg-white px-2 py-1 rounded border border-slate-200">
-                          {doc.fileSize || "1 MB"}
-                        </span>
-                        {!isReadOnly && (
-                          <button
-                            onClick={() => handleDeleteDocument(doc.id)}
-                            className="p-1 text-slate-400 hover:text-red-600 cursor-pointer"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
+              {/* Drag and Drop Quick Upload Zone */}
+              {!isReadOnly && (
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      handleQuickDropUpload(e.dataTransfer.files[0]);
+                    }
+                  }}
+                  onClick={() => quickFileInputRef.current?.click()}
+                  className="p-6 border-2 border-dashed border-slate-300 hover:border-chery-red bg-slate-50/50 hover:bg-red-50/30 rounded-2xl text-center cursor-pointer transition-all group"
+                >
+                  <input
+                    ref={quickFileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.txt,.dwg,*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleQuickDropUpload(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="p-3 bg-white group-hover:bg-red-100 rounded-full border border-slate-200 text-slate-500 group-hover:text-chery-red transition-all shadow-xs">
+                      <Upload className="h-6 w-6" />
                     </div>
-                  ))
-                ) : (
-                  <div className="col-span-2 p-8 text-center text-slate-400 text-xs">
-                    Aucun document lié pour l'instant.
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 group-hover:text-chery-red transition-colors">
+                        Glissez-déposez un fichier ici ou <span className="underline text-chery-red">parcourez vos fichiers</span>
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Formats acceptés : PDF, Word, Excel, Images, AutoCAD (DWG), ZIP (Max 25 MB)
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
+              )}
+
+              {/* Filter and Search Bar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={docSearch}
+                    onChange={(e) => setDocSearch(e.target.value)}
+                    placeholder="Rechercher un document..."
+                    className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-chery-red"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+                  {["Tous", "Cahier des charges", "Plan", "Photo", "Compte rendu", "PV de réception"].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setDocCategoryFilter(cat)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                        docCategoryFilter === cat
+                          ? "bg-slate-900 text-white shadow-xs"
+                          : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Documents Grid */}
+              {(() => {
+                const filteredDocs = (currentProject.documents || []).filter((doc) => {
+                  const matchesCategory = docCategoryFilter === "Tous" || doc.type === docCategoryFilter;
+                  const matchesSearch =
+                    !docSearch ||
+                    doc.name.toLowerCase().includes(docSearch.toLowerCase()) ||
+                    (doc.fileName && doc.fileName.toLowerCase().includes(docSearch.toLowerCase())) ||
+                    doc.type.toLowerCase().includes(docSearch.toLowerCase());
+                  return matchesCategory && matchesSearch;
+                });
+
+                if (filteredDocs.length === 0) {
+                  return (
+                    <div className="p-12 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                      <FileText className="h-10 w-10 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-600">Aucun document trouvé</p>
+                      <p className="text-[11px] text-slate-400">Téléversez un fichier pour alimenter le dossier technique du projet.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredDocs.map((doc) => {
+                      const isImage = doc.fileMimeType?.startsWith("image/") || ["png", "jpg", "jpeg", "webp", "gif"].some((ext) => doc.fileName?.toLowerCase().endsWith(ext) || doc.name.toLowerCase().endsWith(ext));
+                      const isPdf = doc.fileMimeType === "application/pdf" || doc.fileName?.toLowerCase().endsWith(".pdf") || doc.name.toLowerCase().endsWith(".pdf");
+
+                      return (
+                        <div
+                          key={doc.id}
+                          className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-4 group"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`p-3 rounded-xl border shrink-0 ${
+                              doc.type === "Cahier des charges"
+                                ? "bg-red-50 border-red-200 text-chery-red"
+                                : doc.type === "Plan"
+                                ? "bg-blue-50 border-blue-200 text-blue-600"
+                                : doc.type === "Photo"
+                                ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                                : "bg-amber-50 border-amber-200 text-amber-600"
+                            }`}>
+                              {doc.type === "Photo" ? <ImageIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-xs text-slate-900 block truncate group-hover:text-chery-red transition-colors" title={doc.name}>
+                                {doc.name}
+                              </span>
+                              {doc.fileName && doc.fileName !== doc.name && (
+                                <span className="text-[10px] text-slate-400 block truncate font-mono mt-0.5" title={doc.fileName}>
+                                  📁 {doc.fileName}
+                                </span>
+                              )}
+                              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                  {doc.type}
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  {doc.fileSize || "N/A"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+                            <span>👤 {doc.author} • {doc.uploadDate}</span>
+
+                            <div className="flex items-center gap-1">
+                              {(doc.fileData || doc.url) && (
+                                <>
+                                  {(isImage || isPdf) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewDoc(doc)}
+                                      className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer transition-colors"
+                                      title="Visualiser le fichier"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                  <a
+                                    href={doc.fileData || doc.url}
+                                    download={doc.fileName || doc.name}
+                                    className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg cursor-pointer transition-colors flex items-center gap-1 font-bold text-[10px]"
+                                    title="Télécharger le fichier réel"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                    <span>Télécharger</span>
+                                  </a>
+                                </>
+                              )}
+
+                              {!isReadOnly && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDocument(doc.id)}
+                                  className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg cursor-pointer transition-colors ml-1"
+                                  title="Supprimer le document"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1750,30 +2066,91 @@ export default function ProjectsManager({
         </div>
       )}
 
-      {/* MODAL: CREATE DOCUMENT */}
+      {/* MODAL: CREATE / UPLOAD DOCUMENT */}
       {showNewDocModal && (
         <div className="fixed inset-0 bg-neutral-900/80 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-base font-black text-slate-900 border-b pb-2">Attacher un Document</h3>
-            <form onSubmit={handleAddDocument} className="space-y-3 text-xs">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Upload className="h-5 w-5 text-chery-red" />
+                <span>Téléverser un Document Projet</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowNewDocModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-800 rounded-lg cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddDocument} className="space-y-4 text-xs">
+              {/* Upload Zone inside modal */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Nom du Document</label>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Fichier à téléverser <span className="text-red-500">*</span>
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.txt,.dwg,*"
+                  onChange={handleFileInputChange}
+                />
+                {dFile ? (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg shrink-0">
+                        <Check className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-900 block truncate">{dFileName}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">{dFileSize}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDFile(null);
+                        setDFileData(null);
+                        setDFileName("");
+                        setDFileSize("");
+                      }}
+                      className="p-1 text-slate-400 hover:text-red-600 cursor-pointer shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-5 border-2 border-dashed border-slate-300 hover:border-chery-red bg-slate-50 hover:bg-red-50/20 rounded-xl text-center cursor-pointer transition-all"
+                  >
+                    <Upload className="h-6 w-6 text-slate-400 mx-auto mb-1" />
+                    <p className="font-bold text-slate-700">Cliquez pour choisir un fichier sur votre PC</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">PDF, Word, Excel, Plan CAD, Images...</p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Nom / Intitulé du Document</label>
                 <input
                   type="text"
                   required
                   value={dName}
                   onChange={(e) => setDName(e.target.value)}
-                  placeholder="ex: Cahier des charges électricité"
-                  className="w-full border border-slate-300 rounded-xl p-2.5 outline-none"
+                  placeholder="ex: Cahier des charges technique électricité"
+                  className="w-full border border-slate-300 rounded-xl p-2.5 outline-none focus:border-chery-red"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Type de Fichier</label>
+                <label className="font-bold text-slate-700 block mb-1">Catégorie du Document</label>
                 <select
                   value={dType}
                   onChange={(e) => setDType(e.target.value as any)}
-                  className="w-full border border-slate-300 rounded-xl p-2.5 outline-none"
+                  className="w-full border border-slate-300 rounded-xl p-2.5 outline-none font-semibold"
                 >
                   <option value="Cahier des charges">Cahier des charges</option>
                   <option value="Plan">Plan Technique</option>
@@ -1787,18 +2164,74 @@ export default function ProjectsManager({
                 <button
                   type="button"
                   onClick={() => setShowNewDocModal(false)}
-                  className="flex-1 bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl cursor-pointer"
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-slate-900 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md"
+                  disabled={isUploading}
+                  className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl cursor-pointer shadow-md disabled:opacity-50"
                 >
-                  Ajouter Document
+                  {isUploading ? "Chargement..." : "Enregistrer le Document"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PREVIEW DOCUMENT */}
+      {previewDoc && (
+        <div className="fixed inset-0 bg-neutral-900/80 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b pb-3 shrink-0">
+              <div className="min-w-0">
+                <h3 className="text-base font-black text-slate-900 truncate">{previewDoc.name}</h3>
+                <p className="text-xs text-slate-500">{previewDoc.type} • {previewDoc.fileName || previewDoc.name}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {(previewDoc.fileData || previewDoc.url) && (
+                  <a
+                    href={previewDoc.fileData || previewDoc.url}
+                    download={previewDoc.fileName || previewDoc.name}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>Télécharger</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-1 text-slate-400 hover:text-slate-800 rounded-lg cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto bg-slate-100 rounded-xl p-4 flex items-center justify-center min-h-[300px]">
+              {previewDoc.fileMimeType?.startsWith("image/") || ["png", "jpg", "jpeg", "webp", "gif"].some((ext) => previewDoc.fileName?.toLowerCase().endsWith(ext) || previewDoc.name.toLowerCase().endsWith(ext)) ? (
+                <img
+                  src={previewDoc.fileData || previewDoc.url}
+                  alt={previewDoc.name}
+                  className="max-h-[60vh] max-w-full object-contain rounded-lg shadow-md"
+                />
+              ) : previewDoc.fileMimeType === "application/pdf" || previewDoc.fileName?.toLowerCase().endsWith(".pdf") || previewDoc.name.toLowerCase().endsWith(".pdf") ? (
+                <iframe
+                  src={previewDoc.fileData || previewDoc.url}
+                  title={previewDoc.name}
+                  className="w-full h-[60vh] rounded-lg border border-slate-300"
+                />
+              ) : (
+                <div className="text-center p-8 space-y-3">
+                  <FileText className="h-16 w-16 text-slate-400 mx-auto" />
+                  <p className="text-xs font-bold text-slate-700">Aperçu direct non disponible pour ce type de fichier</p>
+                  <p className="text-[11px] text-slate-500">Cliquez sur "Télécharger" ci-dessus pour ouvrir le fichier sur votre appareil.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

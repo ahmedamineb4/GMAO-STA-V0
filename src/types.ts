@@ -222,6 +222,9 @@ export interface ProjectDoc {
   author: string;
   fileSize?: string;
   url?: string;
+  fileData?: string; // Data URL or Base64 string for preview and download
+  fileName?: string;
+  fileMimeType?: string;
 }
 
 export interface Project {

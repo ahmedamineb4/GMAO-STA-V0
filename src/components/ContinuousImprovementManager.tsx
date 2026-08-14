@@ -30,11 +30,14 @@ import {
   SafetyRecord,
   QualityRecord,
   EnvironmentLog,
-  Workshop
+  Workshop,
+  Project
 } from "../types";
 import { WORKSHOPS } from "../data";
+import { generateProjectsAndImprovementExcelFile } from "../utils/excelGenerator";
 
 interface ContinuousImprovementProps {
+  projects?: Project[];
   audits5s: Audit5S[];
   leanItems: LeanItem[];
   safetyRecords: SafetyRecord[];
@@ -60,6 +63,7 @@ interface ContinuousImprovementProps {
 }
 
 export default function ContinuousImprovementManager({
+  projects = [],
   audits5s,
   leanItems,
   safetyRecords,
@@ -317,32 +321,53 @@ export default function ContinuousImprovementManager({
           </p>
         </div>
 
-        {/* Global Submodule Navigation Bar */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 overflow-x-auto shrink-0">
-          {[
-            { id: "5s", label: "5S & Visuel", icon: Sparkles },
-            { id: "lean", label: "Lean & Kaizen", icon: Zap },
-            { id: "securite", label: "Sécurité HSE", icon: ShieldCheck },
-            { id: "qualite", label: "Qualité CAPA", icon: Award },
-            { id: "environnement", label: "Environnement", icon: Leaf }
-          ].map((sub) => {
-            const Icon = sub.icon;
-            const isActive = activeSubModule === sub.id;
-            return (
-              <button
-                key={sub.id}
-                onClick={() => setActiveSubModule(sub.id as any)}
-                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  isActive
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{sub.label}</span>
-              </button>
-            );
-          })}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+          {/* Global Submodule Navigation Bar */}
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 overflow-x-auto">
+            {[
+              { id: "5s", label: "5S & Visuel", icon: Sparkles },
+              { id: "lean", label: "Lean & Kaizen", icon: Zap },
+              { id: "securite", label: "Sécurité HSE", icon: ShieldCheck },
+              { id: "qualite", label: "Qualité CAPA", icon: Award },
+              { id: "environnement", label: "Environnement", icon: Leaf }
+            ].map((sub) => {
+              const Icon = sub.icon;
+              const isActive = activeSubModule === sub.id;
+              return (
+                <button
+                  key={sub.id}
+                  onClick={() => setActiveSubModule(sub.id as any)}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{sub.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              generateProjectsAndImprovementExcelFile(
+                projects,
+                audits5s,
+                leanItems,
+                safetyRecords,
+                qualityRecords,
+                environmentLogs
+              )
+            }
+            className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-emerald-700/10 active:scale-95 shrink-0"
+            title="Télécharger le rapport Excel (.xlsx) complet des projets et de l'amélioration continue"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            <span>Exporter Excel (.xlsx)</span>
+          </button>
         </div>
       </div>
 
