@@ -157,8 +157,17 @@ export default function App() {
   const [anomalyPriority, setAnomalyPriority] = useState<"Faible" | "Moyenne" | "Haute" | "Critique">("Moyenne");
   const [anomalyPhotos, setAnomalyPhotos] = useState<string[]>([]);
 
-  // Status of disk database synchronization
+  // Status of database synchronization (Local, Disk & Neon Cloud)
   const [diskSyncStatus, setDiskSyncStatus] = useState<"synced" | "syncing" | "error" | "idle">("idle");
+  const [neonStatus, setNeonStatus] = useState<{
+    configured: boolean;
+    connected: boolean;
+    serverTime?: string;
+    pgVersion?: string;
+    databaseUrlMasked?: string;
+    message?: string;
+    error?: string;
+  } | null>(null);
 
   // Collapsible Sidebar Menus State
   const [parcOpen, setParcOpen] = useState<boolean>(true);
@@ -791,7 +800,85 @@ export default function App() {
     localStorage.setItem("chery_gmao_filter_calendar", showMaintenanceCalendar ? "true" : "false");
   }, [showMaintenanceCalendar]);
 
-  // Function to manually trigger database backup to LocalStorage AND disk folder (/sauvegardes)
+  // Check Neon DB Status
+  const handleCheckNeonStatus = async () => {
+    try {
+      const res = await fetch("/api/db/status");
+      const data = await res.json();
+      setNeonStatus(data);
+      return data;
+    } catch (err: any) {
+      const fallback = { configured: false, connected: false, message: "API /api/db/status non joignable", error: err?.message };
+      setNeonStatus(fallback);
+      return fallback;
+    }
+  };
+
+  // Sync state to Neon DB & Disk
+  const handleSyncToNeon = async () => {
+    try {
+      const backupPayload = {
+        equipments,
+        interventions,
+        spareParts,
+        vendors,
+        purchaseRequests,
+        compliance,
+        budget,
+        contracts,
+        activityLogs,
+        userProfiles,
+        projects,
+        audits5s,
+        leanItems,
+        safetyRecords,
+        qualityRecords,
+        environmentLogs,
+        savedAt: new Date().toISOString(),
+        version: "GMAO-STA-1.0"
+      };
+
+      const res = await fetch("/api/db/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(backupPayload)
+      });
+      const result = await res.json();
+      if (result.success) {
+        if (result.neonSync) {
+          setNeonStatus((prev) => prev ? { ...prev, connected: true, configured: true } : { configured: true, connected: true });
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.warn("Sync to Neon failed:", e);
+      return false;
+    }
+  };
+
+  // Load state from Neon DB
+  const handleLoadFromNeon = async () => {
+    try {
+      const res = await fetch("/api/db/data");
+      const result = await res.json();
+      if (result.success && result.data) {
+        handleImportAllData(result.data);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Load from Neon failed:", e);
+      return false;
+    }
+  };
+
+  // Check Neon connection status on startup
+  useEffect(() => {
+    handleCheckNeonStatus();
+  }, []);
+
+  // Function to manually trigger database backup to LocalStorage AND Neon / Disk
   const handleManualSaveToDisk = () => {
     setDiskSyncStatus("syncing");
     try {
@@ -817,11 +904,17 @@ export default function App() {
         contracts,
         activityLogs,
         userProfiles,
+        projects,
+        audits5s,
+        leanItems,
+        safetyRecords,
+        qualityRecords,
+        environmentLogs,
         savedAt: new Date().toISOString(),
         version: "GMAO-STA-1.0"
       };
 
-      fetch("/api/backup", {
+      fetch("/api/db/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(backupPayload)
@@ -830,13 +923,18 @@ export default function App() {
         .then((resData) => {
           setDiskSyncStatus("synced");
           if (resData.success) {
-            showToast("💾 Sauvegarde réussie dans le dossier 'sauvegardes' de votre ordinateur !", "success");
+            if (resData.neonSync) {
+              setNeonStatus((prev) => prev ? { ...prev, connected: true } : { configured: true, connected: true });
+              showToast("☁️ Sauvegarde réussie sur Neon PostgreSQL & Local !", "success");
+            } else {
+              showToast("💾 Sauvegarde réussie dans le stockage local et serveur !", "success");
+            }
           } else {
             showToast("💾 Base de données enregistrée en mémoire locale", "info");
           }
         })
         .catch((err) => {
-          console.warn("[GMAO] API Backup non disponible, sauvegarde locale OK:", err);
+          console.warn("[GMAO] API Sync non disponible, sauvegarde locale OK:", err);
           setDiskSyncStatus("synced");
           showToast("💾 Base de données enregistrée en mémoire locale (LocalStorage)", "success");
         });
@@ -847,7 +945,7 @@ export default function App() {
     }
   };
 
-  // Automatic debounced backup to server disk folder (/sauvegardes)
+  // Automatic debounced backup to server & Neon
   useEffect(() => {
     const timer = setTimeout(() => {
       const backupPayload = {
@@ -861,11 +959,17 @@ export default function App() {
         contracts,
         activityLogs,
         userProfiles,
+        projects,
+        audits5s,
+        leanItems,
+        safetyRecords,
+        qualityRecords,
+        environmentLogs,
         savedAt: new Date().toISOString(),
         version: "GMAO-STA-1.0"
       };
 
-      fetch("/api/backup", {
+      fetch("/api/db/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(backupPayload)
@@ -875,7 +979,7 @@ export default function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [equipments, interventions, spareParts, vendors, purchaseRequests, compliance, budget, contracts, userProfiles]);
+  }, [equipments, interventions, spareParts, vendors, purchaseRequests, compliance, budget, contracts, userProfiles, projects, audits5s, leanItems, safetyRecords, qualityRecords, environmentLogs]);
 
   // Set disk sync status to synced on mount
   useEffect(() => {
@@ -2207,7 +2311,7 @@ export default function App() {
           <button
             type="button"
             onClick={handleManualSaveToDisk}
-            title="Cliquer pour forcer la sauvegarde instantanée dans votre navigateur"
+            title={neonStatus?.connected ? "Synchronisation automatique active avec Neon PostgreSQL et sauvegarde locale" : "Cliquer pour forcer la sauvegarde instantanée"}
             className="hidden md:flex items-center gap-2 bg-slate-800/90 hover:bg-slate-700 px-3.5 py-1.5 rounded-xl border border-slate-700/80 transition-all cursor-pointer group active:scale-95 shadow-xs whitespace-nowrap shrink-0"
           >
             {diskSyncStatus === "syncing" ? (
@@ -2222,6 +2326,13 @@ export default function App() {
                 <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
                 <span className="text-xs font-bold text-amber-300 font-mono group-hover:text-amber-200 flex items-center gap-1.5">
                   ⚠️ Réessayer la Sauvegarde
+                </span>
+              </>
+            ) : neonStatus?.connected ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse-subtle shrink-0"></span>
+                <span className="text-xs font-bold text-emerald-300 font-mono group-hover:text-white flex items-center gap-1.5">
+                  🐘 Neon Synced • Enregistrer
                 </span>
               </>
             ) : (
@@ -2933,6 +3044,10 @@ export default function App() {
               onUpdateRoleProfile={handleUpdateRoleProfile}
               onDeleteRoleProfile={handleDeleteRoleProfile}
               showToast={showToast}
+              neonStatus={neonStatus}
+              onCheckNeonStatus={handleCheckNeonStatus}
+              onSyncToNeon={handleSyncToNeon}
+              onLoadFromNeon={handleLoadFromNeon}
             />
           )}
 

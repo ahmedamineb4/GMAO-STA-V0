@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
+import { checkNeonConnection, loadAllDataFromNeon, saveAllDataToNeon } from "./server/db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,10 +30,109 @@ async function startServer() {
     }
   }
 
-  // 1. Endpoint pour enregistrer la sauvegarde automatique sur le disque dur
-  app.post("/api/backup", (req, res) => {
+  // 0a. Endpoint pour vérifier le statut de connexion à la base de données Neon PostgreSQL
+  app.get("/api/db/status", async (req, res) => {
+    try {
+      const status = await checkNeonConnection();
+      res.json(status);
+    } catch (error) {
+      console.error("Neon status check error:", error);
+      res.status(500).json({
+        configured: !!process.env.DATABASE_URL,
+        connected: false,
+        error: error?.message || "Erreur lors de la vérification de la base Neon"
+      });
+    }
+  });
+
+  // 0b. Endpoint pour charger toutes les données depuis Neon (ou fallback disque)
+  app.get("/api/db/data", async (req, res) => {
+    try {
+      if (process.env.DATABASE_URL) {
+        const neonData = await loadAllDataFromNeon();
+        if (neonData && Object.keys(neonData).length > 0) {
+          return res.json({
+            success: true,
+            source: "neon",
+            data: neonData
+          });
+        }
+      }
+
+      // Fallback sur la sauvegarde locale si Neon n'a pas encore de données ou non configuré
+      const backupPath = path.join(backupFolder, "gmao_backup_auto.json");
+      if (fs.existsSync(backupPath)) {
+        const data = fs.readFileSync(backupPath, "utf8");
+        return res.json({
+          success: true,
+          source: "disk",
+          data: JSON.parse(data)
+        });
+      }
+
+      res.json({
+        success: false,
+        source: "none",
+        message: "Aucune donnée trouvée."
+      });
+    } catch (error) {
+      console.error("DB load error:", error);
+      res.status(500).json({ success: false, error: error?.message || "Erreur de chargement" });
+    }
+  });
+
+  // 0c. Endpoint pour synchroniser/sauvegarder toutes les données dans Neon & disque
+  app.post("/api/db/sync", async (req, res) => {
     try {
       const data = req.body;
+      let neonSaved = false;
+      let neonError = null;
+
+      if (process.env.DATABASE_URL) {
+        try {
+          neonSaved = await saveAllDataToNeon(data);
+        } catch (e) {
+          console.warn("[NEON DB] Échec de la sauvegarde Neon :", e);
+          neonError = e?.message;
+        }
+      }
+
+      // Sauvegarder également sur le disque local en copie de sécurité
+      try {
+        const backupPath = path.join(backupFolder, "gmao_backup_auto.json");
+        fs.writeFileSync(backupPath, JSON.stringify(data, null, 2), "utf8");
+      } catch (e) {
+        console.warn("Échec de la sauvegarde fichier local:", e);
+      }
+
+      res.json({
+        success: true,
+        neonSaved,
+        neonError,
+        message: neonSaved
+          ? "Données synchronisées avec succès sur Neon PostgreSQL !"
+          : "Données enregistrées en local (Neon non configuré ou hors ligne)."
+      });
+    } catch (error) {
+      console.error("DB sync error:", error);
+      res.status(500).json({ success: false, error: error?.message || "Erreur lors de la synchronisation" });
+    }
+  });
+
+  // 1. Endpoint pour enregistrer la sauvegarde automatique sur le disque dur et Neon
+  app.post("/api/backup", async (req, res) => {
+    try {
+      const data = req.body;
+      let neonSaved = false;
+
+      if (process.env.DATABASE_URL) {
+        try {
+          neonSaved = await saveAllDataToNeon(data);
+        } catch (e) {
+          console.warn("[NEON DB] Backup save error:", e);
+        }
+      }
+
       const backupPath = path.join(backupFolder, "gmao_backup_auto.json");
       fs.writeFileSync(backupPath, JSON.stringify(data, null, 2), "utf8");
 
@@ -57,20 +157,37 @@ async function startServer() {
         console.warn("Echec de la creation de la sauvegarde historique:", e);
       }
 
-      res.json({ success: true, message: "Sauvegarde enregistree sur le disque." });
+      res.json({
+        success: true,
+        neonSaved,
+        message: neonSaved
+          ? "Sauvegarde enregistrée dans Neon PostgreSQL et sur disque !"
+          : "Sauvegarde enregistrée sur le disque."
+      });
     } catch (error) {
       console.error("Backup write error:", error);
       res.status(500).json({ success: false, error: error?.message || "Erreur disque" });
     }
   });
 
-  // 2. Endpoint pour recuperer la derniere sauvegarde automatique du disque dur
-  app.get("/api/backup", (req, res) => {
+  // 2. Endpoint pour recuperer la derniere sauvegarde automatique du disque dur ou Neon
+  app.get("/api/backup", async (req, res) => {
     try {
+      if (process.env.DATABASE_URL) {
+        try {
+          const neonData = await loadAllDataFromNeon();
+          if (neonData && Object.keys(neonData).length > 0) {
+            return res.json({ success: true, source: "neon", data: neonData });
+          }
+        } catch (e) {
+          console.warn("[NEON DB] Backup read error, fallback to disk:", e);
+        }
+      }
+
       const backupPath = path.join(backupFolder, "gmao_backup_auto.json");
       if (fs.existsSync(backupPath)) {
         const data = fs.readFileSync(backupPath, "utf8");
-        res.json({ success: true, data: JSON.parse(data) });
+        res.json({ success: true, source: "disk", data: JSON.parse(data) });
       } else {
         res.json({ success: false, message: "Aucune sauvegarde trouvee." });
       }

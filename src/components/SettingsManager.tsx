@@ -84,6 +84,18 @@ interface SettingsManagerProps {
   onUpdateRoleProfile?: (profile: UserRoleProfile) => void;
   onDeleteRoleProfile?: (profileId: string) => void;
   showToast?: (message: string, type?: "success" | "error" | "info") => void;
+  neonStatus?: {
+    configured: boolean;
+    connected: boolean;
+    serverTime?: string;
+    pgVersion?: string;
+    databaseUrlMasked?: string;
+    message?: string;
+    error?: string;
+  } | null;
+  onCheckNeonStatus?: () => Promise<any>;
+  onSyncToNeon?: () => Promise<boolean>;
+  onLoadFromNeon?: () => Promise<boolean>;
 }
 
 export default function SettingsManager({
@@ -112,13 +124,21 @@ export default function SettingsManager({
   onAddRoleProfile,
   onUpdateRoleProfile,
   onDeleteRoleProfile,
-  showToast
+  showToast,
+  neonStatus,
+  onCheckNeonStatus,
+  onSyncToNeon,
+  onLoadFromNeon
 }: SettingsManagerProps) {
   const isAdmin = currentRole === "admin";
   const isWritable = !isReadOnly && isAdmin;
 
   // Active Sub-Tab State
-  const [activeSubTab, setActiveSubTab] = useState<"parameters" | "users" | "docs" | "vendors" | "notifications" | "audit">("parameters");
+  const [activeSubTab, setActiveSubTab] = useState<"parameters" | "database" | "users" | "docs" | "vendors" | "notifications" | "audit">("parameters");
+  const [isTestingNeon, setIsTestingNeon] = useState<boolean>(false);
+  const [isSyncingNeon, setIsSyncingNeon] = useState<boolean>(false);
+  const [isLoadingNeon, setIsLoadingNeon] = useState<boolean>(false);
+  const [neonTestResult, setNeonTestResult] = useState<any>(null);
 
   // Safety guard: redirect non-admin away from admin-only subtabs
   useEffect(() => {
@@ -564,6 +584,7 @@ export default function SettingsManager({
           </span>
           {[
             { id: "parameters", label: "⚙️ Paramètres généraux", icon: Sliders },
+            { id: "database", label: "🐘 Base Neon & Vercel", icon: Server },
             ...(isAdmin ? [{ id: "users", label: "👥 Gestion des utilisateurs", icon: Users }] : []),
             { id: "docs", label: "📚 Gestion documentaire", icon: FileText },
             { id: "vendors", label: "🏢 Prestataires & Partenaires", icon: Building2 },
@@ -791,6 +812,244 @@ export default function SettingsManager({
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: BASE DE DONNEES NEON POSTGRESQL & DEPLOIEMENT VERCEL */}
+          {activeSubTab === "database" && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Statut Neon */}
+              <div className="bg-white p-6 rounded-2xl border border-neutral-100 shadow-xs space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-xl shrink-0 border border-emerald-100 shadow-xs">
+                      🐘
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-neutral-800 flex items-center gap-2">
+                        Connexion Base de Données Neon PostgreSQL
+                      </h3>
+                      <p className="text-xs text-neutral-400">
+                        Stockage persistant serverless haute performance pour l'hébergement Vercel et l'exploitation multi-utilisateurs de STA Chery.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {neonStatus?.connected ? (
+                      <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-black rounded-xl border border-emerald-200 flex items-center gap-2 shadow-xs">
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        🟢 Base Neon PostgreSQL Connectée
+                      </span>
+                    ) : neonStatus?.configured ? (
+                      <span className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-black rounded-xl border border-amber-200 flex items-center gap-2 shadow-xs">
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        🟡 URL configurée, vérification en cours...
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1.5 bg-neutral-100 text-neutral-600 text-xs font-bold rounded-xl border border-neutral-200 flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-neutral-400"></span>
+                        ⚪ Mode Stockage Local & Fichier
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Details & Live Actions */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl border border-neutral-200/80 bg-neutral-50/60 space-y-3">
+                    <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">
+                      État du Serveur Cloud
+                    </span>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between items-center py-1 border-b border-neutral-200/50">
+                        <span className="text-neutral-500">Moteur DB :</span>
+                        <span className="font-mono font-bold text-neutral-800">Neon Serverless PostgreSQL</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1 border-b border-neutral-200/50">
+                        <span className="text-neutral-500">DATABASE_URL :</span>
+                        <span className="font-mono text-[10px] font-bold text-neutral-700 max-w-[200px] truncate" title={neonStatus?.databaseUrlMasked || "Non configuré"}>
+                          {neonStatus?.databaseUrlMasked || "Non configuré dans .env ou Vercel"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-1">
+                        <span className="text-neutral-500">Table de stockage :</span>
+                        <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">gmao_store (JSONB)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-neutral-200/80 bg-neutral-50/60 space-y-3">
+                    <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">
+                      Actions de Synchronisation
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        disabled={isTestingNeon}
+                        onClick={async () => {
+                          setIsTestingNeon(true);
+                          try {
+                            if (onCheckNeonStatus) {
+                              const res = await onCheckNeonStatus();
+                              setNeonTestResult(res);
+                              if (res?.connected) {
+                                showToast?.("✅ Connexion à Neon PostgreSQL réussie !", "success");
+                              } else {
+                                showToast?.(res?.error || "⚠️ Impossible de joindre Neon", "error");
+                              }
+                            }
+                          } catch (e: any) {
+                            showToast?.(e?.message || "Erreur de test", "error");
+                          } finally {
+                            setIsTestingNeon(false);
+                          }
+                        }}
+                        className="w-full bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold py-2.5 px-4 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${isTestingNeon ? "animate-spin" : ""}`} />
+                        {isTestingNeon ? "Test en cours..." : "Tester la connexion Neon en direct"}
+                      </button>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          disabled={isSyncingNeon}
+                          onClick={async () => {
+                            setIsSyncingNeon(true);
+                            try {
+                              if (onSyncToNeon) {
+                                const ok = await onSyncToNeon();
+                                if (ok) {
+                                  showToast?.("⬆️ Données synchronisées avec succès vers Neon Cloud !", "success");
+                                } else {
+                                  showToast?.("⚠️ Échec de l'envoi vers Neon (Vérifiez DATABASE_URL)", "error");
+                                }
+                              }
+                            } catch (e: any) {
+                              showToast?.(e?.message || "Erreur de synchronisation", "error");
+                            } finally {
+                              setIsSyncingNeon(false);
+                            }
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          {isSyncingNeon ? "Envoi..." : "Envoyer vers Neon"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isLoadingNeon}
+                          onClick={async () => {
+                            if (!confirm("Voulez-vous recharger et écraser les données locales par celles contenues dans Neon Cloud ?")) return;
+                            setIsLoadingNeon(true);
+                            try {
+                              if (onLoadFromNeon) {
+                                const ok = await onLoadFromNeon();
+                                if (ok) {
+                                  showToast?.("⬇️ Données rechargées depuis Neon Cloud avec succès !", "success");
+                                } else {
+                                  showToast?.("⚠️ Aucune donnée trouvée dans Neon Cloud", "info");
+                                }
+                              }
+                            } catch (e: any) {
+                              showToast?.(e?.message || "Erreur de rechargement", "error");
+                            } finally {
+                              setIsLoadingNeon(false);
+                            }
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          {isLoadingNeon ? "Chargement..." : "Recharger de Neon"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {neonTestResult && (
+                  <div className={`p-3.5 rounded-xl border text-xs ${
+                    neonTestResult.connected 
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-900" 
+                      : "bg-amber-50 border-amber-200 text-amber-900"
+                  }`}>
+                    <p className="font-bold">{neonTestResult.message || (neonTestResult.connected ? "Connecté avec succès !" : "Non connecté")}</p>
+                    {neonTestResult.serverTime && (
+                      <p className="text-[11px] mt-1 font-mono text-neutral-600">
+                        Date & heure serveur Neon : {new Date(neonTestResult.serverTime).toLocaleString("fr-FR")}
+                      </p>
+                    )}
+                    {neonTestResult.error && (
+                      <p className="text-[11px] mt-1 font-mono text-red-600">{neonTestResult.error}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Guide de Déploiement Vercel & Neon */}
+              <div className="bg-white p-6 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                <div className="border-b border-neutral-100 pb-3">
+                  <h3 className="text-sm font-black text-neutral-800 flex items-center gap-2">
+                    🚀 Guide de Partage sur Vercel avec Base Neon
+                  </h3>
+                  <p className="text-xs text-neutral-400">
+                    Voici les étapes simples pour déployer cette application sur Vercel et connecter votre base Neon en production :
+                  </p>
+                </div>
+
+                <div className="space-y-4 text-xs">
+                  {/* Step 1 */}
+                  <div className="p-4 rounded-xl border border-neutral-100 bg-neutral-50/60 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="h-6 w-6 rounded-full bg-chery-red text-white flex items-center justify-center font-bold text-xs">1</span>
+                      <h4 className="font-extrabold text-neutral-800">Créer votre projet PostgreSQL sur Neon.tech</h4>
+                    </div>
+                    <p className="text-neutral-500 pl-8 leading-relaxed">
+                      Créez un compte gratuit sur <strong>neon.tech</strong>, créez un projet (ex: <code>gmao-sta-chery</code>), puis copiez votre chaîne de connexion (<code>DATABASE_URL</code>).
+                    </p>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="p-4 rounded-xl border border-neutral-100 bg-neutral-50/60 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="h-6 w-6 rounded-full bg-chery-red text-white flex items-center justify-center font-bold text-xs">2</span>
+                      <h4 className="font-extrabold text-neutral-800">Exporter le code vers votre GitHub</h4>
+                    </div>
+                    <p className="text-neutral-500 pl-8 leading-relaxed">
+                      Exportez le projet via le menu <strong>Settings &gt; Export to GitHub</strong> ou téléchargez le ZIP et poussez-le vers votre dépôt GitHub.
+                    </p>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="p-4 rounded-xl border border-neutral-100 bg-neutral-50/60 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="h-6 w-6 rounded-full bg-chery-red text-white flex items-center justify-center font-bold text-xs">3</span>
+                      <h4 className="font-extrabold text-neutral-800">Importer sur Vercel et ajouter la variable DATABASE_URL</h4>
+                    </div>
+                    <p className="text-neutral-500 pl-8 leading-relaxed">
+                      Sur <strong>vercel.com</strong>, cliquez sur <strong>"Add New Project"</strong>, sélectionnez votre dépôt GitHub, puis dans la section <strong>"Environment Variables"</strong>, ajoutez :
+                    </p>
+                    <div className="pl-8 pt-1">
+                      <div className="bg-neutral-900 text-neutral-100 p-3 rounded-lg font-mono text-[11px] space-y-1">
+                        <div><span className="text-emerald-400 font-bold">DATABASE_URL</span>=postgres://user:password@ep-xxxx.neon.tech/neondb?sslmode=require</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/40 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="h-6 w-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">4</span>
+                      <h4 className="font-extrabold text-emerald-900">Cliquez sur "Deploy" !</h4>
+                    </div>
+                    <p className="text-emerald-800 pl-8 leading-relaxed">
+                      Le fichier <code>vercel.json</code> et les routes <code>/api</code> que nous avons configurés s'occuperont automatiquement de créer les tables PostgreSQL et d'assurer la synchronisation temps réel pour tous vos ateliers !
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
