@@ -167,6 +167,8 @@ export default function App() {
     databaseUrlMasked?: string;
     message?: string;
     error?: string;
+    totalKeys?: number;
+    storeSummary?: Record<string, { count: number; updatedAt?: string }>;
   } | null>(null);
 
   // Collapsible Sidebar Menus State
@@ -815,7 +817,7 @@ export default function App() {
   };
 
   // Sync state to Neon DB & Disk
-  const handleSyncToNeon = async () => {
+  const handleSyncToNeon = async (overrides?: Record<string, any>) => {
     try {
       const backupPayload = {
         equipments,
@@ -835,7 +837,8 @@ export default function App() {
         qualityRecords,
         environmentLogs,
         savedAt: new Date().toISOString(),
-        version: "GMAO-STA-1.0"
+        version: "GMAO-STA-1.0",
+        ...(overrides || {})
       };
 
       const res = await fetch("/api/db/sync", {
@@ -873,9 +876,31 @@ export default function App() {
     }
   };
 
-  // Check Neon connection status on startup
+  // Check Neon connection status & auto-initialize or load on startup
   useEffect(() => {
-    handleCheckNeonStatus();
+    const initDatabase = async () => {
+      try {
+        const status = await handleCheckNeonStatus();
+        if (status?.connected) {
+          // If Neon has data, load it; if it is empty, seed it with the app data immediately!
+          if (status.totalKeys && status.totalKeys > 0) {
+            const res = await fetch("/api/db/data");
+            const result = await res.json();
+            if (result.success && result.data && Object.keys(result.data).length > 0) {
+              handleImportAllData(result.data);
+            }
+          } else {
+            console.log("[GMAO] Base Neon connectée mais vide. Initialisation automatique...");
+            await handleSyncToNeon();
+            await handleCheckNeonStatus();
+          }
+        }
+      } catch (e) {
+        console.warn("[GMAO] Erreur lors de l'initialisation DB:", e);
+      }
+    };
+
+    initDatabase();
   }, []);
 
   // Function to manually trigger database backup to LocalStorage AND Neon / Disk
@@ -1182,8 +1207,12 @@ export default function App() {
 
   // A. Add a new Equipment Asset
   const handleAddEquipment = (newEq: Equipment) => {
-    setEquipments((prev) => [newEq, ...prev]);
-    showToast(`Équipement ${newEq.code} (${newEq.name}) ajouté avec succès`, "success");
+    const nextEquipments = [newEq, ...equipments];
+    setEquipments(nextEquipments);
+    localStorage.setItem("chery_gmao_equipments", JSON.stringify(nextEquipments));
+    handleSyncToNeon({ equipments: nextEquipments });
+
+    showToast(`Équipement ${newEq.code} (${newEq.name}) ajouté et sauvegardé dans Neon`, "success");
     logActivity(
       "Ajout Équipement",
       `Création de l'équipement : ${newEq.name} (${newEq.code}) - Criticité: ${newEq.critical ? "Critique A" : "Standard"} - Atelier: ${newEq.workshop}`,
@@ -1211,9 +1240,10 @@ export default function App() {
   // A1. Update an existing Equipment Asset (supports code modification by Admin)
   const handleUpdateEquipment = (updatedEq: Equipment, oldCode?: string) => {
     const targetCode = oldCode || updatedEq.code;
-    setEquipments((prev) =>
-      prev.map((eq) => (eq.code === targetCode ? updatedEq : eq))
-    );
+    const nextEquipments = equipments.map((eq) => (eq.code === targetCode ? updatedEq : eq));
+    setEquipments(nextEquipments);
+    localStorage.setItem("chery_gmao_equipments", JSON.stringify(nextEquipments));
+    handleSyncToNeon({ equipments: nextEquipments });
 
     // If equipment code was updated by admin, cascade code change to related interventions and purchase requests
     if (oldCode && oldCode !== updatedEq.code) {
@@ -1259,7 +1289,11 @@ export default function App() {
       alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer un équipement.");
       return;
     }
-    setEquipments((prev) => prev.filter((eq) => eq.code !== code));
+    const nextEquipments = equipments.filter((eq) => eq.code !== code);
+    setEquipments(nextEquipments);
+    localStorage.setItem("chery_gmao_equipments", JSON.stringify(nextEquipments));
+    handleSyncToNeon({ equipments: nextEquipments });
+
     logActivity(
       "Suppression Équipement",
       `Suppression définitive de l'équipement avec le code ${code}`,
@@ -1273,9 +1307,11 @@ export default function App() {
     const eqName = targetEq ? targetEq.name : code;
     const workshop = targetEq ? targetEq.workshop : "Atelier STA";
 
-    setEquipments((prev) =>
-      prev.map((eq) => (eq.code === code ? { ...eq, status } : eq))
-    );
+    const nextEquipments = equipments.map((eq) => (eq.code === code ? { ...eq, status } : eq));
+    setEquipments(nextEquipments);
+    localStorage.setItem("chery_gmao_equipments", JSON.stringify(nextEquipments));
+    handleSyncToNeon({ equipments: nextEquipments });
+
     logActivity(
       "Changement d'État",
       `Équipement ${code} passé au statut : ${status}`,
@@ -1303,7 +1339,10 @@ export default function App() {
   // C. Log a new Intervention (With automatic Warehouse Stock & Budget consumptions!)
   const handleAddIntervention = (newInt: Intervention) => {
     // 1. Add intervention to list
-    setInterventions((prev) => [newInt, ...prev]);
+    const nextInterventions = [newInt, ...interventions];
+    setInterventions(nextInterventions);
+    localStorage.setItem("chery_gmao_interventions", JSON.stringify(nextInterventions));
+    handleSyncToNeon({ interventions: nextInterventions });
 
     // 2. Subtract inventory items used for the intervention
     if (newInt.partsUsed && newInt.partsUsed.length > 0) {
@@ -1385,9 +1424,10 @@ export default function App() {
       }
     }
 
-    setInterventions((prev) =>
-      prev.map((int) => (int.id === id ? { ...int, status: newStatus } : int))
-    );
+    const nextInterventions = interventions.map((int) => (int.id === id ? { ...int, status: newStatus } : int));
+    setInterventions(nextInterventions);
+    localStorage.setItem("chery_gmao_interventions", JSON.stringify(nextInterventions));
+    handleSyncToNeon({ interventions: nextInterventions });
 
     if (targetInt) {
       // If changing to "Terminée", "Clôturée" or "Terminé", restore equipment back to "Opérationnel"
@@ -1419,9 +1459,10 @@ export default function App() {
       }
     }
 
-    setInterventions((prev) =>
-      prev.map((int) => (int.id === updatedInt.id ? updatedInt : int))
-    );
+    const nextInterventions = interventions.map((int) => (int.id === updatedInt.id ? updatedInt : int));
+    setInterventions(nextInterventions);
+    localStorage.setItem("chery_gmao_interventions", JSON.stringify(nextInterventions));
+    handleSyncToNeon({ interventions: nextInterventions });
 
     // Sync equipment status back if the intervention is Terminée or Clôturée
     if (updatedInt.status === "Clôturée" || updatedInt.status === "Terminée") {

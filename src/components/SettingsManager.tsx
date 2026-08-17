@@ -92,6 +92,8 @@ interface SettingsManagerProps {
     databaseUrlMasked?: string;
     message?: string;
     error?: string;
+    totalKeys?: number;
+    storeSummary?: Record<string, { count: number; updatedAt?: string }>;
   } | null;
   onCheckNeonStatus?: () => Promise<any>;
   onSyncToNeon?: () => Promise<boolean>;
@@ -971,21 +973,76 @@ export default function SettingsManager({
                   </div>
                 </div>
 
-                {neonTestResult && (
-                  <div className={`p-3.5 rounded-xl border text-xs ${
-                    neonTestResult.connected 
-                      ? "bg-emerald-50 border-emerald-200 text-emerald-900" 
-                      : "bg-amber-50 border-amber-200 text-amber-900"
-                  }`}>
-                    <p className="font-bold">{neonTestResult.message || (neonTestResult.connected ? "Connecté avec succès !" : "Non connecté")}</p>
-                    {neonTestResult.serverTime && (
-                      <p className="text-[11px] mt-1 font-mono text-neutral-600">
-                        Date & heure serveur Neon : {new Date(neonTestResult.serverTime).toLocaleString("fr-FR")}
-                      </p>
+                {/* Live Neon Storage Summary */}
+                {neonStatus?.connected && (
+                  <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-3">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-emerald-200/60 pb-2.5">
+                      <div>
+                        <span className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                          📊 Contenu Actuel dans votre Base Neon (Table <code className="bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-800 font-mono text-[10px]">gmao_store</code>)
+                        </span>
+                        <span className="text-[11px] text-emerald-700">
+                          {neonStatus.totalKeys && neonStatus.totalKeys > 0 
+                            ? `Total : ${neonStatus.totalKeys} tables/modules synchronisés`
+                            : "La table est actuellement vide (0 enregistrement). Cliquez ci-dessous pour la remplir immédiatement !"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isSyncingNeon}
+                        onClick={async () => {
+                          setIsSyncingNeon(true);
+                          try {
+                            if (onSyncToNeon) {
+                              const ok = await onSyncToNeon();
+                              if (ok) {
+                                await onCheckNeonStatus?.();
+                                showToast?.("🚀 Toutes les tables Neon ont été remplies avec succès !", "success");
+                              } else {
+                                showToast?.("⚠️ Échec du remplissage de Neon (Vérifiez DATABASE_URL)", "error");
+                              }
+                            }
+                          } catch (e: any) {
+                            showToast?.(e?.message || "Erreur", "error");
+                          } finally {
+                            setIsSyncingNeon(false);
+                          }
+                        }}
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs py-2 px-3.5 rounded-xl cursor-pointer transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-50"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        {isSyncingNeon ? "Remplissage en cours..." : "🚀 Remplir / Mettre à jour Neon"}
+                      </button>
+                    </div>
+
+                    {neonStatus.storeSummary && Object.keys(neonStatus.storeSummary).length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        {Object.entries(neonStatus.storeSummary).map(([key, item]: [string, any]) => (
+                          <div key={key} className="bg-white p-2.5 rounded-lg border border-emerald-200/80 shadow-2xs">
+                            <span className="text-[10px] font-mono font-bold text-neutral-500 block truncate">{key}</span>
+                            <span className="text-sm font-black text-emerald-800 font-mono block mt-0.5">
+                              {item.count} <span className="text-[10px] font-normal text-neutral-400">éléments</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-white rounded-lg border border-dashed border-emerald-300 text-center text-xs text-emerald-800">
+                        ⚡ Cliquez sur le bouton vert <strong>« 🚀 Remplir / Mettre à jour Neon »</strong> pour injecter tous les équipements, interventions, pièces, contrats et utilisateurs dans votre base PostgreSQL Neon !
+                      </div>
                     )}
-                    {neonTestResult.error && (
-                      <p className="text-[11px] mt-1 font-mono text-red-600">{neonTestResult.error}</p>
-                    )}
+
+                    <div className="bg-neutral-900 text-neutral-200 p-3 rounded-lg font-mono text-[11px] space-y-2">
+                      <div className="text-neutral-400 text-[10px] font-sans font-bold">💡 Requêtes SQL pour voir vos équipements, interventions et alertes dans Neon (neon.tech) :</div>
+                      <div className="text-emerald-400 select-all">-- 1. Voir la liste de tous vos équipements en tableau classique :</div>
+                      <div className="text-neutral-300 pl-3 select-all">SELECT jsonb_to_recordset(data) AS (id text, name text, code text, category text, critical text, status text, location text, brand text, model text) FROM gmao_store WHERE key = 'equipments';</div>
+                      
+                      <div className="text-emerald-400 select-all pt-1">-- 2. Voir toutes les interventions et leurs pannes :</div>
+                      <div className="text-neutral-300 pl-3 select-all">SELECT jsonb_to_recordset(data) AS (id text, title text, equipment_name text, priority text, status text, type text, assigned_to text, start_date text) FROM gmao_store WHERE key = 'interventions';</div>
+                      
+                      <div className="text-emerald-400 select-all pt-1">-- 3. Voir les pièces en alerte de stock bas :</div>
+                      <div className="text-neutral-300 pl-3 select-all">SELECT jsonb_to_recordset(data) AS (id text, name text, reference text, quantity int, min_quantity int, unit_price numeric) FROM gmao_store WHERE key = 'spareParts';</div>
+                    </div>
                   </div>
                 )}
               </div>

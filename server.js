@@ -108,6 +108,7 @@ async function startServer() {
       res.json({
         success: true,
         neonSaved,
+        neonSync: neonSaved,
         neonError,
         message: neonSaved
           ? "Données synchronisées avec succès sur Neon PostgreSQL !"
