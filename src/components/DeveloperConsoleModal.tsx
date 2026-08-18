@@ -320,7 +320,6 @@ export default function DeveloperConsoleModal({
                   {[
                     { id: "admin", label: "🔑 Admin (Ahmed Amine)", color: "border-red-500/50 bg-red-950/30 text-red-300" },
                     { id: "supervisor", label: "👁️ Superviseur (Lecture seule)", color: "border-blue-500/50 bg-blue-950/30 text-blue-300" },
-                    { id: "magasin", label: "📦 Magasinier (Stock & Achats)", color: "border-amber-500/50 bg-amber-950/30 text-amber-300" },
                     { id: "service_rapide", label: "⚡ Chef Service Rapide", color: "border-purple-500/50 bg-purple-950/30 text-purple-300" },
                     { id: "atelier_mecanique", label: "⚙️ Chef Atelier Mécanique", color: "border-emerald-500/50 bg-emerald-950/30 text-emerald-300" },
                     { id: "batiment", label: "🏢 Chef Maintenance Bâtiment", color: "border-cyan-500/50 bg-cyan-950/30 text-cyan-300" }

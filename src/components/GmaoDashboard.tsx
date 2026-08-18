@@ -114,10 +114,10 @@ export default function GmaoDashboard({
     });
   }, [interventions, periodFilter]);
 
-  // Intelligent Search (Omnibar) across Equipments, Interventions, Spare Parts
+  // Intelligent Search (Omnibar) across Equipments & Interventions
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return { equipments: [], interventions: [], spareParts: [] };
+    if (!q) return { equipments: [], interventions: [] };
 
     const matchingEquipments = equipments.filter(
       (e) => e.code.toLowerCase().includes(q) || e.name.toLowerCase().includes(q) || e.workshop.toLowerCase().includes(q)
@@ -131,16 +131,11 @@ export default function GmaoDashboard({
         i.technician.toLowerCase().includes(q)
     ).slice(0, 3);
 
-    const matchingSpareParts = spareParts.filter(
-      (p) => p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
-    ).slice(0, 3);
-
     return {
       equipments: matchingEquipments,
-      interventions: matchingInterventions,
-      spareParts: matchingSpareParts
+      interventions: matchingInterventions
     };
-  }, [searchQuery, equipments, interventions, spareParts]);
+  }, [searchQuery, equipments, interventions]);
 
   // 1. Calculations & Metrics
   const metrics = useMemo(() => {
@@ -216,7 +211,7 @@ export default function GmaoDashboard({
   const alerts = useMemo(() => {
     const list: Array<{
       id: string;
-      category: "Pneu" | "Garantie" | "Budget" | "Réglementaire" | "Panne" | "Achat" | "Retard" | "Stock";
+      category: "Pneu" | "Garantie" | "Budget" | "Réglementaire" | "Panne" | "Achat" | "Retard";
       title: string;
       desc: string;
       severity: "critical" | "warning" | "info";
@@ -231,19 +226,6 @@ export default function GmaoDashboard({
           title: `Équipement en Panne : ${eq.code}`,
           desc: `${eq.name} (${eq.workshop}) requiert une assistance curative urgente.`,
           severity: "critical"
-        });
-      }
-    });
-
-    // Stock shortage alerts (Ruptures de stock)
-    spareParts.forEach((sp) => {
-      if (sp.currentStock <= (sp.reorderPoint || 1)) {
-        list.push({
-          id: `sp-${sp.code}`,
-          category: "Stock",
-          title: `Rupture / Seuil Alerte Stock : ${sp.code}`,
-          desc: `${sp.name} - Stock actuel: ${sp.currentStock} / Seuil min: ${sp.reorderPoint || 1} (Emplacement: ${sp.location || "Magasin Central"})`,
-          severity: sp.currentStock === 0 ? "critical" : "warning"
         });
       }
     });
@@ -498,8 +480,7 @@ export default function GmaoDashboard({
             {searchQuery.trim() !== "" && (
               <div className="absolute top-full right-0 left-0 mt-2 bg-neutral-900 border border-neutral-700 rounded-2xl p-3 shadow-2xl z-50 space-y-3 text-xs max-h-80 overflow-y-auto">
                 {searchResults.equipments.length === 0 &&
-                searchResults.interventions.length === 0 &&
-                searchResults.spareParts.length === 0 ? (
+                searchResults.interventions.length === 0 ? (
                   <p className="text-neutral-400 text-center py-2 text-[11px]">Aucun résultat trouvé pour "{searchQuery}"</p>
                 ) : (
                   <>
@@ -543,29 +524,6 @@ export default function GmaoDashboard({
                             >
                               <span className="font-mono font-bold text-chery-red">{i.id}</span>
                               <span className="text-neutral-300 text-[10px] truncate max-w-[130px]">{i.title}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {searchResults.spareParts.length > 0 && (
-                      <div>
-                        <span className="text-[10px] text-neutral-400 font-black uppercase tracking-wider block mb-1">
-                          Stock & Pièces
-                        </span>
-                        <div className="space-y-1">
-                          {searchResults.spareParts.map((sp) => (
-                            <button
-                              key={sp.code}
-                              onClick={() => {
-                                onNavigate("magasin");
-                                setSearchQuery("");
-                              }}
-                              className="w-full text-left p-1.5 hover:bg-neutral-800 rounded-lg flex items-center justify-between cursor-pointer"
-                            >
-                              <span className="font-mono font-bold text-amber-400">{sp.code}</span>
-                              <span className="text-neutral-300 text-[10px] truncate max-w-[120px]">{sp.name}</span>
                             </button>
                           ))}
                         </div>

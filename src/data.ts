@@ -1425,77 +1425,9 @@ export const INITIAL_SPARE_PARTS: SparePart[] = [
   }
 ];
 
-export const INITIAL_INTERVENTIONS: Intervention[] = [
-  {
-    id: "INT-2026-001",
-    equipmentCode: "EQ-CR-16",
-    type: "Préventif",
-    title: "Entretien préventif Cabine de peinture",
-    description: "Maintenance périodique, nettoyage complet des filtres d'extraction et contrôle d'étanchéité.",
-    dateIntervention: "2026-06-27",
-    durationHours: 8.0,
-    costParts: 0,
-    costLabor: 450,
-    technician: "Technicien Spécialisé",
-    status: "Terminé",
-    partsUsed: [],
-    notes: "Entretien fait le 27 et 28 Juin 2026"
-  },
-  {
-    id: "INT-2026-002",
-    equipmentCode: "EQ-CR-17",
-    type: "Préventif",
-    title: "Entretien préventif Compresseur à vis Carrosserie",
-    description: "Vidange d'huile, changement des filtres et vérification de la pression d'alimentation d'air.",
-    dateIntervention: "2026-06-27",
-    durationHours: 4.0,
-    costParts: 0,
-    costLabor: 250,
-    technician: "Technicien Interne",
-    status: "Terminé",
-    partsUsed: [],
-    notes: "Entretien fait le 27 et 28 Juin 2026"
-  }
-];
+export const INITIAL_INTERVENTIONS: Intervention[] = [];
 
-export const INITIAL_VENDORS: Vendor[] = [
-  {
-    id: "VND-SGS",
-    name: "SGS Tunisie",
-    serviceType: "Contrôles réglementaires et Étalonnage",
-    phone: "+216 71 206 500",
-    email: "tunis.control@sgs.com",
-    contactPerson: "Monia Jendoubi",
-    rating: 4
-  },
-  {
-    id: "VND-SOCO",
-    name: "Socomat SAS Tunisie",
-    serviceType: "Fournisseur d'équipements de garage & SAV",
-    phone: "+216 71 332 550",
-    email: "sav@socomat.tn",
-    contactPerson: "Walid Mansour",
-    rating: 4
-  },
-  {
-    id: "VND-TUNCOMP",
-    name: "Tunisie Compresseurs",
-    serviceType: "Spécialiste compresseurs & Réseaux d'air",
-    phone: "+216 71 556 123",
-    email: "technique@tuncomp.com",
-    contactPerson: "Mohamed Ali Sassi",
-    rating: 5
-  },
-  {
-    id: "VND-AUTOEQUIP",
-    name: "Automotive Equipment Engineering",
-    serviceType: "Calibration d'appareils de diagnostic et géométrie",
-    phone: "+216 71 668 991",
-    email: "support@autoequip.tn",
-    contactPerson: "Fares Gharbi",
-    rating: 4
-  }
-];
+export const INITIAL_VENDORS: Vendor[] = [];
 
 export const INITIAL_CONTRACTS: MaintenanceContract[] = [
   {

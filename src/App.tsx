@@ -37,7 +37,8 @@ import {
   Terminal,
   Camera,
   Image as ImageIcon,
-  ZoomIn
+  ZoomIn,
+  Key
 } from "lucide-react";
 
 // Types & Initial Data
@@ -208,13 +209,14 @@ export default function App() {
 
   const [interventions, setInterventions] = useState<Intervention[]>(() => {
     try {
+      const isCleaned = localStorage.getItem("chery_gmao_cleared_all_interventions_and_vendors_v1");
+      if (!isCleaned) return [];
       const saved = localStorage.getItem("chery_gmao_interventions");
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.warn("Failed to parse interventions from localStorage", e);
     }
-    const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
-    return mode === "demo" ? INITIAL_INTERVENTIONS : [];
+    return [];
   });
 
   const [spareParts, setSpareParts] = useState<SparePart[]>(() => {
@@ -230,13 +232,14 @@ export default function App() {
 
   const [vendors, setVendors] = useState<Vendor[]>(() => {
     try {
+      const isCleaned = localStorage.getItem("chery_gmao_cleared_all_interventions_and_vendors_v1");
+      if (!isCleaned) return [];
       const saved = localStorage.getItem("chery_gmao_vendors");
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.warn("Failed to parse vendors from localStorage", e);
     }
-    const mode = localStorage.getItem("chery_gmao_database_mode") || "vierge";
-    return mode === "demo" ? INITIAL_VENDORS : [];
+    return [];
   });
 
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>(() => {
@@ -404,7 +407,6 @@ export default function App() {
   const DEFAULT_USER_PROFILES: UserRoleProfile[] = [
     { id: "admin", label: "M. Ahmed Amine (Admin)", userFullName: "Ahmed Amine", rights: "Accès total, modifications budget, mots de passe", badge: "Administrateur", pin: "1924", isSystem: true },
     { id: "supervisor", label: "Superviseur (Lecture seule)", userFullName: "Direction STA", rights: "Lecture seule sur tous les modules", badge: "Superviseur", pin: "1234", isSystem: true },
-    { id: "magasin", label: "Responsable Achats & Appro", userFullName: "Sami Ben Ali", rights: "Gestion des commandes de travaux, fournitures et achats", badge: "Achats", pin: "2026", isSystem: true },
     { id: "service_rapide", label: "Chef d'Atelier : Service Rapide", userFullName: "Mohamed Ben Amor", rights: "Interventions et pannes sur Service Rapide", badge: "Atelier", pin: "0000", workshop: "Service Rapide" },
     { id: "atelier_mecanique", label: "Chef d'Atelier : Mécanique & Élec", userFullName: "Karim Gharbi", rights: "Interventions et pannes sur Mécanique", badge: "Atelier", pin: "0000", workshop: "Atelier Mécanique" },
     { id: "atelier_diagnostic", label: "Chef d'Atelier : Diagnostic", userFullName: "Youssef Tounsi", rights: "Interventions et pannes sur Diagnostic", badge: "Atelier", pin: "0000", workshop: "Atelier Diagnostic" },
@@ -417,7 +419,9 @@ export default function App() {
     const saved = localStorage.getItem("chery_gmao_user_profiles");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed: UserRoleProfile[] = JSON.parse(saved);
+        const filtered = parsed.filter((p) => p.id !== "magasin" && !p.id.includes("magasin"));
+        if (filtered.length > 0) return filtered;
       } catch (e) {
         return DEFAULT_USER_PROFILES;
       }
@@ -728,7 +732,7 @@ export default function App() {
     return undefined;
   };
 
-  const isEquipmentsReadOnly = currentUserRole === "supervisor" || currentUserRole === "magasin";
+  const isEquipmentsReadOnly = currentUserRole === "supervisor";
   const isPurchasesReadOnly = currentUserRole === "supervisor";
   const isSettingsReadOnly = currentUserRole !== "admin";
   const canAccessProjetsAndAmelioration = currentUserRole === "admin" || currentUserRole === "supervisor";
@@ -1011,15 +1015,28 @@ export default function App() {
     setDiskSyncStatus("synced");
   }, []);
 
+  // Auto-clear all interventions and vendors as explicitly requested by the user
+  useEffect(() => {
+    const isCleaned = localStorage.getItem("chery_gmao_cleared_all_interventions_and_vendors_v1");
+    if (!isCleaned) {
+      localStorage.setItem("chery_gmao_cleared_all_interventions_and_vendors_v1", "true");
+      localStorage.setItem("chery_gmao_interventions", JSON.stringify([]));
+      localStorage.setItem("chery_gmao_vendors", JSON.stringify([]));
+      setInterventions([]);
+      setVendors([]);
+      handleSyncToNeon({ interventions: [], vendors: [] });
+    }
+  }, []);
+
   // Auto-migration to version 9: Populated with full STA Chery Tunisia dataset
   useEffect(() => {
     const migrated = localStorage.getItem("chery_gmao_db_migrated_v9_populated_chery");
     if (!migrated) {
       localStorage.setItem("chery_gmao_database_mode", "demo");
       localStorage.setItem("chery_gmao_equipments", JSON.stringify(INITIAL_EQUIPMENTS));
-      localStorage.setItem("chery_gmao_interventions", JSON.stringify(INITIAL_INTERVENTIONS));
+      localStorage.setItem("chery_gmao_interventions", JSON.stringify([]));
       localStorage.setItem("chery_gmao_spare_parts", JSON.stringify(INITIAL_SPARE_PARTS));
-      localStorage.setItem("chery_gmao_vendors", JSON.stringify(INITIAL_VENDORS));
+      localStorage.setItem("chery_gmao_vendors", JSON.stringify([]));
       localStorage.setItem("chery_gmao_purchase_requests", JSON.stringify(INITIAL_PURCHASE_REQUESTS));
       localStorage.setItem("chery_gmao_contracts", JSON.stringify(INITIAL_CONTRACTS));
       localStorage.setItem("chery_gmao_compliance", JSON.stringify(INITIAL_COMPLIANCE_CHECKS));
@@ -1028,9 +1045,9 @@ export default function App() {
 
       setDbMode("demo");
       setEquipments(INITIAL_EQUIPMENTS);
-      setInterventions(INITIAL_INTERVENTIONS);
+      setInterventions([]);
       setSpareParts(INITIAL_SPARE_PARTS);
-      setVendors(INITIAL_VENDORS);
+      setVendors([]);
       setPurchaseRequests(INITIAL_PURCHASE_REQUESTS);
       setContracts(INITIAL_CONTRACTS);
       setCompliance(INITIAL_COMPLIANCE_CHECKS);
@@ -1041,7 +1058,7 @@ export default function App() {
           timestamp: new Date().toLocaleString("fr-FR"),
           userRole: "admin",
           action: "Base de Données Chery Chargée",
-          details: "Chargement du parc d'équipements, des demandes d'achats, interventions et budget de STA Chery Tunisie.",
+          details: "Chargement du parc d'équipements, des demandes d'achats et budget de STA Chery Tunisie.",
           type: "other"
         }
       ]);
@@ -1813,172 +1830,204 @@ export default function App() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col justify-between antialiased font-sans relative overflow-hidden">
-        {/* Futuristic glowing backdrop elements */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-chery-red/10 rounded-full blur-[120px] pointer-events-none animate-pulse-subtle"></div>
-        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-red-900/10 rounded-full blur-[150px] pointer-events-none"></div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30 pointer-events-none"></div>
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between antialiased font-sans relative">
+        {/* Subtle decorative background elements */}
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-[100px] pointer-events-none"></div>
+        <div className="absolute bottom-0 left-1/4 w-[400px] h-[400px] bg-red-500/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-        {/* Corporate header branding with premium styling */}
-        <header className="border-b border-white/5 bg-neutral-900/40 backdrop-blur-md shrink-0 py-4 z-10">
-          <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-            <div className="flex items-center gap-4 select-none mx-auto sm:mx-0">
-              <div className="bg-white px-3.5 py-1.5 rounded-xl shadow-lg border border-slate-200 flex items-center">
-                <CheryStaLogo className="h-9 w-auto" />
+        {/* Corporate header branding */}
+        <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-md shrink-0 py-3.5 z-10 shadow-2xs">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+            <div className="flex items-center gap-3.5 select-none">
+              <div className="bg-white px-3 py-1 rounded-xl shadow-xs border border-slate-200 flex items-center">
+                <CheryStaLogo className="h-8 w-auto" />
               </div>
-              <div className="border-l border-white/10 pl-3.5 hidden sm:block">
-                <span className="font-display font-black text-sm tracking-tight text-white block leading-tight">
+              <div className="border-l border-slate-200 pl-3.5 hidden sm:block">
+                <span className="font-display font-black text-sm tracking-tight text-slate-900 block leading-tight">
                   STA TUNISIE
                 </span>
-                <span className="text-[10px] text-neutral-400 font-bold tracking-wider block uppercase mt-0.5">
-                  Concessionnaire Officiel Chery • Portail GMAO 2.0
+                <span className="text-[10px] text-slate-500 font-bold tracking-wider block uppercase mt-0.5">
+                  Concessionnaire Officiel Chery • Portail GMAO & Maintenance
                 </span>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Système En Ligne
+              </span>
             </div>
           </div>
         </header>
 
-        {/* Central Auth Container */}
-        <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-5xl mx-auto w-full z-10 relative">
-          <div className="text-center space-y-3 mb-10 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-chery-red/10 border border-chery-red/20 text-chery-red text-xs font-semibold uppercase tracking-wider mb-2 animate-pulse-subtle">
-              <span className="h-1.5 w-1.5 rounded-full bg-chery-red animate-ping"></span>
-              Système de Contrôle d'Accès Sécurisé
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
-              Portail d'Authentification GMAO
-            </h1>
-            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
-              Sélectionnez votre profil professionnel ci-dessous et saisissez votre code PIN d'atelier pour accéder à vos indicateurs et fiches d'intervention.
-            </p>
-          </div>
+        {/* Central Content Container */}
+        <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 max-w-5xl mx-auto w-full z-10 relative space-y-8">
+          
+          {/* 🏢 1. ESPACE DÉCLARATION LIBRE • TOUT LE PERSONNEL (HERO CENTERPIECE) */}
+          <div className="w-full bg-white rounded-3xl border-2 border-blue-500/30 shadow-md p-6 sm:p-8 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600"></div>
 
-          {/* Profiles Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
-            {Object.entries(ROLE_LABELS).map(([role, label]) => {
-              let icon = "⚙️";
-              let colorClasses = "border-white/5 hover:border-white/10 hover:bg-white/[0.02]";
-              let badgeText = "Chef d'Atelier";
-              let badgeColor = "bg-white/5 text-neutral-300 border-white/5";
-
-              if (role === "admin") {
-                icon = "🔑";
-                colorClasses = "border-red-500/20 hover:border-chery-red/50 hover:bg-chery-red/[0.02] shadow-[0_0_25px_rgba(209,26,42,0.02)]";
-                badgeText = "Administrateur";
-                badgeColor = "bg-chery-red/10 text-chery-red border-chery-red/20";
-              } else if (role === "supervisor") {
-                icon = "👁️";
-                colorClasses = "border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/[0.02]";
-                badgeText = "Superviseur";
-                badgeColor = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-              } else if (role === "magasin") {
-                icon = "📦";
-                colorClasses = "border-emerald-500/20 hover:border-emerald-500/50 hover:bg-emerald-500/[0.02]";
-                badgeText = "Magasinier";
-                badgeColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-              } else {
-                if (role === "service_rapide") icon = "⚡";
-                else if (role === "carrosserie") icon = "🎨";
-                else if (role === "lavage") icon = "🧼";
-                else if (role === "atelier_diagnostic") icon = "🔬";
-                else if (role === "atelier_mecanique") icon = "⚙️";
-                else if (role === "batiment") icon = "🏢";
-              }
-
-              return (
-                <button
-                  key={role}
-                  onClick={() => {
-                    setLoginPendingRole(role);
-                    setLoginPasswordInput("");
-                    setLoginPasswordError(false);
-                  }}
-                  className={`flex flex-col text-left p-6 rounded-2xl border bg-neutral-900/50 backdrop-blur-md transition-all duration-300 cursor-pointer group relative overflow-hidden ${colorClasses} hover:scale-[1.02] hover:shadow-xl`}
-                >
-                  {/* Subtle top indicator bar */}
-                  <div className={`absolute top-0 left-0 right-0 h-[2px] transition-all duration-300 opacity-0 group-hover:opacity-100 ${
-                    role === "admin" ? "bg-chery-red" : role === "supervisor" ? "bg-amber-500" : role === "magasin" ? "bg-emerald-500" : "bg-blue-500"
-                  }`} />
-                  
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-3xl filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)]">{icon}</span>
-                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${badgeColor}`}>
-                      {badgeText}
-                    </span>
-                  </div>
-                  <h3 className="font-bold text-sm text-white tracking-wide group-hover:text-chery-red transition-colors">
-                    {label}
-                  </h3>
-                  <p className="text-[11px] text-neutral-400 mt-2 leading-relaxed">
-                    {role === "admin" 
-                      ? "Supervision globale, gestion budgétaire & extraction des données"
-                      : role === "supervisor"
-                      ? "Consultation de l'état des ateliers en temps réel (lecture seule)"
-                      : role === "magasin"
-                      ? "Mouvements de stock, inventaire des pièces détachées et demandes d'achat"
-                      : "Saisie d'interventions, signalement de pannes et demandes d'achat de pièces"}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 🏢 Quick Building Anomaly Report Banner (Free Access for All Staff) */}
-          <div className="w-full mt-8 p-6 bg-gradient-to-r from-neutral-900 via-neutral-900/90 to-neutral-900 rounded-3xl border border-blue-500/30 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <div className="flex items-start gap-4">
-              <div className="p-3.5 bg-blue-500/15 border border-blue-500/30 rounded-2xl text-blue-400 shrink-0 shadow-lg">
-                <Building className="h-7 w-7 animate-pulse-subtle" />
-              </div>
-              <div className="space-y-1">
-                <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider">
-                  ⚡ Espace Déclaration Libre • Tout le Personnel
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+              <div className="flex items-start gap-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl text-blue-600 shrink-0 shadow-xs">
+                  <Building className="h-8 w-8 animate-pulse-subtle" />
                 </div>
-                <h3 className="text-base font-black text-white tracking-wide">
-                  Signaler une Anomalie Bâtiment & Infrastructure
-                </h3>
-                <p className="text-xs text-neutral-400 leading-relaxed max-w-xl">
-                  Électricité, climatisation, fuite d'eau/plomberie, serrurerie, portes ou éclairage ? Déclarez un problème en 30 secondes sans mot de passe pour alerter l'équipe de maintenance.
-                </p>
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/80 text-blue-800 text-[11px] font-extrabold uppercase tracking-wider">
+                    ⚡ Espace Déclaration Libre • Tout le Personnel STA
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                    Signaler une Anomalie Bâtiment & Infrastructure
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-2xl">
+                    Électricité, climatisation, fuite d'eau, plomberie, serrurerie, portes ou éclairage ? Déclarez un problème en 30 secondes sans mot de passe pour alerter instantanément l'équipe de maintenance.
+                  </p>
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBuildingAnomalyModal(true);
+                  setBuildingAnomalySuccess(null);
+                }}
+                className="w-full lg:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm py-3.5 px-6 rounded-2xl transition-all duration-200 shadow-md shadow-blue-600/25 hover:scale-102 active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+              >
+                <AlertTriangle className="h-4 w-4 text-amber-300" />
+                <span>Déclarer une Anomalie (Accès Libre)</span>
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setShowBuildingAnomalyModal(true);
-                setBuildingAnomalySuccess(null);
-              }}
-              className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white font-black text-xs py-3.5 px-6 rounded-2xl transition-all duration-200 shadow-lg shadow-blue-600/30 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-            >
-              <AlertTriangle className="h-4 w-4 text-amber-300" />
-              <span>Déclarer une Anomalie Bâtiment</span>
-            </button>
+            {/* Quick Category Shortcuts */}
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-3">
+                Sélection rapide par domaine d'intervention :
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { id: "⚡ Électricité & Éclairage", label: "⚡ Électricité", desc: "Prise, disjoncteur, panne" },
+                  { id: "❄️ Climatisation & Chauffage", label: "❄️ Climatisation", desc: "Split, fuite, température" },
+                  { id: "🚰 Plomberie & Sanitaires", label: "🚰 Plomberie", desc: "Fuite d'eau, WC, évacuation" },
+                  { id: "🚪 Serrurerie & Portes", label: "🚪 Portes & Serrures", desc: "Rideau, serrure, vitrage" },
+                  { id: "💡 Éclairage Ateliers/Showroom", label: "💡 Éclairage", desc: "Néons, projecteurs" },
+                  { id: "🧱 Structure & Infiltration", label: "🧱 Bâtiment", desc: "Peinture, faux-plafond" },
+                  { id: "🛡️ Sécurité & Extincteurs", label: "🛡️ Sécurité", desc: "Alarme, extincteur, accès" },
+                  { id: "❓ Autre Problème Bâtiment", label: "❓ Autre Panne", desc: "Divers bâtiment" }
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setAnomalyCategory(cat.id);
+                      setShowBuildingAnomalyModal(true);
+                      setBuildingAnomalySuccess(null);
+                    }}
+                    className="text-left p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/80 hover:bg-blue-50/70 hover:border-blue-300 transition-all cursor-pointer group"
+                  >
+                    <div className="text-xs font-bold text-slate-800 group-hover:text-blue-700">{cat.label}</div>
+                    <div className="text-[10px] text-slate-500">{cat.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 🔐 2. COMPACT BOTTOM SECTION: CHOIX DU PROFIL & ACCÈS ESPACE */}
+          <div className="w-full bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-slate-100 rounded-lg text-slate-700">
+                  <Key className="h-4 w-4 text-chery-red" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                    Authentification Atelier & GMAO Pro
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Choisissez votre profil ci-dessous pour accéder à votre espace de travail avec votre code PIN d'atelier :
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                8 Profils d'accès
+              </span>
+            </div>
+
+            {/* Compact Profile Pills Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {Object.entries(ROLE_LABELS).map(([role, label]) => {
+                let icon = "⚙️";
+                let badgeColor = "bg-slate-100 text-slate-700 border-slate-200";
+                let hoverBorder = "hover:border-slate-400 hover:bg-slate-50";
+
+                if (role === "admin") {
+                  icon = "🔑";
+                  badgeColor = "bg-red-50 text-chery-red border-red-200";
+                  hoverBorder = "hover:border-chery-red hover:bg-red-50/50";
+                } else if (role === "supervisor") {
+                  icon = "👁️";
+                  badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+                  hoverBorder = "hover:border-amber-400 hover:bg-amber-50/50";
+                } else {
+                  if (role === "service_rapide") icon = "⚡";
+                  else if (role === "carrosserie") icon = "🎨";
+                  else if (role === "lavage") icon = "🧼";
+                  else if (role === "atelier_diagnostic") icon = "🔬";
+                  else if (role === "atelier_mecanique") icon = "⚙️";
+                  else if (role === "batiment") icon = "🏢";
+                  hoverBorder = "hover:border-blue-400 hover:bg-blue-50/50";
+                }
+
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => {
+                      setLoginPendingRole(role);
+                      setLoginPasswordInput("");
+                      setLoginPasswordError(false);
+                    }}
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-white text-left transition-all cursor-pointer group shadow-2xs ${hoverBorder} hover:scale-[1.02]`}
+                  >
+                    <span className="text-xl shrink-0">{icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-slate-800 truncate group-hover:text-slate-900">
+                        {label}
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex items-center justify-between mt-0.5">
+                        <span>{role === "admin" ? "Admin" : role === "supervisor" ? "Lecture" : "Atelier"}</span>
+                        <span className="font-bold text-chery-red opacity-0 group-hover:opacity-100 transition-opacity">Entrer →</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </main>
 
         {/* 🏢 Building Anomaly Reporting Modal (Free Access) */}
         {showBuildingAnomalyModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
-            <div className="bg-neutral-900 border border-blue-500/30 rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-7 space-y-5 relative overflow-hidden text-neutral-100 max-h-[90vh] overflow-y-auto">
-              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-600"></div>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-7 space-y-5 relative overflow-hidden text-slate-900 max-h-[90vh] overflow-y-auto">
+              <div className="absolute top-0 left-0 w-full h-[4px] bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600"></div>
 
               {buildingAnomalySuccess ? (
                 <div className="text-center space-y-5 py-4">
-                  <div className="w-16 h-16 bg-emerald-500/20 border border-emerald-500/40 rounded-full flex items-center justify-center text-emerald-400 mx-auto text-3xl animate-bounce">
+                  <div className="w-16 h-16 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center text-emerald-600 mx-auto text-3xl animate-bounce">
                     ✅
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-xl font-black text-white">Anomalie Signalée avec Succès !</h3>
-                    <p className="text-xs text-neutral-300 max-w-md mx-auto leading-relaxed">
+                    <h3 className="text-xl font-black text-slate-900">Anomalie Signalée avec Succès !</h3>
+                    <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
                       Votre déclaration a été transmise instantanément au service Maintenance Bâtiment de la STA Chery Tunisie.
                     </p>
-                    <div className="p-3 bg-neutral-800 rounded-2xl border border-neutral-700 font-mono text-xs text-blue-400 font-bold tracking-wider inline-block">
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 font-mono text-xs text-blue-700 font-bold tracking-wider inline-block">
                       Ticket N° : {buildingAnomalySuccess}
                     </div>
                   </div>
-                  <p className="text-[11px] text-neutral-400">
+                  <p className="text-[11px] text-slate-500">
                     Un technicien qualifié va intervenir dans les meilleurs délais pour résoudre le problème.
                   </p>
                   <button
@@ -1987,23 +2036,23 @@ export default function App() {
                       setShowBuildingAnomalyModal(false);
                       setBuildingAnomalySuccess(null);
                     }}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-2xl text-xs cursor-pointer transition-colors shadow-lg shadow-emerald-600/20"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl text-xs cursor-pointer transition-colors shadow-md shadow-emerald-600/20"
                   >
                     Fermer et Retourner à l'Accueil
                   </button>
                 </div>
               ) : (
                 <form onSubmit={handleReportBuildingAnomaly} className="space-y-4">
-                  <div className="flex items-start justify-between pb-3 border-b border-white/10">
+                  <div className="flex items-start justify-between pb-3 border-b border-slate-100">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-blue-500/20 border border-blue-500/30 rounded-2xl text-blue-400">
+                      <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-2xl text-blue-600">
                         <Building className="h-5 w-5" />
                       </div>
                       <div>
-                        <h3 className="text-base font-black text-white tracking-wide">
+                        <h3 className="text-base font-black text-slate-900 tracking-wide">
                           Signaler une Anomalie Bâtiment
                         </h3>
-                        <p className="text-[11px] text-neutral-400">
+                        <p className="text-[11px] text-slate-500">
                           Déclaration libre sans mot de passe pour tout le personnel STA
                         </p>
                       </div>
@@ -2011,7 +2060,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setShowBuildingAnomalyModal(false)}
-                      className="text-neutral-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+                      className="text-slate-400 hover:text-slate-700 p-1 rounded-lg transition-colors cursor-pointer"
                     >
                       <X className="h-5 w-5" />
                     </button>
@@ -2019,7 +2068,7 @@ export default function App() {
 
                   {/* Category Selector Buttons */}
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-neutral-300">
+                    <label className="block text-xs font-bold text-slate-700">
                       Type / Domaine de l'anomalie :
                     </label>
                     <div className="grid grid-cols-2 gap-2">
@@ -2039,12 +2088,12 @@ export default function App() {
                           onClick={() => setAnomalyCategory(cat.id)}
                           className={`text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
                             anomalyCategory === cat.id
-                              ? "bg-blue-600/30 border-blue-500 text-white shadow-md shadow-blue-500/10 font-bold"
-                              : "bg-white/5 border-white/5 text-neutral-300 hover:bg-white/10"
+                              ? "bg-blue-50 border-blue-500 text-blue-900 shadow-xs font-bold"
+                              : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
                           }`}
                         >
                           <div className="text-xs">{cat.label}</div>
-                          <div className="text-[9px] text-neutral-400 font-normal">{cat.desc}</div>
+                          <div className="text-[9px] text-slate-500 font-normal">{cat.desc}</div>
                         </button>
                       ))}
                     </div>
@@ -2052,13 +2101,13 @@ export default function App() {
 
                   {/* Location / Zone */}
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-neutral-300">
+                    <label className="block text-xs font-bold text-slate-700">
                       Zone / Localisation dans la concession STA :
                     </label>
                     <select
                       value={anomalyLocation}
                       onChange={(e) => setAnomalyLocation(e.target.value)}
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white font-medium outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 font-medium outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer"
                     >
                       <option value="Showroom Véhicules Neufs">🏢 Showroom Véhicules Neufs Chery</option>
                       <option value="Réception Après-Vente">📋 Réception Après-Vente / Accueil</option>
@@ -2067,7 +2116,6 @@ export default function App() {
                       <option value="Atelier Diagnostic">🔬 Atelier Diagnostic</option>
                       <option value="Atelier Carrosserie / Peinture">🎨 Atelier Carrosserie / Peinture</option>
                       <option value="Atelier Lavage">🧼 Atelier Lavage</option>
-                      <option value="Magasin Pièces de Rechange">📦 Magasin Pièces de Rechange</option>
                       <option value="Bureaux Administratifs / Direction">💼 Bureaux Administratifs & Direction</option>
                       <option value="Sanitaires & Salles d'eau">🚰 Sanitaires & Salles d'eau</option>
                       <option value="Parking & Extérieur">🚗 Parking & Abords Extérieurs</option>
@@ -2076,7 +2124,7 @@ export default function App() {
 
                   {/* Symptom Description */}
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-neutral-300">
+                    <label className="block text-xs font-bold text-slate-700">
                       Description précise du problème constaté * :
                     </label>
                     <textarea
@@ -2085,14 +2133,14 @@ export default function App() {
                       placeholder="Exemple : Le climatiseur du bureau réception fuit sur le sol / La prise 380V de la baie 2 disjoncte..."
                       value={anomalyDesc}
                       onChange={(e) => setAnomalyDesc(e.target.value)}
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white resize-none"
                     />
                   </div>
 
                   {/* Reporter Name & Phone */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="block text-xs font-bold text-neutral-300">
+                      <label className="block text-xs font-bold text-slate-700">
                         Votre Nom & Prénom * :
                       </label>
                       <input
@@ -2101,11 +2149,11 @@ export default function App() {
                         placeholder="Ex: Mohamed Ben Ali"
                         value={anomalyReporter}
                         onChange={(e) => setAnomalyReporter(e.target.value)}
-                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="block text-xs font-bold text-neutral-300">
+                      <label className="block text-xs font-bold text-slate-700">
                         Téléphone / Poste interne :
                       </label>
                       <input
@@ -2113,20 +2161,20 @@ export default function App() {
                         placeholder="Ex: Poste 102 / Tél 98..."
                         value={anomalyPhone}
                         onChange={(e) => setAnomalyPhone(e.target.value)}
-                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                       />
                     </div>
                   </div>
 
                   {/* Priority */}
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-neutral-300">
+                    <label className="block text-xs font-bold text-slate-700">
                       Niveau d'Urgence :
                     </label>
                     <select
                       value={anomalyPriority}
                       onChange={(e) => setAnomalyPriority(e.target.value as any)}
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-2.5 text-xs text-white font-medium outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 font-medium outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer"
                     >
                       <option value="Faible">🟢 Normal (Gêne mineure, à traiter sous 48h)</option>
                       <option value="Moyenne">🟡 Moyen (Dysfonctionnement gênant le travail)</option>
@@ -2137,20 +2185,20 @@ export default function App() {
 
                   {/* Photo Attachment / Capture */}
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-neutral-300 flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-700 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <Camera className="h-4 w-4 text-blue-400" />
+                        <Camera className="h-4 w-4 text-blue-600" />
                         <span>Photo / Preuve visuelle de l'anomalie (Optionnel) :</span>
                       </span>
                       {anomalyPhotos.length > 0 && (
-                        <span className="text-[10px] text-blue-300 font-bold">
+                        <span className="text-[10px] text-blue-600 font-bold">
                           {anomalyPhotos.length} photo(s)
                         </span>
                       )}
                     </label>
                     <div className="flex flex-wrap items-center gap-2">
-                      <label className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-dashed border-neutral-600 text-neutral-200 font-semibold text-xs py-2 px-3 rounded-xl cursor-pointer transition-colors shadow-xs">
-                        <ImageIcon className="h-4 w-4 text-blue-400" />
+                      <label className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-300 text-slate-700 font-semibold text-xs py-2 px-3 rounded-xl cursor-pointer transition-colors shadow-2xs">
+                        <ImageIcon className="h-4 w-4 text-blue-600" />
                         <span>Prendre / Joindre Photo</span>
                         <input
                           type="file"
@@ -2185,12 +2233,12 @@ export default function App() {
                                 initialIndex: idx,
                                 title: `Anomalie Bâtiment - Photo ${idx + 1}`
                               })}
-                              className="relative group h-11 w-14 rounded-lg overflow-hidden border border-white/20 bg-black/40 shadow-xs shrink-0 cursor-pointer"
+                              className="relative group h-11 w-14 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs shrink-0 cursor-pointer"
                               title="Cliquer pour agrandir et zoomer la photo"
                             >
                               <img src={img} alt={`Anomalie ${idx}`} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-200" />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <ZoomIn className="h-3.5 w-3.5 text-white drop-shadow-sm" />
+                              <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <ZoomIn className="h-3.5 w-3.5 text-white drop-shadow-xs" />
                               </div>
                               <button
                                 type="button"
@@ -2210,20 +2258,20 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-2 border-t border-white/10">
+                  <div className="flex gap-3 pt-2 border-t border-slate-100">
                     <button
                       type="button"
                       onClick={() => {
                         setShowBuildingAnomalyModal(false);
                         setAnomalyPhotos([]);
                       }}
-                      className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 text-xs font-bold py-3 rounded-2xl cursor-pointer transition-colors"
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-bold py-3 rounded-2xl cursor-pointer transition-colors"
                     >
                       Annuler
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black py-3 rounded-2xl cursor-pointer transition-colors shadow-lg shadow-blue-600/30 flex items-center justify-center gap-1.5"
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black py-3 rounded-2xl cursor-pointer transition-colors shadow-md shadow-blue-600/25 flex items-center justify-center gap-1.5"
                     >
                       <Building className="h-4 w-4" />
                       <span>Envoyer le Ticket</span>
@@ -2235,21 +2283,21 @@ export default function App() {
           </div>
         )}
 
-        {/* Interactive Glassmorphism PIN Entry Modal */}
+        {/* Interactive PIN Entry Modal */}
         {loginPendingRole && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
-            <div className="bg-neutral-900/90 border border-white/10 rounded-3xl shadow-2xl max-w-sm w-full p-7 space-y-5 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-chery-red to-transparent"></div>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-sm w-full p-7 space-y-5 relative overflow-hidden text-slate-900">
+              <div className="absolute top-0 left-0 w-full h-[4px] bg-gradient-to-r from-red-500 via-chery-red to-red-700"></div>
               
               <div className="text-center space-y-1.5">
-                <span className="text-4xl filter drop-shadow-[0_4px_10px_rgba(209,26,42,0.3)] block mb-1">🔐</span>
-                <h3 className="text-lg font-black text-white tracking-wide">
+                <span className="text-4xl block mb-1">🔐</span>
+                <h3 className="text-lg font-black text-slate-900 tracking-wide">
                   Code d'Accès Requis
                 </h3>
-                <p className="text-[11px] text-neutral-400">
+                <p className="text-[11px] text-slate-500">
                   Veuillez renseigner le code PIN d'atelier pour :
                 </p>
-                <p className="text-xs font-mono font-bold text-white bg-white/5 py-2 px-3 rounded-xl border border-white/10 inline-block mt-1">
+                <p className="text-xs font-mono font-bold text-slate-800 bg-slate-100 py-2 px-3 rounded-xl border border-slate-200 inline-block mt-1">
                   {ROLE_LABELS[loginPendingRole]}
                 </p>
               </div>
@@ -2268,16 +2316,14 @@ export default function App() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleLoginVerifyPassword();
                   }}
-                  className="w-full text-center tracking-[0.75em] text-2xl font-black font-mono border border-white/10 rounded-2xl p-3 bg-black/40 text-white outline-none focus:border-chery-red focus:ring-1 focus:ring-chery-red transition-all"
+                  className="w-full text-center tracking-[0.75em] text-2xl font-black font-mono border border-slate-300 rounded-2xl p-3 bg-slate-50 text-slate-900 outline-none focus:border-chery-red focus:bg-white focus:ring-2 focus:ring-chery-red/20 transition-all"
                 />
                 {loginPasswordError && (
-                  <p className="text-[11px] text-red-400 font-bold text-center animate-bounce">
+                  <p className="text-[11px] text-red-600 font-bold text-center animate-bounce">
                     ⚠️ Code PIN d'atelier incorrect !
                   </p>
                 )}
               </div>
-
-
 
               <div className="flex gap-3 pt-1">
                 <button
@@ -2288,14 +2334,14 @@ export default function App() {
                     setLoginPasswordError(false);
                     setShowHelperCodes(false);
                   }}
-                  className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 text-neutral-300 text-xs font-semibold py-3 rounded-xl cursor-pointer transition-all active:scale-95"
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-semibold py-3 rounded-xl cursor-pointer transition-all active:scale-95"
                 >
                   Annuler
                 </button>
                 <button
                   type="button"
                   onClick={handleLoginVerifyPassword}
-                  className="flex-1 bg-chery-red hover:bg-chery-dark text-white text-xs font-semibold py-3 rounded-xl cursor-pointer transition-all active:scale-95 shadow-lg shadow-chery-red/25"
+                  className="flex-1 bg-chery-red hover:bg-red-700 text-white text-xs font-semibold py-3 rounded-xl cursor-pointer transition-all active:scale-95 shadow-md shadow-red-600/25"
                 >
                   Se connecter
                 </button>
@@ -2305,7 +2351,7 @@ export default function App() {
         )}
 
         {/* Corporate Footer */}
-        <footer className="border-t border-white/5 py-5 text-center text-[10px] text-neutral-500 shrink-0 bg-neutral-900/10 z-10">
+        <footer className="border-t border-slate-200/80 py-4 text-center text-[10px] text-slate-400 shrink-0 bg-white z-10">
           <p className="font-bold tracking-wider">
             PORTAIL GMAO HAUTE PERFORMANCE • CONCESSIONNAIRE STA TUNISIE © 2026
           </p>
@@ -2424,7 +2470,6 @@ export default function App() {
               >
                 <option value="admin" className="bg-slate-900 text-white">🔑 Admin: M. Ahmed Amine</option>
                 <option value="supervisor" className="bg-slate-900 text-white">👁️ Superviseur (Lecture seule)</option>
-                <option value="magasin" className="bg-slate-900 text-white">📦 Magasinier (Pièces)</option>
                 <option value="service_rapide" className="bg-slate-900 text-white">⚡ Atelier Service Rapide</option>
                 <option value="atelier_mecanique" className="bg-slate-900 text-white">⚙️ Atelier Mécanique / élec</option>
                 <option value="atelier_diagnostic" className="bg-slate-900 text-white">🔬 Atelier Diagnostic</option>
@@ -2441,8 +2486,6 @@ export default function App() {
                     ? "M. Ahmed Amine" 
                     : currentUserRole === "supervisor" 
                     ? "Superviseur STA" 
-                    : currentUserRole === "magasin" 
-                    ? "Magasinier Chery" 
                     : "Chef d'Atelier"}
                 </span>
                 <span className="text-[9px] text-red-300 font-bold uppercase block tracking-wider">
@@ -2450,8 +2493,6 @@ export default function App() {
                     ? "Admin Maintenance" 
                     : currentUserRole === "supervisor" 
                     ? "Lecture Totale" 
-                    : currentUserRole === "magasin" 
-                    ? "Stocks & Achats" 
                     : "Accès Atelier"}
                 </span>
               </div>
@@ -2460,11 +2501,9 @@ export default function App() {
                   ? "bg-chery-red border-red-500 shadow-glow-red" 
                   : currentUserRole === "supervisor" 
                   ? "bg-amber-600 border-amber-500" 
-                  : currentUserRole === "magasin" 
-                  ? "bg-neutral-800 border-neutral-700" 
                   : "bg-blue-600 border-blue-500"
               }`}>
-                {currentUserRole === "admin" ? "AA" : currentUserRole === "supervisor" ? "SV" : currentUserRole === "magasin" ? "MG" : "OP"}
+                {currentUserRole === "admin" ? "AA" : currentUserRole === "supervisor" ? "SV" : "OP"}
               </div>
             </div>
 
