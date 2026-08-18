@@ -87,6 +87,7 @@ export default function ContractsManager({
   // Contract Modal States
   const [showAddContract, setShowAddContract] = useState(false);
   const [editingContract, setEditingContract] = useState<MaintenanceContract | null>(null);
+  const [contractToDelete, setContractToDelete] = useState<MaintenanceContract | null>(null);
 
   // New Contract Form State
   const [contractTitle, setContractTitle] = useState("");
@@ -181,15 +182,7 @@ export default function ContractsManager({
   };
 
   const handleDeleteContractAction = (c: MaintenanceContract) => {
-    if (!canModifyContracts || currentRole !== "admin") {
-      alert("⛔ Seul l'Administrateur est autorisé à supprimer un contrat de maintenance.");
-      return;
-    }
-    if (confirm(`Êtes-vous sûr de vouloir supprimer le contrat "${c.title}" (${c.id}) ?`)) {
-      if (onDeleteContract) {
-        onDeleteContract(c.id);
-      }
-    }
+    setContractToDelete(c);
   };
 
   // New compliance form inputs
@@ -967,6 +960,45 @@ export default function ContractsManager({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM DELETE CONTRACT MODAL */}
+      {contractToDelete && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-xl max-w-sm w-full p-6 text-center space-y-4 animate-scale-up">
+            <div className="w-12 h-12 bg-red-50 text-chery-red rounded-full flex items-center justify-center mx-auto">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-neutral-800">Supprimer le contrat ?</h3>
+              <p className="text-xs text-neutral-500 mt-1">
+                Êtes-vous sûr de vouloir supprimer définitivement le contrat{" "}
+                <strong className="text-neutral-800 font-bold">{contractToDelete.title}</strong> ({contractToDelete.id}) ?
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setContractToDelete(null)}
+                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-xl font-semibold text-xs cursor-pointer transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteContract && contractToDelete) {
+                    onDeleteContract(contractToDelete.id);
+                  }
+                  setContractToDelete(null);
+                }}
+                className="flex-1 bg-chery-red hover:bg-chery-dark text-white py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-colors shadow-sm"
+              >
+                Oui, Supprimer
+              </button>
+            </div>
           </div>
         </div>
       )}

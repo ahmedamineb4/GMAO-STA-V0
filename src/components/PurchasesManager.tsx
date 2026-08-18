@@ -34,6 +34,8 @@ interface PurchasesManagerProps {
   onUpdatePurchaseRequest?: (req: PurchaseRequest) => void;
   onDeletePurchaseRequest?: (id: string) => void;
   onAddVendor: (vendor: Vendor) => void;
+  onUpdateVendor?: (vendor: Vendor) => void;
+  onDeleteVendor?: (id: string) => void;
   isReadOnly?: boolean;
   currentRole?: string;
   allowedWorkshop?: Workshop;
@@ -48,6 +50,8 @@ export default function PurchasesManager({
   onUpdatePurchaseRequest,
   onDeletePurchaseRequest,
   onAddVendor,
+  onUpdateVendor,
+  onDeleteVendor,
   isReadOnly = false,
   currentRole = "admin",
   allowedWorkshop
@@ -99,16 +103,60 @@ export default function PurchasesManager({
     setEditingRequest(null);
   };
 
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [editVendorName, setEditVendorName] = useState("");
+  const [editVendorContact, setEditVendorContact] = useState("");
+  const [editVendorPhone, setEditVendorPhone] = useState("");
+  const [editVendorEmail, setEditVendorEmail] = useState("");
+  const [editVendorServiceType, setEditVendorServiceType] = useState("");
+
+  const handleStartEditVendor = (v: Vendor) => {
+    setEditingVendor(v);
+    setEditVendorName(v.name);
+    setEditVendorContact(v.contactPerson);
+    setEditVendorPhone(v.phone);
+    setEditVendorEmail(v.email);
+    setEditVendorServiceType(v.serviceType);
+  };
+
+  const handleEditVendorSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVendor || !onUpdateVendor) return;
+    const updated: Vendor = {
+      ...editingVendor,
+      name: editVendorName,
+      contactPerson: editVendorContact,
+      phone: editVendorPhone,
+      email: editVendorEmail,
+      serviceType: editVendorServiceType
+    };
+    onUpdateVendor(updated);
+    setEditingVendor(null);
+  };
+
+  const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null);
+  const [requestToDelete, setRequestToDelete] = useState<PurchaseRequest | null>(null);
+
   const handleDelete = (req: PurchaseRequest) => {
-    if (currentRole !== "admin") {
-      alert("⛔ Seul l'Administrateur peut supprimer une demande d'achat.");
-      return;
+    setRequestToDelete(req);
+  };
+
+  const confirmDeleteRequest = () => {
+    if (requestToDelete && onDeletePurchaseRequest) {
+      onDeletePurchaseRequest(requestToDelete.id);
     }
-    if (confirm(`Êtes-vous sûr de vouloir supprimer la demande d'achat ${req.id} (${req.equipmentName}) ?`)) {
-      if (onDeletePurchaseRequest) {
-        onDeletePurchaseRequest(req.id);
-      }
+    setRequestToDelete(null);
+  };
+
+  const handleDeleteVendor = (vendor: Vendor) => {
+    setVendorToDelete(vendor);
+  };
+
+  const confirmDeleteVendor = () => {
+    if (vendorToDelete && onDeleteVendor) {
+      onDeleteVendor(vendorToDelete.id);
     }
+    setVendorToDelete(null);
   };
 
   // Auth/Role rules
@@ -661,10 +709,129 @@ export default function PurchasesManager({
                       {purchaseRequests.filter((r) => r.vendorId === vendor.id).length} demande(s)
                     </span>
                   </div>
+
+                  {/* Actions for Vendor: Edit / Delete */}
+                  {(canManageVendors || currentRole === "admin") && (
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                      {onUpdateVendor && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditVendor(vendor)}
+                          className="flex items-center gap-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold px-2.5 py-1 rounded-lg text-[10px] cursor-pointer transition-colors"
+                          title="Modifier ce prestataire"
+                        >
+                          <Edit2 className="h-3 w-3 text-neutral-600" />
+                          Modifier
+                        </button>
+                      )}
+                      {currentRole === "admin" && onDeleteVendor && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteVendor(vendor)}
+                          className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-chery-red font-bold px-2.5 py-1 rounded-lg text-[10px] cursor-pointer transition-colors"
+                          title="Supprimer ce prestataire (Admin)"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Supprimer
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* EDIT VENDOR MODAL */}
+      {editingVendor && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-neutral-100">
+              <h3 className="text-base font-bold text-neutral-800 flex items-center gap-2">
+                <Building className="h-5 w-5 text-chery-red" />
+                Modifier le Fournisseur ({editingVendor.id})
+              </h3>
+              <button
+                onClick={() => setEditingVendor(null)}
+                className="p-1 rounded-full hover:bg-neutral-100 text-neutral-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditVendorSubmit} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Raison Sociale *</label>
+                <input
+                  type="text"
+                  required
+                  value={editVendorName}
+                  onChange={(e) => setEditVendorName(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white font-bold outline-none focus:ring-1 focus:ring-chery-red"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Interlocuteur / Contact *</label>
+                <input
+                  type="text"
+                  required
+                  value={editVendorContact}
+                  onChange={(e) => setEditVendorContact(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Téléphone</label>
+                  <input
+                    type="text"
+                    value={editVendorPhone}
+                    onChange={(e) => setEditVendorPhone(e.target.value)}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white font-mono outline-none focus:ring-1 focus:ring-chery-red"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editVendorEmail}
+                    onChange={(e) => setEditVendorEmail(e.target.value)}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-600 mb-1">Type de Prestation / Spécialité</label>
+                <input
+                  type="text"
+                  value={editVendorServiceType}
+                  onChange={(e) => setEditVendorServiceType(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-neutral-100 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingVendor(null)}
+                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-lg font-medium text-center cursor-pointer transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-chery-red hover:bg-chery-dark text-white py-2.5 rounded-lg font-bold text-center cursor-pointer transition-colors shadow-sm"
+                >
+                  Enregistrer
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -1111,6 +1278,74 @@ export default function PurchasesManager({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM DELETE VENDOR MODAL */}
+      {vendorToDelete && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-xl max-w-sm w-full p-6 text-center space-y-4 animate-scale-up">
+            <div className="w-12 h-12 bg-red-50 text-chery-red rounded-full flex items-center justify-center mx-auto">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-neutral-800">Supprimer le fournisseur ?</h3>
+              <p className="text-xs text-neutral-500 mt-1">
+                Êtes-vous sûr de vouloir supprimer définitivement le prestataire{" "}
+                <strong className="text-neutral-800 font-bold">{vendorToDelete.name}</strong> ({vendorToDelete.id}) ?
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setVendorToDelete(null)}
+                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-xl font-semibold text-xs cursor-pointer transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteVendor}
+                className="flex-1 bg-chery-red hover:bg-chery-dark text-white py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-colors shadow-sm"
+              >
+                Oui, Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM DELETE REQUEST MODAL */}
+      {requestToDelete && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-xl max-w-sm w-full p-6 text-center space-y-4 animate-scale-up">
+            <div className="w-12 h-12 bg-red-50 text-chery-red rounded-full flex items-center justify-center mx-auto">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-neutral-800">Supprimer la demande ?</h3>
+              <p className="text-xs text-neutral-500 mt-1">
+                Êtes-vous sûr de vouloir supprimer la demande d'achat{" "}
+                <strong className="text-neutral-800 font-bold">{requestToDelete.id}</strong> ({requestToDelete.equipmentName}) ?
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setRequestToDelete(null)}
+                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-xl font-semibold text-xs cursor-pointer transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteRequest}
+                className="flex-1 bg-chery-red hover:bg-chery-dark text-white py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-colors shadow-sm"
+              >
+                Oui, Supprimer
+              </button>
+            </div>
           </div>
         </div>
       )}

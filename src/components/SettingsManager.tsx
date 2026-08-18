@@ -185,7 +185,7 @@ export default function SettingsManager({
 
   // Default User Profiles fallback if empty
   const defaultProfiles: UserRoleProfile[] = useMemo(() => [
-    { id: "admin", label: "M. Ahmed Amine (Admin)", userFullName: "Ahmed Amine", rights: "Accès total, modifications budget, mots de passe", badge: "Administrateur", pin: passwords.admin || "1924", isSystem: true },
+    { id: "admin", label: "Admin", userFullName: "Admin", rights: "Accès total, modifications budget, mots de passe", badge: "Administrateur", pin: passwords.admin || "1924", isSystem: true },
     { id: "supervisor", label: "Direction / Superviseur", userFullName: "Direction STA", rights: "Lecture seule sur tous les modules", badge: "Superviseur", pin: passwords.supervisor || "1234", isSystem: true },
     { id: "magasin", label: "Responsable Achats & Appro", userFullName: "Sami Ben Ali", rights: "Gestion des commandes de travaux, fournitures et achats", badge: "Achats", pin: passwords.magasin || "2026", isSystem: true },
     { id: "service_rapide", label: "Chef d'Atelier : Service Rapide", userFullName: "Mohamed Ben Amor", rights: "Interventions et pannes sur Service Rapide", badge: "Atelier", pin: passwords.service_rapide || "0000", workshop: "Service Rapide" },
@@ -290,6 +290,7 @@ export default function SettingsManager({
   ];
 
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null);
   const [evName, setEvName] = useState("");
   const [evContact, setEvContact] = useState("");
   const [evPhone, setEvPhone] = useState("");
@@ -1645,20 +1646,14 @@ export default function SettingsManager({
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
-                              {currentRole === "admin" && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (confirm(`Voulez-vous vraiment supprimer le prestataire "${vendor.name}" ?`)) {
-                                      if (onDeleteVendor) onDeleteVendor(vendor.id);
-                                    }
-                                  }}
-                                  title="Supprimer ce prestataire (Admin uniquement)"
-                                  className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => setVendorToDelete(vendor)}
+                                title="Supprimer ce prestataire"
+                                className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             </div>
                           )}
                         </div>
@@ -2400,6 +2395,45 @@ export default function SettingsManager({
           )}
         </div>
       </div>
+
+      {/* CONFIRM DELETE VENDOR MODAL */}
+      {vendorToDelete && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-xl max-w-sm w-full p-6 text-center space-y-4 animate-scale-up">
+            <div className="w-12 h-12 bg-red-50 text-chery-red rounded-full flex items-center justify-center mx-auto">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-neutral-800">Supprimer le fournisseur ?</h3>
+              <p className="text-xs text-neutral-500 mt-1">
+                Êtes-vous sûr de vouloir supprimer définitivement le prestataire{" "}
+                <strong className="text-neutral-800 font-bold">{vendorToDelete.name}</strong> ({vendorToDelete.id}) ?
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setVendorToDelete(null)}
+                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-xl font-semibold text-xs cursor-pointer transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteVendor && vendorToDelete) {
+                    onDeleteVendor(vendorToDelete.id);
+                  }
+                  setVendorToDelete(null);
+                }}
+                className="flex-1 bg-chery-red hover:bg-chery-dark text-white py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-colors shadow-sm"
+              >
+                Oui, Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

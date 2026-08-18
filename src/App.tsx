@@ -405,7 +405,7 @@ export default function App() {
 
   // User Authentication & Access Control States & Editable Profiles
   const DEFAULT_USER_PROFILES: UserRoleProfile[] = [
-    { id: "admin", label: "M. Ahmed Amine (Admin)", userFullName: "Ahmed Amine", rights: "Accès total, modifications budget, mots de passe", badge: "Administrateur", pin: "1924", isSystem: true },
+    { id: "admin", label: "Admin", userFullName: "Admin", rights: "Accès total, modifications budget, mots de passe", badge: "Administrateur", pin: "1924", isSystem: true },
     { id: "supervisor", label: "Superviseur (Lecture seule)", userFullName: "Direction STA", rights: "Lecture seule sur tous les modules", badge: "Superviseur", pin: "1234", isSystem: true },
     { id: "service_rapide", label: "Chef d'Atelier : Service Rapide", userFullName: "Mohamed Ben Amor", rights: "Interventions et pannes sur Service Rapide", badge: "Atelier", pin: "0000", workshop: "Service Rapide" },
     { id: "atelier_mecanique", label: "Chef d'Atelier : Mécanique & Élec", userFullName: "Karim Gharbi", rights: "Interventions et pannes sur Mécanique", badge: "Atelier", pin: "0000", workshop: "Atelier Mécanique" },
@@ -420,7 +420,12 @@ export default function App() {
     if (saved) {
       try {
         const parsed: UserRoleProfile[] = JSON.parse(saved);
-        const filtered = parsed.filter((p) => p.id !== "magasin" && !p.id.includes("magasin"));
+        const filtered = parsed.filter((p) => p.id !== "magasin" && !p.id.includes("magasin")).map((p) => {
+          if (p.id === "admin" && (p.label.includes("Ahmed Amine") || p.userFullName?.includes("Ahmed Amine"))) {
+            return { ...p, label: "Admin", userFullName: "Admin" };
+          }
+          return p;
+        });
         if (filtered.length > 0) return filtered;
       } catch (e) {
         return DEFAULT_USER_PROFILES;
@@ -1578,12 +1583,11 @@ export default function App() {
   };
 
   const handleDeletePurchaseRequest = (id: string) => {
-    if (currentUserRole !== "admin") {
-      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer une demande d'achat.");
-      return;
-    }
     const target = purchaseRequests.find((p) => p.id === id);
-    setPurchaseRequests((prev) => prev.filter((p) => p.id !== id));
+    const nextRequests = purchaseRequests.filter((p) => p.id !== id);
+    setPurchaseRequests(nextRequests);
+    localStorage.setItem("chery_gmao_purchase_requests", JSON.stringify(nextRequests));
+    handleSyncToNeon({ purchaseRequests: nextRequests });
     if (target) {
       logActivity(
         "Suppression DA",
@@ -1618,12 +1622,11 @@ export default function App() {
   };
 
   const handleDeleteContract = (id: string) => {
-    if (currentUserRole !== "admin") {
-      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer un contrat de maintenance.");
-      return;
-    }
     const target = contracts.find((c) => c.id === id);
-    setContracts((prev) => prev.filter((c) => c.id !== id));
+    const nextContracts = contracts.filter((c) => c.id !== id);
+    setContracts(nextContracts);
+    localStorage.setItem("chery_gmao_contracts", JSON.stringify(nextContracts));
+    handleSyncToNeon({ contracts: nextContracts });
     if (target) {
       logActivity(
         "Suppression Contrat",
@@ -1635,36 +1638,46 @@ export default function App() {
   };
 
   const handleAddVendor = (newVendor: Vendor) => {
-    setVendors((prev) => [newVendor, ...prev]);
+    const nextVendors = [newVendor, ...vendors];
+    setVendors(nextVendors);
+    localStorage.setItem("chery_gmao_vendors", JSON.stringify(nextVendors));
+    handleSyncToNeon({ vendors: nextVendors });
     logActivity(
       "Nouveau Fournisseur",
       `Enregistrement du fournisseur agréé : ${newVendor.name} - Spécialité: ${newVendor.serviceType}`,
       "purchase"
     );
+    showToast(`Fournisseur ${newVendor.name} enregistré`, "success");
   };
 
   const handleUpdateVendor = (updatedVendor: Vendor) => {
-    setVendors((prev) => prev.map((v) => (v.id === updatedVendor.id ? updatedVendor : v)));
+    const nextVendors = vendors.map((v) => (v.id === updatedVendor.id ? updatedVendor : v));
+    setVendors(nextVendors);
+    localStorage.setItem("chery_gmao_vendors", JSON.stringify(nextVendors));
+    handleSyncToNeon({ vendors: nextVendors });
     logActivity(
       "Modification Fournisseur",
       `Mise à jour des coordonnées du prestataire : ${updatedVendor.name}`,
       "purchase"
     );
+    showToast(`Fournisseur ${updatedVendor.name} mis à jour`, "success");
   };
 
   const handleDeleteVendor = (vendorId: string) => {
-    if (currentUserRole !== "admin") {
-      alert("⛔ Accès refusé : Seul l'Administrateur (Admin) est autorisé à supprimer un prestataire.");
-      return;
-    }
     const v = vendors.find((x) => x.id === vendorId);
-    setVendors((prev) => prev.filter((x) => x.id !== vendorId));
+    const nextVendors = vendors.filter((x) => x.id !== vendorId);
+    setVendors(nextVendors);
+    localStorage.setItem("chery_gmao_vendors", JSON.stringify(nextVendors));
+    handleSyncToNeon({ vendors: nextVendors });
     if (v) {
       logActivity(
         "Suppression Fournisseur",
         `Suppression du prestataire externe : ${v.name}`,
         "purchase"
       );
+      showToast(`Fournisseur "${v.name}" supprimé avec succès`, "info");
+    } else {
+      showToast("Fournisseur supprimé avec succès", "info");
     }
   };
 
@@ -2468,7 +2481,7 @@ export default function App() {
                 }}
                 className="bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl border border-slate-700 outline-none cursor-pointer shadow-xs transition-all"
               >
-                <option value="admin" className="bg-slate-900 text-white">🔑 Admin: M. Ahmed Amine</option>
+                <option value="admin" className="bg-slate-900 text-white">🔑 Admin</option>
                 <option value="supervisor" className="bg-slate-900 text-white">👁️ Superviseur (Lecture seule)</option>
                 <option value="service_rapide" className="bg-slate-900 text-white">⚡ Atelier Service Rapide</option>
                 <option value="atelier_mecanique" className="bg-slate-900 text-white">⚙️ Atelier Mécanique / élec</option>
@@ -2483,7 +2496,7 @@ export default function App() {
               <div className="text-right hidden sm:block">
                 <span className="font-bold text-xs text-white block leading-tight">
                   {currentUserRole === "admin" 
-                    ? "M. Ahmed Amine" 
+                    ? "Admin" 
                     : currentUserRole === "supervisor" 
                     ? "Superviseur STA" 
                     : "Chef d'Atelier"}
@@ -2503,7 +2516,7 @@ export default function App() {
                   ? "bg-amber-600 border-amber-500" 
                   : "bg-blue-600 border-blue-500"
               }`}>
-                {currentUserRole === "admin" ? "AA" : currentUserRole === "supervisor" ? "SV" : "OP"}
+                {currentUserRole === "admin" ? "AD" : currentUserRole === "supervisor" ? "SV" : "OP"}
               </div>
             </div>
 
@@ -3075,6 +3088,8 @@ export default function App() {
               onUpdatePurchaseRequest={handleUpdatePurchaseRequest}
               onDeletePurchaseRequest={handleDeletePurchaseRequest}
               onAddVendor={handleAddVendor}
+              onUpdateVendor={handleUpdateVendor}
+              onDeleteVendor={handleDeleteVendor}
               isReadOnly={isPurchasesReadOnly}
               currentRole={currentUserRole}
               allowedWorkshop={allowedWorkshop}
