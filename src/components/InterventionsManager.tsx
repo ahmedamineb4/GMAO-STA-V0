@@ -39,7 +39,13 @@ import {
   Edit,
   Trash2,
   Save,
-  AlertCircle
+  AlertCircle,
+  Check,
+  RotateCcw,
+  ListPlus,
+  Pencil,
+  Camera,
+  Upload
 } from "lucide-react";
 import { Equipment, Intervention, InterventionStatus, InterventionType, SparePart, PartUsed } from "../types";
 import { generateInterventionReportPDF } from "../utils/pdfGenerator";
@@ -167,14 +173,28 @@ export default function InterventionsManager({
   // Edit & Delete Modal States
   const [editingIntervention, setEditingIntervention] = useState<Intervention | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editModalChecklistInput, setEditModalChecklistInput] = useState("");
 
-  // Inspection sub-sheet checklist & signature controls
-  const [activeChecklist, setActiveChecklist] = useState<Record<string, boolean>>({});
+  // Inspection sub-sheet checklist & signature controls (Dynamic Custom Check-list)
+  const [drawerChecklist, setDrawerChecklist] = useState<{ id: string; task: string; done: boolean }[]>([]);
+  const [newDrawerTaskInput, setNewDrawerTaskInput] = useState("");
+  const [editingDrawerTaskIdx, setEditingDrawerTaskIdx] = useState<number | null>(null);
+  const [editingDrawerTaskText, setEditingDrawerTaskText] = useState("");
+
+  // Checklist for Work Order creation form
+  const [formChecklist, setFormChecklist] = useState<{ task: string; done: boolean }[]>([]);
+  const [formChecklistInput, setFormChecklistInput] = useState("");
+
   const [signatureName, setSignatureName] = useState("");
   const [realMinutesValue, setRealMinutesValue] = useState<number>(120);
-  const [inspectedPhotos, setInspectedPhotos] = useState<string[]>([]);
+  const [inspectedPhotosBefore, setInspectedPhotosBefore] = useState<string[]>([]);
+  const [inspectedPhotosAfter, setInspectedPhotosAfter] = useState<string[]>([]);
 
-  // Default technical checklists depending on type
+  // Photos for Work Order creation form
+  const [formPhotosBefore, setFormPhotosBefore] = useState<string[]>([]);
+  const [formPhotosAfter, setFormPhotosAfter] = useState<string[]>([]);
+
+  // Default technical checklists depending on type (Baseline models only)
   const DEFAULT_CHECKLISTS = {
     Correctif: [
       "Consigner l'équipement électriquement & pneumatiquement",
@@ -201,6 +221,14 @@ export default function InterventionsManager({
       "Enregistrer les observations pour le rapport officiel Apave"
     ]
   };
+
+  // Sync Form Checklist when opening create form or changing intervention type
+  useEffect(() => {
+    if (showForm && formChecklist.length === 0) {
+      const defs = DEFAULT_CHECKLISTS[newType as keyof typeof DEFAULT_CHECKLISTS] || DEFAULT_CHECKLISTS.Correctif;
+      setFormChecklist(defs.map((t) => ({ task: t, done: false })));
+    }
+  }, [showForm, newType]);
 
   // Filtered interventions
   const filteredInterventions = useMemo(() => {
@@ -231,17 +259,28 @@ export default function InterventionsManager({
   // Load checklist, photos, and real duration when selectedIntervention changes
   useEffect(() => {
     if (selectedIntervention) {
-      // Setup checklist
-      const initial: Record<string, boolean> = {};
-      const items = selectedIntervention.checklist || (DEFAULT_CHECKLISTS[selectedIntervention.type as keyof typeof DEFAULT_CHECKLISTS] || DEFAULT_CHECKLISTS.Correctif).map(t => ({ task: t, done: false }));
-      items.forEach((item) => {
-        const taskName = typeof item === "string" ? item : (item as any).task;
-        const isDone = typeof item === "string" 
-          ? (selectedIntervention.status === "Terminée" || selectedIntervention.status === "Clôturée")
-          : (item as any).done;
-        initial[taskName] = isDone;
-      });
-      setActiveChecklist(initial);
+      // Setup dynamic checklist items
+      let items: { id: string; task: string; done: boolean }[] = [];
+      if (selectedIntervention.checklist && selectedIntervention.checklist.length > 0) {
+        items = selectedIntervention.checklist.map((item, idx) => ({
+          id: `task-${idx}-${Date.now()}`,
+          task: typeof item === "string" ? item : (item as any).task,
+          done: typeof item === "string" 
+            ? (selectedIntervention.status === "Terminée" || selectedIntervention.status === "Clôturée")
+            : Boolean((item as any).done)
+        }));
+      } else {
+        const defs = (DEFAULT_CHECKLISTS[selectedIntervention.type as keyof typeof DEFAULT_CHECKLISTS] || DEFAULT_CHECKLISTS.Correctif);
+        items = defs.map((t, idx) => ({
+          id: `task-${idx}-${Date.now()}`,
+          task: t,
+          done: false
+        }));
+      }
+      setDrawerChecklist(items);
+      setEditingDrawerTaskIdx(null);
+      setEditingDrawerTaskText("");
+      setNewDrawerTaskInput("");
 
       // Setup other details
       const sigName = typeof selectedIntervention.signature === "string" 
@@ -249,9 +288,131 @@ export default function InterventionsManager({
         : selectedIntervention.signature?.name || "";
       setSignatureName(sigName);
       setRealMinutesValue(selectedIntervention.realDurationMinutes || (selectedIntervention.durationHours * 60));
-      setInspectedPhotos(selectedIntervention.photos || []);
+      const pBefore = selectedIntervention.photosBefore || [];
+      const pAfter = selectedIntervention.photosAfter || (selectedIntervention.photosBefore ? [] : (selectedIntervention.photos || []));
+      setInspectedPhotosBefore(pBefore);
+      setInspectedPhotosAfter(pAfter);
     }
   }, [selectedIntervention]);
+
+  // Dynamic Drawer Checklist Actions (Add custom, edit, delete, clear, toggle)
+  const handleAddDrawerCustomTask = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newDrawerTaskInput.trim() || !selectedIntervention) return;
+    const newTask = {
+      id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      task: newDrawerTaskInput.trim(),
+      done: false
+    };
+    const updated = [...drawerChecklist, newTask];
+    setDrawerChecklist(updated);
+    setNewDrawerTaskInput("");
+
+    if (onUpdateIntervention) {
+      onUpdateIntervention({
+        ...selectedIntervention,
+        checklist: updated.map(t => ({ task: t.task, done: t.done }))
+      });
+    }
+    showToast("Point de contrôle personnalisé ajouté.", "success");
+  };
+
+  const handleToggleDrawerTask = (idx: number) => {
+    if (selectedIntervention?.status === "Clôturée") return;
+    const updated = drawerChecklist.map((item, i) => i === idx ? { ...item, done: !item.done } : item);
+    setDrawerChecklist(updated);
+    if (selectedIntervention && onUpdateIntervention) {
+      onUpdateIntervention({
+        ...selectedIntervention,
+        checklist: updated.map(t => ({ task: t.task, done: t.done }))
+      });
+    }
+  };
+
+  const handleDeleteDrawerTask = (idx: number) => {
+    if (selectedIntervention?.status === "Clôturée") return;
+    const updated = drawerChecklist.filter((_, i) => i !== idx);
+    setDrawerChecklist(updated);
+    if (selectedIntervention && onUpdateIntervention) {
+      onUpdateIntervention({
+        ...selectedIntervention,
+        checklist: updated.map(t => ({ task: t.task, done: t.done }))
+      });
+    }
+    showToast("Point de contrôle retiré.", "info");
+  };
+
+  const handleStartEditTask = (idx: number, currentText: string) => {
+    if (selectedIntervention?.status === "Clôturée") return;
+    setEditingDrawerTaskIdx(idx);
+    setEditingDrawerTaskText(currentText);
+  };
+
+  const handleSaveEditTask = (idx: number) => {
+    if (!editingDrawerTaskText.trim()) return;
+    const updated = drawerChecklist.map((item, i) => i === idx ? { ...item, task: editingDrawerTaskText.trim() } : item);
+    setDrawerChecklist(updated);
+    setEditingDrawerTaskIdx(null);
+    setEditingDrawerTaskText("");
+    if (selectedIntervention && onUpdateIntervention) {
+      onUpdateIntervention({
+        ...selectedIntervention,
+        checklist: updated.map(t => ({ task: t.task, done: t.done }))
+      });
+    }
+    showToast("Tâche modifiée avec succès.", "success");
+  };
+
+  const handleClearDrawerChecklist = () => {
+    if (selectedIntervention?.status === "Clôturée") return;
+    setDrawerChecklist([]);
+    if (selectedIntervention && onUpdateIntervention) {
+      onUpdateIntervention({
+        ...selectedIntervention,
+        checklist: []
+      });
+    }
+    showToast("Check-list vidée. Vous pouvez saisir vos tâches personnalisées.", "info");
+  };
+
+  const handleLoadTemplateChecklist = (typeKey: keyof typeof DEFAULT_CHECKLISTS) => {
+    if (selectedIntervention?.status === "Clôturée") return;
+    const defs = DEFAULT_CHECKLISTS[typeKey];
+    const items = defs.map((t, idx) => ({
+      id: `tpl-${typeKey}-${idx}-${Date.now()}`,
+      task: t,
+      done: false
+    }));
+    setDrawerChecklist(items);
+    if (selectedIntervention && onUpdateIntervention) {
+      onUpdateIntervention({
+        ...selectedIntervention,
+        checklist: items.map(t => ({ task: t.task, done: t.done }))
+      });
+    }
+    showToast(`Modèle ${typeKey} chargé.`, "info");
+  };
+
+  // Form (Create Work Order) checklist actions
+  const handleAddFormChecklistItem = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!formChecklistInput.trim()) return;
+    setFormChecklist([...formChecklist, { task: formChecklistInput.trim(), done: false }]);
+    setFormChecklistInput("");
+  };
+
+  const handleRemoveFormChecklistItem = (idx: number) => {
+    setFormChecklist(formChecklist.filter((_, i) => i !== idx));
+  };
+
+  const handleClearFormChecklist = () => {
+    setFormChecklist([]);
+  };
+
+  const handleLoadFormTemplate = (typeKey: keyof typeof DEFAULT_CHECKLISTS) => {
+    const defs = DEFAULT_CHECKLISTS[typeKey] || DEFAULT_CHECKLISTS.Correctif;
+    setFormChecklist(defs.map(t => ({ task: t, done: false })));
+  };
 
   // Total Intervention Costs in historical view
   const aggregateCosts = useMemo(() => {
@@ -317,7 +478,12 @@ export default function InterventionsManager({
       executorType: newExecutorType,
       externalProvider: newExecutorType === "Externe" ? newExternalProvider : undefined,
       priority: newPriority,
-      checklist: (DEFAULT_CHECKLISTS[newType as keyof typeof DEFAULT_CHECKLISTS] || DEFAULT_CHECKLISTS.Correctif).map(t => ({ task: t, done: false }))
+      photosBefore: formPhotosBefore,
+      photosAfter: formPhotosAfter,
+      photos: formPhotosAfter.length > 0 ? formPhotosAfter : formPhotosBefore,
+      checklist: formChecklist.length > 0
+        ? formChecklist.map(t => ({ task: t.task, done: false }))
+        : (DEFAULT_CHECKLISTS[newType as keyof typeof DEFAULT_CHECKLISTS] || DEFAULT_CHECKLISTS.Correctif).map(t => ({ task: t, done: false }))
     };
 
     onAddIntervention(created);
@@ -332,6 +498,10 @@ export default function InterventionsManager({
     setNewTechnician("");
     setNewNotes("");
     setFormPartsUsed([]);
+    setFormChecklist([]);
+    setFormChecklistInput("");
+    setFormPhotosBefore([]);
+    setFormPhotosAfter([]);
     setNewExecutorType("Interne");
     setNewExternalProvider("");
     setNewPriority("Moyenne");
@@ -347,10 +517,10 @@ export default function InterventionsManager({
   const handleSaveInspectionReport = (isValidationAndClosure = false) => {
     if (!selectedIntervention || !onUpdateIntervention) return;
 
-    // Build list of checklist items with their done status
-    const formattedChecklist = Object.entries(activeChecklist).map(([task, done]) => ({
-      task,
-      done
+    // Build list of checklist items with their done status from drawerChecklist
+    const formattedChecklist = drawerChecklist.map((item) => ({
+      task: item.task,
+      done: item.done
     }));
 
     // Auto-fill signature name with assigned technician if blank for rapid closure
@@ -366,7 +536,9 @@ export default function InterventionsManager({
         dataUrl: undefined
       } as any,
       validationBy: isValidationAndClosure ? finalSigName : selectedIntervention.validationBy,
-      photos: inspectedPhotos,
+      photosBefore: inspectedPhotosBefore,
+      photosAfter: inspectedPhotosAfter,
+      photos: inspectedPhotosAfter.length > 0 ? inspectedPhotosAfter : inspectedPhotosBefore,
       checklist: formattedChecklist
     };
 
@@ -414,17 +586,148 @@ export default function InterventionsManager({
     setDeleteConfirmId(null);
   };
 
-  const handleUploadPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Drawer Photo Handlers: AVANT & APRÈS
+  const handleUploadPhotoBefore = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        const url = event.target.result as string;
-        setInspectedPhotos([url, ...inspectedPhotos]);
-      }
-    };
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files);
+    files.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const url = event.target.result as string;
+          setInspectedPhotosBefore(prev => [url, ...prev]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const handleRemovePhotoBefore = (index: number) => {
+    setInspectedPhotosBefore(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleUploadPhotoAfter = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    files.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const url = event.target.result as string;
+          setInspectedPhotosAfter(prev => [url, ...prev]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const handleRemovePhotoAfter = (index: number) => {
+    setInspectedPhotosAfter(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  // Form Creation Photo Handlers
+  const handleUploadFormPhotoBefore = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    files.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const url = event.target.result as string;
+          setFormPhotosBefore(prev => [url, ...prev]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const handleRemoveFormPhotoBefore = (index: number) => {
+    setFormPhotosBefore(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleUploadFormPhotoAfter = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    files.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const url = event.target.result as string;
+          setFormPhotosAfter(prev => [url, ...prev]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const handleRemoveFormPhotoAfter = (index: number) => {
+    setFormPhotosAfter(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  // Edit Modal Photo Handlers
+  const handleUploadEditPhotoBefore = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !editingIntervention) return;
+    const files = Array.from(e.target.files);
+    files.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const url = event.target.result as string;
+          const currentBefore = editingIntervention.photosBefore || [];
+          setEditingIntervention(prev => prev ? {
+            ...prev,
+            photosBefore: [url, ...currentBefore]
+          } : null);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const handleRemoveEditPhotoBefore = (index: number) => {
+    if (!editingIntervention) return;
+    const currentBefore = editingIntervention.photosBefore || [];
+    setEditingIntervention({
+      ...editingIntervention,
+      photosBefore: currentBefore.filter((_, idx) => idx !== index)
+    });
+  };
+
+  const handleUploadEditPhotoAfter = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !editingIntervention) return;
+    const files = Array.from(e.target.files);
+    files.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const url = event.target.result as string;
+          const currentAfter = editingIntervention.photosAfter || editingIntervention.photos || [];
+          setEditingIntervention(prev => prev ? {
+            ...prev,
+            photosAfter: [url, ...currentAfter],
+            photos: [url, ...currentAfter]
+          } : null);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const handleRemoveEditPhotoAfter = (index: number) => {
+    if (!editingIntervention) return;
+    const currentAfter = editingIntervention.photosAfter || editingIntervention.photos || [];
+    const updated = currentAfter.filter((_, idx) => idx !== index);
+    setEditingIntervention({
+      ...editingIntervention,
+      photosAfter: updated,
+      photos: updated
+    });
   };
 
   return (
@@ -1004,39 +1307,227 @@ export default function InterventionsManager({
                 </div>
               </div>
 
-              {/* Interactive Technical Checklist (Check-list optionnelle) */}
-              <div className="space-y-2.5 bg-neutral-50/50 p-3.5 rounded-xl border border-neutral-100">
-                <div className="flex justify-between items-center border-b border-neutral-200/50 pb-1.5">
-                  <h4 className="font-bold text-neutral-700 flex items-center gap-1.5 text-xs">
+              {/* Interactive Technical Checklist (100% Personnalisable & Saisie Libre) */}
+              <div className="space-y-3 bg-neutral-50/70 p-3.5 rounded-xl border border-neutral-200">
+                <div className="flex justify-between items-center border-b border-neutral-200/70 pb-2">
+                  <div className="flex items-center gap-2">
                     <ClipboardList className="h-4 w-4 text-chery-red" />
-                    Check-list Technique de Contrôle
-                  </h4>
-                  <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider">Optionnel</span>
-                </div>
-                
-                <div className="space-y-2 max-h-44 overflow-y-auto">
-                  {Object.keys(activeChecklist).map((item) => {
-                    const checked = activeChecklist[item];
-                    return (
-                      <div
-                        key={item}
-                        onClick={() => {
-                          if (selectedIntervention.status === "Clôturée") return;
-                          setActiveChecklist({ ...activeChecklist, [item]: !checked });
-                        }}
-                        className={`flex items-start gap-2.5 text-xs cursor-pointer select-none py-1 px-1 rounded hover:bg-white transition-colors ${
-                          checked ? "text-neutral-800" : "text-neutral-400"
-                        }`}
-                      >
-                        {checked ? (
-                          <CheckSquare className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
-                        ) : (
-                          <Square className="h-4 w-4 text-neutral-300 shrink-0 mt-0.5" />
-                        )}
-                        <span className="leading-snug text-[11px]">{item}</span>
+                    <div>
+                      <h4 className="font-bold text-neutral-800 text-xs flex items-center gap-1.5">
+                        Check-list Technique de Contrôle
+                        <span className="text-[10px] bg-red-100 text-chery-red font-bold px-1.5 py-0.2 rounded-full">
+                          {drawerChecklist.filter(t => t.done).length}/{drawerChecklist.length}
+                        </span>
+                      </h4>
+                    </div>
+                  </div>
+                  
+                  {selectedIntervention.status !== "Clôturée" && (
+                    <div className="flex items-center gap-1 flex-wrap justify-end">
+                      {drawerChecklist.length > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = drawerChecklist.map(t => ({ ...t, done: true }));
+                              setDrawerChecklist(updated);
+                              if (selectedIntervention && onUpdateIntervention) {
+                                onUpdateIntervention({
+                                  ...selectedIntervention,
+                                  checklist: updated.map(t => ({ task: t.task, done: t.done }))
+                                });
+                              }
+                            }}
+                            className="text-[10px] text-green-700 hover:text-green-800 font-semibold px-2 py-0.5 rounded hover:bg-green-50 transition-colors cursor-pointer border border-green-200"
+                            title="Cocher tous les points réalisés"
+                          >
+                            ✓ Tout cocher
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = drawerChecklist.map(t => ({ ...t, done: false }));
+                              setDrawerChecklist(updated);
+                              if (selectedIntervention && onUpdateIntervention) {
+                                onUpdateIntervention({
+                                  ...selectedIntervention,
+                                  checklist: updated.map(t => ({ task: t.task, done: t.done }))
+                                });
+                              }
+                            }}
+                            className="text-[10px] text-neutral-500 hover:text-neutral-800 font-semibold px-1.5 py-0.5 rounded hover:bg-neutral-200 transition-colors cursor-pointer"
+                            title="Décocher tous les points"
+                          >
+                            Décocher
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleClearDrawerChecklist}
+                            className="text-[10px] text-neutral-500 hover:text-red-600 font-semibold px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors flex items-center gap-0.5 cursor-pointer"
+                            title="Vider la liste pour saisir des tâches 100% personnalisées"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Vider</span>
+                          </button>
+                        </>
+                      )}
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          className="text-[10px] text-neutral-500 hover:text-neutral-800 font-semibold px-1.5 py-0.5 rounded hover:bg-neutral-200 transition-colors cursor-pointer"
+                          title="Modèles standards rapides"
+                        >
+                          Modèles ▾
+                        </button>
+                        <div className="absolute right-0 top-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 px-1 z-30 hidden group-hover:block min-w-[130px]">
+                          <button
+                            type="button"
+                            onClick={() => handleLoadTemplateChecklist("Correctif")}
+                            className="w-full text-left text-[10px] p-1.5 hover:bg-neutral-50 rounded text-neutral-700 font-medium"
+                          >
+                            Modèle Correctif
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleLoadTemplateChecklist("Préventif")}
+                            className="w-full text-left text-[10px] p-1.5 hover:bg-neutral-50 rounded text-neutral-700 font-medium"
+                          >
+                            Modèle Préventif
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleLoadTemplateChecklist("Réglementaire")}
+                            className="w-full text-left text-[10px] p-1.5 hover:bg-neutral-50 rounded text-neutral-700 font-medium"
+                          >
+                            Modèle Réglementaire
+                          </button>
+                        </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Saisie directe d'une tâche personnalisée */}
+                {selectedIntervention.status !== "Clôturée" && (
+                  <form onSubmit={handleAddDrawerCustomTask} className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={newDrawerTaskInput}
+                      onChange={(e) => setNewDrawerTaskInput(e.target.value)}
+                      placeholder="✍️ Taper une tâche / contrôle sur-mesure..."
+                      className="flex-1 text-xs bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-chery-red focus:border-chery-red"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newDrawerTaskInput.trim()}
+                      className="bg-neutral-900 hover:bg-black text-white text-xs font-bold px-3 py-1.5 rounded-lg shrink-0 flex items-center gap-1 disabled:opacity-40 cursor-pointer shadow-2xs"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Ajouter</span>
+                    </button>
+                  </form>
+                )}
+                
+                {/* Liste des tâches interactives avec modification et suppression */}
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                  {drawerChecklist.length === 0 ? (
+                    <div className="text-center py-4 px-2 bg-white rounded-lg border border-dashed border-neutral-200">
+                      <ListPlus className="h-5 w-5 text-neutral-300 mx-auto mb-1" />
+                      <p className="text-[11px] font-bold text-neutral-600">Aucun point de contrôle pour le moment</p>
+                      <p className="text-[10px] text-neutral-400 mt-0.5">
+                        Tapez votre tâche personnalisée ci-dessus pour composer une check-list sur-mesure.
+                      </p>
+                    </div>
+                  ) : (
+                    drawerChecklist.map((item, idx) => {
+                      const isEditingThis = editingDrawerTaskIdx === idx;
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className={`group flex items-start justify-between gap-2 p-2 rounded-lg transition-all border ${
+                            item.done
+                              ? "bg-green-50/50 border-green-200/60 text-neutral-800"
+                              : "bg-white border-neutral-200 text-neutral-700 hover:border-neutral-300"
+                          }`}
+                        >
+                          {isEditingThis ? (
+                            <div className="flex-1 flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                autoFocus
+                                value={editingDrawerTaskText}
+                                onChange={(e) => setEditingDrawerTaskText(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSaveEditTask(idx);
+                                  if (e.key === "Escape") setEditingDrawerTaskIdx(null);
+                                }}
+                                className="w-full text-[11px] bg-white border border-blue-300 rounded p-1 outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditTask(idx)}
+                                className="p-1 bg-green-600 hover:bg-green-700 text-white rounded cursor-pointer"
+                                title="Valider"
+                              >
+                                <Check className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingDrawerTaskIdx(null)}
+                                className="p-1 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 rounded cursor-pointer"
+                                title="Annuler"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <div
+                                onClick={() => handleToggleDrawerTask(idx)}
+                                className="flex items-start gap-2 text-xs cursor-pointer select-none flex-1"
+                              >
+                                {item.done ? (
+                                  <CheckSquare className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+                                ) : (
+                                  <Square className="h-4 w-4 text-neutral-300 group-hover:text-neutral-400 shrink-0 mt-0.5" />
+                                )}
+                                <span className={`leading-snug text-[11px] ${item.done ? "line-through text-neutral-500 font-medium" : "font-medium"}`}>
+                                  {item.task}
+                                </span>
+                              </div>
+
+                              {selectedIntervention.status !== "Clôturée" && (
+                                <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStartEditTask(idx, item.task);
+                                    }}
+                                    className="p-1 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                                    title="Modifier le libellé de la tâche"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteDrawerTask(idx);
+                                    }}
+                                    className="p-1 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                    title="Supprimer cette tâche"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -1053,45 +1544,157 @@ export default function InterventionsManager({
                   />
                 </div>
 
-                {/* Photo attachment board */}
-                <div className="space-y-1.5 pt-2 border-t border-neutral-50">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-neutral-500 text-[11px]">Photos Après Travaux ({inspectedPhotos.length})</span>
-                    {selectedIntervention.status !== "Clôturée" && (
-                      <label className="text-[9px] font-black text-chery-red bg-red-50 hover:bg-red-100 px-1.5 py-0.5 rounded cursor-pointer transition-colors">
-                        Ajouter
-                        <input type="file" accept="image/*" className="hidden" onChange={handleUploadPhoto} />
-                      </label>
+                {/* Double Photo attachment board: AVANT & APRÈS */}
+                <div className="space-y-3 pt-2.5 border-t border-neutral-200">
+                  {/* PHOTOS AVANT INTERVENTION */}
+                  <div className="bg-amber-50/50 border border-amber-200/70 p-2.5 rounded-lg space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1.5">
+                        <Camera className="h-3.5 w-3.5 text-amber-600" />
+                        <span className="font-bold text-amber-900 text-[11px]">
+                          Photos AVANT Intervention ({inspectedPhotosBefore.length})
+                        </span>
+                      </div>
+                      {selectedIntervention.status !== "Clôturée" && (
+                        <label className="text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1 shadow-2xs">
+                          <Plus className="h-3 w-3" />
+                          <span>Ajouter</span>
+                          <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadPhotoBefore} />
+                        </label>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-amber-700/80">
+                      Constat de panne, anomalie constatée ou état initial avant intervention.
+                    </p>
+
+                    {inspectedPhotosBefore.length > 0 ? (
+                      <div className="flex gap-2 overflow-x-auto py-1 pr-1">
+                        {inspectedPhotosBefore.map((ph, i) => (
+                          <div
+                            key={`before-${i}`}
+                            className="relative group h-14 w-20 rounded-lg overflow-hidden border border-amber-300 shrink-0 bg-neutral-900 shadow-2xs hover:border-amber-500 transition-all"
+                          >
+                            <img
+                              src={ph}
+                              alt={`Avant ${i + 1}`}
+                              referrerPolicy="no-referrer"
+                              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                            <div className="absolute top-0.5 left-0.5 bg-black/60 text-[8px] font-black text-amber-300 px-1 py-0.2 rounded">
+                              AVANT
+                            </div>
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setLightboxState({
+                                  isOpen: true,
+                                  images: inspectedPhotosBefore,
+                                  initialIndex: i,
+                                  title: `[AVANT INTERVENTION] ${selectedIntervention.id} - Photo ${i + 1}`
+                                })}
+                                className="p-1 bg-white/20 hover:bg-white/40 text-white rounded cursor-pointer"
+                                title="Agrandir"
+                              >
+                                <ZoomIn className="h-3 w-3" />
+                              </button>
+                              {selectedIntervention.status !== "Clôturée" && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemovePhotoBefore(i);
+                                  }}
+                                  className="p-1 bg-red-600/80 hover:bg-red-600 text-white rounded cursor-pointer"
+                                  title="Supprimer"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-neutral-400 italic py-1 text-center bg-white/60 rounded border border-dashed border-amber-200">
+                        Aucune photo avant travaux attachée
+                      </div>
                     )}
                   </div>
-                  
-                  {inspectedPhotos.length > 0 && (
-                    <div className="flex gap-1.5 overflow-x-auto py-1">
-                      {inspectedPhotos.map((ph, i) => (
-                        <div
-                          key={i}
-                          onClick={() => setLightboxState({
-                            isOpen: true,
-                            images: inspectedPhotos,
-                            initialIndex: i,
-                            title: `Intervention ${selectedIntervention.id} - Photo ${i + 1}`
-                          })}
-                          className="relative group h-11 w-16 rounded-lg overflow-hidden border border-neutral-200 shrink-0 bg-neutral-900 cursor-pointer shadow-2xs hover:border-chery-red transition-all"
-                          title="Cliquer pour agrandir et zoomer la photo"
-                        >
-                          <img
-                            src={ph}
-                            alt="Preuve"
-                            referrerPolicy="no-referrer"
-                            className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-200"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <ZoomIn className="h-3.5 w-3.5 text-white drop-shadow-md" />
-                          </div>
-                        </div>
-                      ))}
+
+                  {/* PHOTOS APRÈS INTERVENTION */}
+                  <div className="bg-green-50/50 border border-green-200/70 p-2.5 rounded-lg space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                        <span className="font-bold text-green-900 text-[11px]">
+                          Photos APRÈS Intervention ({inspectedPhotosAfter.length})
+                        </span>
+                      </div>
+                      {selectedIntervention.status !== "Clôturée" && (
+                        <label className="text-[10px] font-bold text-green-800 bg-green-100 hover:bg-green-200 px-2 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1 shadow-2xs">
+                          <Plus className="h-3 w-3" />
+                          <span>Ajouter</span>
+                          <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadPhotoAfter} />
+                        </label>
+                      )}
                     </div>
-                  )}
+                    <p className="text-[10px] text-green-700/80">
+                      Preuve de réparation, composant neuf installé, équipement remis en service.
+                    </p>
+
+                    {inspectedPhotosAfter.length > 0 ? (
+                      <div className="flex gap-2 overflow-x-auto py-1 pr-1">
+                        {inspectedPhotosAfter.map((ph, i) => (
+                          <div
+                            key={`after-${i}`}
+                            className="relative group h-14 w-20 rounded-lg overflow-hidden border border-green-300 shrink-0 bg-neutral-900 shadow-2xs hover:border-green-500 transition-all"
+                          >
+                            <img
+                              src={ph}
+                              alt={`Après ${i + 1}`}
+                              referrerPolicy="no-referrer"
+                              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                            <div className="absolute top-0.5 left-0.5 bg-black/60 text-[8px] font-black text-green-400 px-1 py-0.2 rounded">
+                              APRÈS
+                            </div>
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setLightboxState({
+                                  isOpen: true,
+                                  images: inspectedPhotosAfter,
+                                  initialIndex: i,
+                                  title: `[APRÈS INTERVENTION] ${selectedIntervention.id} - Photo ${i + 1}`
+                                })}
+                                className="p-1 bg-white/20 hover:bg-white/40 text-white rounded cursor-pointer"
+                                title="Agrandir"
+                              >
+                                <ZoomIn className="h-3 w-3" />
+                              </button>
+                              {selectedIntervention.status !== "Clôturée" && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemovePhotoAfter(i);
+                                  }}
+                                  className="p-1 bg-red-600/80 hover:bg-red-600 text-white rounded cursor-pointer"
+                                  title="Supprimer"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-neutral-400 italic py-1 text-center bg-white/60 rounded border border-dashed border-green-200">
+                        Aucune photo après travaux attachée
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1368,6 +1971,197 @@ export default function InterventionsManager({
                 />
               </div>
 
+              {/* 📋 Check-list Technique Personnalisable à la création */}
+              <div className="space-y-2.5 bg-neutral-50 p-3.5 rounded-xl border border-neutral-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5 font-bold text-neutral-800">
+                    <ClipboardList className="h-4 w-4 text-chery-red" />
+                    <span>Check-list & Points de Contrôle ({formChecklist.filter(t => t.done).length}/{formChecklist.length})</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {formChecklist.length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setFormChecklist(formChecklist.map(t => ({ ...t, done: true })))}
+                          className="text-[10px] text-green-700 hover:text-green-800 font-semibold px-2 py-0.5 rounded hover:bg-green-50 cursor-pointer border border-green-200"
+                        >
+                          ✓ Tout cocher
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormChecklist(formChecklist.map(t => ({ ...t, done: false })))}
+                          className="text-[10px] text-neutral-600 hover:text-neutral-800 font-semibold px-2 py-0.5 rounded hover:bg-neutral-200 cursor-pointer"
+                        >
+                          Décocher tout
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearFormChecklist}
+                          className="text-[10px] text-red-600 hover:text-red-700 font-semibold px-2 py-0.5 rounded hover:bg-red-50 cursor-pointer"
+                        >
+                          Vider tout
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleLoadFormTemplate(newType as keyof typeof DEFAULT_CHECKLISTS)}
+                      className="text-[10px] text-neutral-600 hover:text-neutral-900 font-semibold px-2 py-0.5 rounded hover:bg-neutral-200 cursor-pointer"
+                    >
+                      Modèle {newType}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formChecklistInput}
+                    onChange={(e) => setFormChecklistInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddFormChecklistItem();
+                      }
+                    }}
+                    placeholder="Taper un point de contrôle sur-mesure..."
+                    className="flex-1 text-xs bg-white border border-neutral-300 rounded-lg p-2 outline-none focus:ring-1 focus:ring-chery-red"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddFormChecklistItem()}
+                    disabled={!formChecklistInput.trim()}
+                    className="bg-neutral-800 hover:bg-black text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1 shrink-0 disabled:opacity-40 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Ajouter</span>
+                  </button>
+                </div>
+
+                {formChecklist.length > 0 ? (
+                  <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                    {formChecklist.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs border transition-all ${
+                          item.done
+                            ? "bg-green-50/70 border-green-200 text-neutral-800"
+                            : "bg-white border-neutral-200 text-neutral-700 hover:border-neutral-300"
+                        }`}
+                      >
+                        <div
+                          onClick={() => {
+                            setFormChecklist(formChecklist.map((t, i) => i === idx ? { ...t, done: !t.done } : t));
+                          }}
+                          className="flex items-center gap-2 flex-1 cursor-pointer select-none"
+                        >
+                          {item.done ? (
+                            <CheckSquare className="h-4 w-4 text-green-600 shrink-0" />
+                          ) : (
+                            <Square className="h-4 w-4 text-neutral-400 shrink-0" />
+                          )}
+                          <span className={`leading-snug font-medium ${item.done ? "line-through text-neutral-500" : "text-neutral-800"}`}>
+                            {idx + 1}. {item.task}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFormChecklistItem(idx)}
+                          className="text-neutral-400 hover:text-red-600 p-1 rounded cursor-pointer shrink-0"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-neutral-400 italic text-center py-2">
+                    Aucun point prédéfini. Tapez vos tâches sur-mesure ci-dessus ou chargez un modèle.
+                  </p>
+                )}
+              </div>
+
+              {/* 📷 Double section Photos AVANT & Photos APRÈS à la création */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                {/* Photos Avant Form */}
+                <div className="bg-amber-50/60 border border-amber-200/80 p-3 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900 text-xs">
+                      <Camera className="h-3.5 w-3.5 text-amber-600" />
+                      <span>Photos AVANT ({formPhotosBefore.length})</span>
+                    </div>
+                    <label className="text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1 shadow-2xs">
+                      <Plus className="h-3 w-3" />
+                      <span>Ajouter</span>
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadFormPhotoBefore} />
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-amber-700/80">Photos de l'état initial ou de la défaillance.</p>
+                  
+                  {formPhotosBefore.length > 0 ? (
+                    <div className="flex gap-1.5 overflow-x-auto py-1">
+                      {formPhotosBefore.map((ph, idx) => (
+                        <div key={idx} className="relative group h-12 w-16 rounded-md overflow-hidden border border-amber-300 shrink-0 bg-black">
+                          <img src={ph} alt="Avant" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFormPhotoBefore(idx)}
+                            className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded p-0.5 opacity-80 hover:opacity-100 cursor-pointer"
+                            title="Supprimer"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-neutral-400 italic text-center py-1 bg-white/50 rounded border border-dashed border-amber-200">
+                      Aucune photo avant
+                    </div>
+                  )}
+                </div>
+
+                {/* Photos Après Form */}
+                <div className="bg-green-50/60 border border-green-200/80 p-3 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5 font-bold text-green-900 text-xs">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                      <span>Photos APRÈS ({formPhotosAfter.length})</span>
+                    </div>
+                    <label className="text-[10px] font-bold text-green-800 bg-green-100 hover:bg-green-200 px-2 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1 shadow-2xs">
+                      <Plus className="h-3 w-3" />
+                      <span>Ajouter</span>
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadFormPhotoAfter} />
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-green-700/80">Photos des réparations et tests réussis.</p>
+
+                  {formPhotosAfter.length > 0 ? (
+                    <div className="flex gap-1.5 overflow-x-auto py-1">
+                      {formPhotosAfter.map((ph, idx) => (
+                        <div key={idx} className="relative group h-12 w-16 rounded-md overflow-hidden border border-green-300 shrink-0 bg-black">
+                          <img src={ph} alt="Après" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFormPhotoAfter(idx)}
+                            className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded p-0.5 opacity-80 hover:opacity-100 cursor-pointer"
+                            title="Supprimer"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-neutral-400 italic text-center py-1 bg-white/50 rounded border border-dashed border-green-200">
+                      Aucune photo après
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-neutral-100 flex gap-2">
                 <button
                   type="button"
@@ -1596,6 +2390,247 @@ export default function InterventionsManager({
                   onChange={(e) => setEditingIntervention({ ...editingIntervention, notes: e.target.value })}
                   className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
                 />
+              </div>
+
+              {/* 📋 Custom Check-list in Edit Modal */}
+              <div className="space-y-2.5 bg-neutral-50 p-3.5 rounded-xl border border-neutral-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5 font-bold text-neutral-800">
+                    <ClipboardList className="h-4 w-4 text-chery-red" />
+                    <span>
+                      Points de Contrôle (
+                      {(editingIntervention.checklist || []).filter(t => typeof t === "object" ? Boolean((t as any).done) : false).length}
+                      /{(editingIntervention.checklist || []).length})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {(editingIntervention.checklist?.length || 0) > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = (editingIntervention.checklist || []).map(item => {
+                              const taskText = typeof item === "string" ? item : item.task;
+                              return { task: taskText, done: true };
+                            });
+                            setEditingIntervention({ ...editingIntervention, checklist: updated });
+                          }}
+                          className="text-[10px] text-green-700 hover:text-green-800 font-semibold px-2 py-0.5 rounded hover:bg-green-50 cursor-pointer border border-green-200"
+                        >
+                          ✓ Tout cocher
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = (editingIntervention.checklist || []).map(item => {
+                              const taskText = typeof item === "string" ? item : item.task;
+                              return { task: taskText, done: false };
+                            });
+                            setEditingIntervention({ ...editingIntervention, checklist: updated });
+                          }}
+                          className="text-[10px] text-neutral-600 hover:text-neutral-800 font-semibold px-2 py-0.5 rounded hover:bg-neutral-200 cursor-pointer"
+                        >
+                          Décocher tout
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingIntervention({ ...editingIntervention, checklist: [] })}
+                          className="text-[10px] text-red-600 hover:text-red-700 font-semibold px-2 py-0.5 rounded hover:bg-red-50 cursor-pointer"
+                        >
+                          Vider tout
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const defs = DEFAULT_CHECKLISTS[editingIntervention.type as keyof typeof DEFAULT_CHECKLISTS] || DEFAULT_CHECKLISTS.Correctif;
+                        setEditingIntervention({
+                          ...editingIntervention,
+                          checklist: defs.map(t => ({ task: t, done: false }))
+                        });
+                      }}
+                      className="text-[10px] text-neutral-600 hover:text-neutral-900 font-semibold px-2 py-0.5 rounded hover:bg-neutral-200 cursor-pointer"
+                    >
+                      Modèle {editingIntervention.type}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={editModalChecklistInput}
+                    onChange={(e) => setEditModalChecklistInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (!editModalChecklistInput.trim()) return;
+                        const currentList = editingIntervention.checklist || [];
+                        setEditingIntervention({
+                          ...editingIntervention,
+                          checklist: [...currentList, { task: editModalChecklistInput.trim(), done: false }]
+                        });
+                        setEditModalChecklistInput("");
+                      }
+                    }}
+                    placeholder="Taper un point de contrôle personnalisé..."
+                    className="flex-1 text-xs bg-white border border-neutral-300 rounded-lg p-2 outline-none focus:ring-1 focus:ring-chery-red"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editModalChecklistInput.trim()) return;
+                      const currentList = editingIntervention.checklist || [];
+                      setEditingIntervention({
+                        ...editingIntervention,
+                        checklist: [...currentList, { task: editModalChecklistInput.trim(), done: false }]
+                      });
+                      setEditModalChecklistInput("");
+                    }}
+                    disabled={!editModalChecklistInput.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1 shrink-0 disabled:opacity-40 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Ajouter</span>
+                  </button>
+                </div>
+
+                {editingIntervention.checklist && editingIntervention.checklist.length > 0 ? (
+                  <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                    {editingIntervention.checklist.map((item, idx) => {
+                      const taskName = typeof item === "string" ? item : (item as any).task;
+                      const isDone = typeof item === "object" ? Boolean((item as any).done) : false;
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs border transition-all ${
+                            isDone
+                              ? "bg-green-50/70 border-green-200 text-neutral-800"
+                              : "bg-white border-neutral-200 text-neutral-700 hover:border-neutral-300"
+                          }`}
+                        >
+                          <div
+                            onClick={() => {
+                              const updated = (editingIntervention.checklist || []).map((t, i) => {
+                                if (i !== idx) return t;
+                                const tName = typeof t === "string" ? t : t.task;
+                                return { task: tName, done: !isDone };
+                              });
+                              setEditingIntervention({ ...editingIntervention, checklist: updated });
+                            }}
+                            className="flex items-center gap-2 flex-1 cursor-pointer select-none"
+                          >
+                            {isDone ? (
+                              <CheckSquare className="h-4 w-4 text-green-600 shrink-0" />
+                            ) : (
+                              <Square className="h-4 w-4 text-neutral-400 shrink-0" />
+                            )}
+                            <span className={`leading-snug font-medium ${isDone ? "line-through text-neutral-500" : "text-neutral-800"}`}>
+                              {idx + 1}. {taskName}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = (editingIntervention.checklist || []).filter((_, i) => i !== idx);
+                              setEditingIntervention({ ...editingIntervention, checklist: updated });
+                            }}
+                            className="text-neutral-400 hover:text-red-600 p-1 rounded cursor-pointer shrink-0"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-neutral-400 italic text-center py-2">
+                    Aucun point de contrôle. Saisissez vos tâches libres ci-dessus.
+                  </p>
+                )}
+              </div>
+
+              {/* 📷 Double section Photos AVANT & Photos APRÈS en modification */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                {/* Photos Avant Edit */}
+                <div className="bg-amber-50/60 border border-amber-200/80 p-3 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900 text-xs">
+                      <Camera className="h-3.5 w-3.5 text-amber-600" />
+                      <span>Photos AVANT ({(editingIntervention.photosBefore || []).length})</span>
+                    </div>
+                    <label className="text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1 shadow-2xs">
+                      <Plus className="h-3 w-3" />
+                      <span>Ajouter</span>
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadEditPhotoBefore} />
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-amber-700/80">Photos de l'état initial avant réparation.</p>
+
+                  {(editingIntervention.photosBefore || []).length > 0 ? (
+                    <div className="flex gap-1.5 overflow-x-auto py-1">
+                      {(editingIntervention.photosBefore || []).map((ph, idx) => (
+                        <div key={idx} className="relative group h-12 w-16 rounded-md overflow-hidden border border-amber-300 shrink-0 bg-black">
+                          <img src={ph} alt="Avant" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditPhotoBefore(idx)}
+                            className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded p-0.5 opacity-80 hover:opacity-100 cursor-pointer"
+                            title="Supprimer"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-neutral-400 italic text-center py-1 bg-white/50 rounded border border-dashed border-amber-200">
+                      Aucune photo avant
+                    </div>
+                  )}
+                </div>
+
+                {/* Photos Après Edit */}
+                <div className="bg-green-50/60 border border-green-200/80 p-3 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5 font-bold text-green-900 text-xs">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                      <span>
+                        Photos APRÈS ({(editingIntervention.photosAfter || editingIntervention.photos || []).length})
+                      </span>
+                    </div>
+                    <label className="text-[10px] font-bold text-green-800 bg-green-100 hover:bg-green-200 px-2 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1 shadow-2xs">
+                      <Plus className="h-3 w-3" />
+                      <span>Ajouter</span>
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={handleUploadEditPhotoAfter} />
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-green-700/80">Photos des réparations et remise en état.</p>
+
+                  {(editingIntervention.photosAfter || editingIntervention.photos || []).length > 0 ? (
+                    <div className="flex gap-1.5 overflow-x-auto py-1">
+                      {(editingIntervention.photosAfter || editingIntervention.photos || []).map((ph, idx) => (
+                        <div key={idx} className="relative group h-12 w-16 rounded-md overflow-hidden border border-green-300 shrink-0 bg-black">
+                          <img src={ph} alt="Après" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditPhotoAfter(idx)}
+                            className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded p-0.5 opacity-80 hover:opacity-100 cursor-pointer"
+                            title="Supprimer"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-neutral-400 italic text-center py-1 bg-white/50 rounded border border-dashed border-green-200">
+                      Aucune photo après
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="pt-4 border-t border-neutral-100 flex gap-2">

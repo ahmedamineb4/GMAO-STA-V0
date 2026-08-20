@@ -67,6 +67,8 @@ export interface Intervention {
   checklist?: { task: string; done: boolean }[];
   signature?: { name: string; date: string; dataUrl?: string };
   photos?: string[];
+  photosBefore?: string[];
+  photosAfter?: string[];
   realDurationMinutes?: number;
 }
 

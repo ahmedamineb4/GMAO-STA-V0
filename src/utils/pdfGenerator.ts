@@ -627,6 +627,9 @@ export function generateInterventionReportPDF(intervention: Intervention, equipm
   doc.line(rightColX + 4, sigBoxY + 34, rightColX + colWidth - 8, sigBoxY + 34);
 
   // --- 7. OFFICIAL COMPACT FOOTER (Y: 280 -> 287) ---
+  const hasPhotos = ((intervention.photosBefore?.length || 0) > 0) || ((intervention.photosAfter?.length || 0) > 0) || ((intervention.photos?.length || 0) > 0);
+  const totalPages = hasPhotos ? 2 : 1;
+
   const footerY = 282;
   doc.setDrawColor(226, 232, 240);
   doc.line(leftX, footerY, rightX, footerY);
@@ -637,7 +640,93 @@ export function generateInterventionReportPDF(intervention: Intervention, equipm
   doc.text("SOCIÉTÉ TUNISIENNE D'AUTOMOBILES • PORTAIL GMAO STA CHERY v1.0 • DOCUMENT OFFICIEL DE TRAÇABILITÉ", leftX, footerY + 4.5);
 
   doc.setFont("Helvetica", "bold");
-  doc.text("Page 1 / 1", rightX - doc.getTextWidth("Page 1 / 1"), footerY + 4.5);
+  doc.text(`Page 1 / ${totalPages}`, rightX - doc.getTextWidth(`Page 1 / ${totalPages}`), footerY + 4.5);
+
+  // --- OPTIONAL PAGE 2: PHOTOGRAPHIC ANNEX (BEFORE & AFTER) ---
+  if (hasPhotos) {
+    doc.addPage();
+    drawHeader(doc, `ANNEXE PHOTOGRAPHIQUE - BON N° ${intervention.id}`, `Machine : [${equipment.code}] ${equipment.name} • Date : ${intervention.dateIntervention}`);
+
+    let pY = 50;
+
+    // Photos Avant Section
+    const beforeList = intervention.photosBefore || [];
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(180, 83, 9); // Amber
+    doc.text(`1. PHOTOS AVANT INTERVENTION (CONSTAT / DÉFAILLANCE) [${beforeList.length}]`, leftX, pY);
+    pY += 6;
+
+    if (beforeList.length === 0) {
+      doc.setFont("Helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text("Aucune photo avant intervention attachée à ce dossier.", leftX + 4, pY);
+      pY += 12;
+    } else {
+      let curX = leftX;
+      beforeList.slice(0, 3).forEach((imgData, i) => {
+        try {
+          doc.setFillColor(254, 243, 199);
+          doc.rect(curX - 1, pY - 1, 56, 42, "F");
+          doc.addImage(imgData, "JPEG", curX, pY, 54, 40);
+          doc.setFont("Helvetica", "bold");
+          doc.setFontSize(7);
+          doc.setTextColor(180, 83, 9);
+          doc.text(`Photo Avant #${i + 1}`, curX + 2, pY + 44);
+        } catch (e) {
+          doc.text(`[Photo Avant #${i + 1}]`, curX, pY + 10);
+        }
+        curX += 60;
+      });
+      pY += 50;
+    }
+
+    // Photos Après Section
+    const afterList = intervention.photosAfter || (!intervention.photosBefore ? (intervention.photos || []) : []);
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(16, 124, 65); // Green
+    doc.text(`2. PHOTOS APRÈS INTERVENTION (RÉPARATION / REMISE EN SERVICE) [${afterList.length}]`, leftX, pY);
+    pY += 6;
+
+    if (afterList.length === 0) {
+      doc.setFont("Helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text("Aucune photo après intervention attachée à ce dossier.", leftX + 4, pY);
+      pY += 12;
+    } else {
+      let curX = leftX;
+      afterList.slice(0, 3).forEach((imgData, i) => {
+        try {
+          doc.setFillColor(220, 252, 231);
+          doc.rect(curX - 1, pY - 1, 56, 42, "F");
+          doc.addImage(imgData, "JPEG", curX, pY, 54, 40);
+          doc.setFont("Helvetica", "bold");
+          doc.setFontSize(7);
+          doc.setTextColor(16, 124, 65);
+          doc.text(`Photo Après #${i + 1}`, curX + 2, pY + 44);
+        } catch (e) {
+          doc.text(`[Photo Après #${i + 1}]`, curX, pY + 10);
+        }
+        curX += 60;
+      });
+      pY += 50;
+    }
+
+    // Page 2 Footer
+    doc.setDrawColor(226, 232, 240);
+    doc.line(leftX, footerY, rightX, footerY);
+
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text("SOCIÉTÉ TUNISIENNE D'AUTOMOBILES • PORTAIL GMAO STA CHERY v1.0 • PREUVES VISUELLES", leftX, footerY + 4.5);
+
+    doc.setFont("Helvetica", "bold");
+    doc.text(`Page 2 / ${totalPages}`, rightX - doc.getTextWidth(`Page 2 / ${totalPages}`), footerY + 4.5);
+  }
 
   // Single page download trigger
   doc.save(`Bon_Intervention_${intervention.id}.pdf`);
