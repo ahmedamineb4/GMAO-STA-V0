@@ -1498,6 +1498,33 @@ export default function App() {
       `Intervention ${updatedInt.id} sur ${updatedInt.equipmentCode} mise à jour. Statut: ${updatedInt.status}`,
       "intervention"
     );
+    showToast(`Intervention ${updatedInt.id} modifiée avec succès`, "success");
+  };
+
+  // D3. Delete Intervention
+  const handleDeleteIntervention = (id: string) => {
+    const target = interventions.find((i) => i.id === id);
+    if (!target) return;
+
+    if (allowedWorkshop) {
+      const targetEq = equipments.find((e) => e.code === target.equipmentCode);
+      if (targetEq && targetEq.workshop !== allowedWorkshop) {
+        alert(`⛔ Action non autorisée : Vous pouvez uniquement supprimer les interventions de votre propre atelier (${allowedWorkshop}).`);
+        return;
+      }
+    }
+
+    const nextInterventions = interventions.filter((i) => i.id !== id);
+    setInterventions(nextInterventions);
+    localStorage.setItem("chery_gmao_interventions", JSON.stringify(nextInterventions));
+    handleSyncToNeon({ interventions: nextInterventions });
+
+    logActivity(
+      "Suppression Intervention",
+      `Suppression de l'intervention ${id} (${target.title}) sur l'équipement ${target.equipmentCode}`,
+      "intervention"
+    );
+    showToast(`Intervention ${id} supprimée avec succès`, "info");
   };
 
   // E. Restock Spare Parts
@@ -3001,11 +3028,13 @@ export default function App() {
               onAddIntervention={handleAddIntervention}
               onUpdateInterventionStatus={handleUpdateInterventionStatus}
               onUpdateIntervention={handleUpdateIntervention}
+              onDeleteIntervention={handleDeleteIntervention}
               initialType={selectedMaintenanceType}
               initialStatus={selectedMaintenanceStatus}
               showCalendarByDefault={showMaintenanceCalendar}
               isReadOnly={isEquipmentsReadOnly}
               allowedWorkshop={allowedWorkshop}
+              currentUserRole={currentUserRole}
             />
           )}
 
@@ -3017,11 +3046,13 @@ export default function App() {
               onAddIntervention={handleAddIntervention}
               onUpdateInterventionStatus={handleUpdateInterventionStatus}
               onUpdateIntervention={handleUpdateIntervention}
+              onDeleteIntervention={handleDeleteIntervention}
               initialType="All"
               initialStatus="All"
               showCalendarByDefault={false}
               isReadOnly={isEquipmentsReadOnly}
               allowedWorkshop={allowedWorkshop}
+              currentUserRole={currentUserRole}
             />
           )}
 

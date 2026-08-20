@@ -35,7 +35,11 @@ import {
   Lock,
   ThumbsUp,
   Download,
-  ZoomIn
+  ZoomIn,
+  Edit,
+  Trash2,
+  Save,
+  AlertCircle
 } from "lucide-react";
 import { Equipment, Intervention, InterventionStatus, InterventionType, SparePart, PartUsed } from "../types";
 import { generateInterventionReportPDF } from "../utils/pdfGenerator";
@@ -48,11 +52,13 @@ interface InterventionsManagerProps {
   onAddIntervention: (newInt: Intervention) => void;
   onUpdateInterventionStatus: (id: string, status: InterventionStatus) => void;
   onUpdateIntervention?: (updatedInt: Intervention) => void;
+  onDeleteIntervention?: (id: string) => void;
   initialType?: string;
   initialStatus?: string;
   showCalendarByDefault?: boolean;
   isReadOnly?: boolean;
   allowedWorkshop?: string;
+  currentUserRole?: string;
 }
 
 export default function InterventionsManager({
@@ -62,11 +68,13 @@ export default function InterventionsManager({
   onAddIntervention,
   onUpdateInterventionStatus,
   onUpdateIntervention,
+  onDeleteIntervention,
   initialType = "All",
   initialStatus = "All",
   showCalendarByDefault = false,
   isReadOnly = false,
-  allowedWorkshop
+  allowedWorkshop,
+  currentUserRole
 }: InterventionsManagerProps) {
   // Navigation tabs inside Interventions Manager
   const [viewMode, setViewMode] = useState<"list" | "calendar">(showCalendarByDefault ? "calendar" : "list");
@@ -155,6 +163,10 @@ export default function InterventionsManager({
   const [formPartsUsed, setFormPartsUsed] = useState<PartUsed[]>([]);
   const [selectedPartToAdd, setSelectedPartToAdd] = useState("");
   const [partQtyToAdd, setPartQtyToAdd] = useState<number>(1);
+
+  // Edit & Delete Modal States
+  const [editingIntervention, setEditingIntervention] = useState<Intervention | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Inspection sub-sheet checklist & signature controls
   const [activeChecklist, setActiveChecklist] = useState<Record<string, boolean>>({});
@@ -371,6 +383,37 @@ export default function InterventionsManager({
     }
   };
 
+  // Handle Save Edited Intervention
+  const handleSaveEditIntervention = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingIntervention) return;
+
+    if (!editingIntervention.equipmentCode || !editingIntervention.title || !editingIntervention.technician) {
+      alert("Veuillez renseigner l'Équipement, le Titre et le Technicien.");
+      return;
+    }
+
+    if (onUpdateIntervention) {
+      onUpdateIntervention(editingIntervention);
+    }
+    showToast(`Intervention ${editingIntervention.id} modifiée avec succès.`, "success");
+    setEditingIntervention(null);
+  };
+
+  // Handle Delete Intervention
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmId) return;
+    const idToDelete = deleteConfirmId;
+    if (onDeleteIntervention) {
+      onDeleteIntervention(idToDelete);
+    }
+    if (selectedIntId === idToDelete) {
+      setSelectedIntId(null);
+    }
+    showToast(`Intervention ${idToDelete} supprimée avec succès.`, "info");
+    setDeleteConfirmId(null);
+  };
+
   const handleUploadPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
@@ -562,7 +605,7 @@ export default function InterventionsManager({
                         <th className="py-3 px-4 text-right font-bold">Total (TND)</th>
                         <th className="py-3 px-4">Intervenant</th>
                         <th className="py-3 px-4 text-center">Statut</th>
-                        <th className="py-3 px-4 text-center">PDF</th>
+                        <th className="py-3 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-50 font-medium">
@@ -651,30 +694,50 @@ export default function InterventionsManager({
                                 {int.status}
                               </span>
                             </td>
-                            <td className="py-2 px-2 text-center" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => {
-                                  const associatedEquipment = equipments.find((eq) => eq.code === int.equipmentCode) || {
-                                    code: int.equipmentCode,
-                                    name: "Équipement Non Référencé",
-                                    workshop: "Atelier Diagnostic",
-                                    status: "Opérationnel",
-                                    purchaseDate: "2026-01-01",
-                                    warrantyEnd: "2028-12-31",
-                                    purchasePrice: 15000,
-                                    location: "Ligne A",
-                                    serialNumber: "SN-999-TEMP",
-                                    critical: false,
-                                    mtbfTargetHours: 250,
-                                    mttrTargetHours: 4
-                                  };
-                                  generateInterventionReportPDF(int, associatedEquipment as any);
-                                }}
-                                title="Télécharger le bon en PDF"
-                                className="p-1 hover:bg-red-50 text-neutral-400 hover:text-chery-red rounded transition-colors cursor-pointer inline-flex items-center justify-center"
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </button>
+                            <td className="py-2 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => {
+                                    const associatedEquipment = equipments.find((eq) => eq.code === int.equipmentCode) || {
+                                      code: int.equipmentCode,
+                                      name: "Équipement Non Référencé",
+                                      workshop: "Atelier Diagnostic",
+                                      status: "Opérationnel",
+                                      purchaseDate: "2026-01-01",
+                                      warrantyEnd: "2028-12-31",
+                                      purchasePrice: 15000,
+                                      location: "Ligne A",
+                                      serialNumber: "SN-999-TEMP",
+                                      critical: false,
+                                      mtbfTargetHours: 250,
+                                      mttrTargetHours: 4
+                                    };
+                                    generateInterventionReportPDF(int, associatedEquipment as any);
+                                  }}
+                                  title="Télécharger le bon en PDF"
+                                  className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-neutral-800 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </button>
+                                {!isReadOnly && (
+                                  <>
+                                    <button
+                                      onClick={() => setEditingIntervention({ ...int })}
+                                      title="Modifier ce bon d'intervention"
+                                      className="p-1.5 hover:bg-blue-50 text-neutral-400 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteConfirmId(int.id)}
+                                      title="Supprimer cette intervention"
+                                      className="p-1.5 hover:bg-red-50 text-neutral-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -843,30 +906,55 @@ export default function InterventionsManager({
                 </button>
               </div>
 
-              {/* PDF Download Button */}
-              <button
-                onClick={() => {
-                  const associatedEquipment = equipments.find((eq) => eq.code === selectedIntervention.equipmentCode) || {
-                    code: selectedIntervention.equipmentCode,
-                    name: "Équipement Non Référencé",
-                    workshop: "Atelier Diagnostic",
-                    status: "Opérationnel",
-                    purchaseDate: "2026-01-01",
-                    warrantyEnd: "2028-12-31",
-                    purchasePrice: 15000,
-                    location: "Ligne A",
-                    serialNumber: "SN-999-TEMP",
-                    critical: false,
-                    mtbfTargetHours: 250,
-                    mttrTargetHours: 4
-                  };
-                  generateInterventionReportPDF(selectedIntervention, associatedEquipment as any);
-                }}
-                className="w-full flex items-center justify-center gap-2 bg-neutral-900 hover:bg-neutral-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-xs cursor-pointer transition-all border border-neutral-800"
-              >
-                <Download className="h-4 w-4 text-chery-red" />
-                Télécharger le Rapport PDF
-              </button>
+              {/* Action Toolbar: PDF, Edit, Delete */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const associatedEquipment = equipments.find((eq) => eq.code === selectedIntervention.equipmentCode) || {
+                      code: selectedIntervention.equipmentCode,
+                      name: "Équipement Non Référencé",
+                      workshop: "Atelier Diagnostic",
+                      status: "Opérationnel",
+                      purchaseDate: "2026-01-01",
+                      warrantyEnd: "2028-12-31",
+                      purchasePrice: 15000,
+                      location: "Ligne A",
+                      serialNumber: "SN-999-TEMP",
+                      critical: false,
+                      mtbfTargetHours: 250,
+                      mttrTargetHours: 4
+                    };
+                    generateInterventionReportPDF(selectedIntervention, associatedEquipment as any);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold py-2.5 px-3 rounded-xl text-xs shadow-xs cursor-pointer transition-all border border-neutral-800"
+                  title="Télécharger le bon d'intervention au format PDF A4"
+                >
+                  <Download className="h-4 w-4 text-chery-red" />
+                  <span>PDF</span>
+                </button>
+
+                {!isReadOnly && (
+                  <>
+                    <button
+                      onClick={() => setEditingIntervention({ ...selectedIntervention })}
+                      className="flex items-center justify-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-2.5 px-3 rounded-xl text-xs shadow-xs cursor-pointer transition-all border border-blue-200"
+                      title="Modifier les détails de ce bon d'intervention"
+                    >
+                      <Edit className="h-4 w-4" />
+                      <span>Modifier</span>
+                    </button>
+
+                    <button
+                      onClick={() => setDeleteConfirmId(selectedIntervention.id)}
+                      className="flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2.5 px-3 rounded-xl text-xs shadow-xs cursor-pointer transition-all border border-red-200"
+                      title="Supprimer définitivement cette intervention"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>Supprimer</span>
+                    </button>
+                  </>
+                )}
+              </div>
 
               {/* Live Status Control inside details */}
               <div className="space-y-1 bg-neutral-50 p-3 rounded-lg border border-neutral-100">
@@ -1299,6 +1387,285 @@ export default function InterventionsManager({
           </div>
         </div>
       )}
+
+      {/* ✏️ Edit Intervention Modal */}
+      {editingIntervention && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full border border-neutral-200 shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in duration-150">
+            <div className="p-5 bg-neutral-900 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-600/20 text-blue-400 rounded-lg border border-blue-500/30">
+                  <Edit className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">Modifier l'Intervention {editingIntervention.id}</h3>
+                  <p className="text-xs text-neutral-400">Mise à jour des informations techniques et statut</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingIntervention(null)}
+                className="p-1 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditIntervention} className="p-6 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
+              {/* Row 1: Target Equipment & Type */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Cible Équipement *</label>
+                  <select
+                    required
+                    value={editingIntervention.equipmentCode}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, equipmentCode: e.target.value })}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none font-medium focus:ring-1 focus:ring-chery-red"
+                  >
+                    {equipments.map((eq) => (
+                      <option key={eq.code} value={eq.code}>
+                        [{eq.code}] {eq.name} ({eq.workshop})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Type d'Intervention</label>
+                  <select
+                    value={editingIntervention.type}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, type: e.target.value as InterventionType })}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none font-semibold focus:ring-1 focus:ring-chery-red"
+                  >
+                    <option value="Correctif">Correctif (Panne / Curatif)</option>
+                    <option value="Préventif">Préventif (Systématique / Planifié)</option>
+                    <option value="Réglementaire">Réglementaire (Conformité Sécurité)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 2: Title & Priority */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <label className="block font-bold text-neutral-700 mb-1">Désignation du Problème / Titre *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingIntervention.title}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, title: e.target.value })}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Niveau de Priorité *</label>
+                  <select
+                    value={editingIntervention.priority || "Moyenne"}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, priority: e.target.value as any })}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none font-bold"
+                  >
+                    <option value="Faible">Faible (Niveau 3)</option>
+                    <option value="Moyenne">Moyenne (Niveau 2)</option>
+                    <option value="Haute">Haute (Crucial)</option>
+                    <option value="Critique">Critique (Bloquant)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">Description détaillée des travaux / symptômes</label>
+                <textarea
+                  rows={2}
+                  value={editingIntervention.description}
+                  onChange={(e) => setEditingIntervention({ ...editingIntervention, description: e.target.value })}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none focus:ring-1 focus:ring-chery-red"
+                />
+              </div>
+
+              {/* Row 3: Dates, Duration, Labor & Parts costs */}
+              <div className="grid grid-cols-4 gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Date d'Intervention</label>
+                  <input
+                    type="date"
+                    value={editingIntervention.dateIntervention}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, dateIntervention: e.target.value })}
+                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Durée (Heures)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={editingIntervention.durationHours}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, durationHours: Number(e.target.value) })}
+                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Main d'Œuvre (TND)</label>
+                  <input
+                    type="number"
+                    value={editingIntervention.costLabor}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, costLabor: Number(e.target.value) })}
+                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Coût Pièces (TND)</label>
+                  <input
+                    type="number"
+                    value={editingIntervention.costParts || 0}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, costParts: Number(e.target.value) })}
+                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Executor Type & Provider */}
+              <div className="grid grid-cols-2 gap-4 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+                <div>
+                  <label className="block font-bold text-neutral-600 mb-1">Type d'Intervenant</label>
+                  <select
+                    value={editingIntervention.executorType || "Interne"}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, executorType: e.target.value as "Interne" | "Externe" })}
+                    className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-semibold"
+                  >
+                    <option value="Interne">Équipe Interne STA</option>
+                    <option value="Externe">Prestataire Externe</option>
+                  </select>
+                </div>
+
+                {editingIntervention.executorType === "Externe" ? (
+                  <div>
+                    <label className="block font-bold text-neutral-600 mb-1">Société Prestataire</label>
+                    <input
+                      type="text"
+                      placeholder="ex: Weinmann, ABAC, Sotradies..."
+                      value={editingIntervention.externalProvider || ""}
+                      onChange={(e) => setEditingIntervention({ ...editingIntervention, externalProvider: e.target.value })}
+                      className="w-full border border-neutral-200 rounded-lg p-2 bg-white outline-none font-medium"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center text-[11px] text-neutral-500 pt-5 pl-1">
+                    🔧 Maintenance interne prise en charge par STA Chery.
+                  </div>
+                )}
+              </div>
+
+              {/* Row 5: Technician & Status */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">
+                    {editingIntervention.executorType === "Externe" ? "Technicien du Prestataire *" : "Technicien Interne Assigné *"}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingIntervention.technician}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, technician: e.target.value })}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Statut du Bon d'Intervention</label>
+                  <select
+                    value={editingIntervention.status}
+                    onChange={(e) => setEditingIntervention({ ...editingIntervention, status: e.target.value as InterventionStatus })}
+                    className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none font-bold"
+                  >
+                    <option value="Nouvelle">Nouvelle</option>
+                    <option value="Planifiée">Planifiée</option>
+                    <option value="En cours">En cours</option>
+                    <option value="En attente">En attente</option>
+                    <option value="Terminée">Terminée</option>
+                    <option value="Clôturée">Clôturée</option>
+                    <option value="Annulée">Annulée</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Diagnostic Notes */}
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">Rapport de diagnostic / Observations</label>
+                <input
+                  type="text"
+                  placeholder="Notes de diagnostic ou observations de réparation"
+                  value={editingIntervention.notes || ""}
+                  onChange={(e) => setEditingIntervention({ ...editingIntervention, notes: e.target.value })}
+                  className="w-full border border-neutral-200 rounded-lg p-2.5 bg-white outline-none"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-neutral-100 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingIntervention(null)}
+                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-lg font-medium text-center cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold text-center cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Enregistrer les modifications</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🗑️ Delete Confirmation Dialog */}
+      {deleteConfirmId && (() => {
+        const intToDelete = interventions.find((i) => i.id === deleteConfirmId);
+        return (
+          <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl max-w-md w-full border border-neutral-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-red-100 text-red-600 rounded-xl">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-neutral-800 text-base">Supprimer l'Intervention</h3>
+                  <p className="text-xs text-neutral-500 font-mono">{deleteConfirmId}</p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-xs space-y-1">
+                <div className="font-bold text-neutral-800">{intToDelete?.title || "Intervention"}</div>
+                <div className="text-neutral-500 flex justify-between">
+                  <span>Équipement: <strong className="font-mono text-neutral-700">{intToDelete?.equipmentCode}</strong></span>
+                  <span>Date: <strong>{intToDelete?.dateIntervention}</strong></span>
+                </div>
+              </div>
+
+              <p className="text-xs text-neutral-600">
+                Êtes-vous certain de vouloir supprimer définitivement cette fiche d'intervention ? Cette action est irréversible.
+              </p>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 py-2.5 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Confirmer la suppression</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 🖼️ High-Res Image Lightbox Modal */}
       {lightboxState && (
